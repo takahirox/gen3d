@@ -86,8 +86,15 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
       if (!e.status) console.error(e.message);
     }
   });
-  server.on('close', () => { if (fs.existsSync(lockFile) && fs.readFileSync(lockFile, 'utf8') === String(process.pid)) fs.unlinkSync(lockFile); });
-  return { server, store, runner };
+  // Closing HTTP stops requests, but modeling may still be saving project state.
+  const closed = new Promise((resolve, reject) => {
+    server.once('close', () => {
+      Promise.resolve(runner.pending).then(() => {
+        if (fs.existsSync(lockFile) && fs.readFileSync(lockFile, 'utf8') === String(process.pid)) fs.unlinkSync(lockFile);
+      }).then(resolve, reject);
+    });
+  });
+  return { server, store, runner, closed };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -96,6 +103,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   app.server.listen(port, '127.0.0.1', () => console.log(`gen3d: http://127.0.0.1:${port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
     // Do not let a restarted server overlap a modeling job still using Blender.
-    app.server.close(async () => { await app.runner.pending; process.exit(0); });
+    app.server.close(async () => { await app.closed; process.exit(0); });
   });
 }

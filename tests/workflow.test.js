@@ -31,7 +31,7 @@ async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
   const dataDir = temporary(t);
   const instance = createApp({ dataDir, generate });
   instance.server.listen(0, '127.0.0.1'); await once(instance.server, 'listening');
-  t.after(async () => { await instance.runner.pending; await new Promise(resolve => instance.server.close(resolve)); });
+  t.after(async () => { await instance.runner.pending; await new Promise(resolve => instance.server.close(resolve)); await instance.closed; });
   const url = `http://127.0.0.1:${instance.server.address().port}`;
   async function request(route, method = 'GET', data, headers = {}) {
     const res = await fetch(url + route, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: data === undefined ? undefined : JSON.stringify(data) });
@@ -109,6 +109,44 @@ test('interrupted jobs recover as failed, and a second server cannot alter activ
   const a = await app(t); const project = a.store.create(input, 'web'); project.versions.push({ id: 'active', status: 'running' }); a.store.save(project);
   assert.throws(() => createApp({ dataDir: a.dataDir }), /already has/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(a.dataDir, project.id, 'project.json'))).versions[0].status, 'running');
+});
+
+test('shutdown retains store ownership through generation and final persistence', async t => {
+  let release; const barrier = new Promise(resolve => { release = resolve; });
+  const a = await app(t, async (p, v, dir) => { await barrier; artifacts(dir); });
+  const p = a.store.create(input, 'web');
+  a.runner.start(p.id, {}, 'web');
+  const lockFile = path.join(a.dataDir, 'server.lock');
+  const projectFile = path.join(a.dataDir, p.id, 'project.json');
+  const save = a.store.save.bind(a.store);
+  let persisted = false;
+  a.store.save = project => {
+    assert.equal(fs.existsSync(lockFile), true);
+    assert.throws(() => createApp({ dataDir: a.dataDir }), /already has/);
+    save(project);
+    persisted = true;
+  };
+  try {
+    await new Promise(resolve => a.server.close(resolve));
+    assert.equal(a.runner.active, true);
+    assert.equal(fs.existsSync(lockFile), true);
+    assert.throws(() => createApp({ dataDir: a.dataDir }), /already has/);
+    assert.equal(JSON.parse(fs.readFileSync(projectFile)).versions[0].status, 'running');
+  } catch (e) {
+    a.store.save = save;
+    throw e;
+  } finally { release(); }
+  await a.closed;
+  assert.equal(persisted, true);
+  assert.equal(a.runner.active, false);
+  assert.equal(fs.existsSync(lockFile), false);
+  assert.equal(JSON.parse(fs.readFileSync(projectFile)).versions[0].status, 'ready');
+  const restarted = createApp({ dataDir: a.dataDir });
+  restarted.server.listen(0, '127.0.0.1'); await once(restarted.server, 'listening');
+  t.after(async () => { restarted.server.close(); await restarted.closed; });
+  assert.equal(restarted.store.get(p.id).versions[0].status, 'ready');
+  restarted.store.update(p.id, { name: 'Edited after shutdown' }, 'web');
+  assert.equal(JSON.parse(fs.readFileSync(projectFile)).name, 'Edited after shutdown');
 });
 
 test('API validates inputs, rejects cross-origin calls and restricts artifacts to the manifest', async t => {
