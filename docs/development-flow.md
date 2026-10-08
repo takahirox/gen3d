@@ -18,7 +18,7 @@ For example, when merge triggers deployment, validate the changed code/configura
 
 Implement the Issue and propose the change through a Pull Request associated with it. Avoid speculative abstractions, unrelated refactoring, and frameworks not needed to satisfy the Issue.
 
-Validation must fit the changed files and available tooling. This repository currently has no application or build/test setup. Do not invent build commands or add an application scaffold, dependencies, or CI merely to document a process. For documentation changes, inspect Markdown and template syntax, resolve local links and anchors, and check whitespace with `git diff --check` (stage new files first and use `git diff --cached --check`). Use existing relevant build/test commands when the repository actually provides them.
+Validation must fit the changed files and available tooling. Application checks are `npm test` and `npm run check`. For Codex/Blender integration changes, run relevant live checks when those prerequisites are available and record actual results; synthetic test artifacts do not demonstrate real generation. See [local setup](local-setup.md) and [recorded validation](validation.md). Do not invent build commands or add dependencies or CI merely to document a process. For documentation changes, inspect Markdown and template syntax, resolve local links and anchors, and check whitespace with `git diff --check` (stage new files first and use `git diff --cached --check`).
 
 Use the PR template to explain:
 
