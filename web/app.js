@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const $ = id => document.getElementById(id);
 let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId = null, loaded = '', model = null, lastState = '', loadToken = 0;
+let followLatest = false;
 let status = { busy: false, usageLimited: false };
 function notify(message) { $('notice').textContent = message; $('notice').hidden = !message; }
 async function api(route, method = 'GET', input) {
@@ -64,37 +65,56 @@ function figure(file, caption) {
   image.src = artifact(file); image.alt = caption; label.textContent = caption; node.append(image, label); return node;
 }
 function render() {
-  $('projects').replaceChildren(...projects.map(p => { const b = button(p.name, () => { projectId = p.id; versionId = null; localStorage.setItem('gen3d-project', p.id); lastState = ''; render(); }); b.classList.toggle('selected', p.id === projectId); return b; }));
+  $('projects').replaceChildren(...projects.map(p => { const b = button(p.name, () => { projectId = p.id; versionId = null; followLatest = false; localStorage.setItem('gen3d-project', p.id); lastState = ''; render(); }); b.classList.toggle('selected', p.id === projectId); return b; }));
   const p = project(); $('empty').hidden = !!p; $('workspace').hidden = !p;
   if (!p) return;
   $('title').textContent = p.name;
   const signature = JSON.stringify(p);
-  if (!versionId || !p.versions.some(v => v.id === versionId)) versionId = p.versions.at(-1)?.id || null;
+  if (followLatest || !versionId || !p.versions.some(v => v.id === versionId)) versionId = p.versions.at(-1)?.id || null;
   const v = p.versions.find(v => v.id === versionId);
-  const projectBusy = p.versions.some(v => v.status === 'running');
+  const sourceConcept = p.concepts.find(c => c.id === v?.conceptId);
+  const projectBusy = p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running');
+  const pendingConcept = p.concepts.some(c => c.prompt === p.prompt && c.status === 'ready' && c.review === 'pending');
+  const pendingPreview = p.versions.some(v => v.status === 'ready' && v.checkpoints?.preview && v.review === 'pending');
+  if (followLatest && !projectBusy && !pendingConcept && v?.status === 'ready') followLatest = false;
+  const pendingInput = ((p.checkpoints.input || p.inputCheckpoint) && p.inputReview !== 'approved') || p.inputReview === 'rejected';
   const busy = status.busy || projectBusy;
   const pendingRefs = p.references.some(r => r.review === 'pending');
-  $('project-state').textContent = status.usageLimited ? 'Codex usage limit' : projectBusy ? 'Modeling in Blender' : pendingRefs ? 'Review references' : v?.status === 'ready' ? `Model ${v.review}` : 'Ready to generate';
-  for (const id of ['generate', 'retry']) $(id).disabled = busy || pendingRefs || status.usageLimited;
+  $('project-state').textContent = status.usageLimited ? 'Codex usage limit' : projectBusy ? 'Generating…' : pendingInput ? 'Review input' : pendingConcept ? 'Review concept image' : pendingPreview ? 'Review 3D preview' : pendingRefs ? 'Review references' : v?.status === 'ready' ? `Model ${v.review}` : 'Ready to generate';
+  for (const id of ['generate', 'retry']) $(id).disabled = busy || pendingRefs || pendingInput || pendingConcept || pendingPreview || status.usageLimited;
   for (const id of ['approve', 'reject']) $(id).disabled = v?.status !== 'ready';
-  $('revise').querySelector('button').disabled = busy || pendingRefs || status.usageLimited || v?.status !== 'ready';
+  $('revise').querySelector('button').disabled = busy || pendingRefs || pendingInput || pendingConcept || pendingPreview || status.usageLimited || v?.status !== 'ready';
+  $('concept-retry').hidden = p.mode !== 'text'; $('concept-heading').hidden = p.mode !== 'text';
+  $('concept-retry').querySelector('button').disabled = busy || pendingInput || pendingPreview || pendingRefs || status.usageLimited;
+  $('checkpoints').querySelector('button').disabled = projectBusy;
   $('edit').querySelector('button').disabled = projectBusy; $('reference').querySelector('button').disabled = projectBusy;
-  $('version-info').textContent = v ? `Version ${v.number} · ${v.kind} · ${v.status} · ${v.review}${v.feedback ? ` · ${v.feedback}` : ''}${v.error ? ` — ${v.error}` : ''}` : 'No versions yet. Generate your first model.';
+  $('version-info').textContent = v ? `Version ${v.number} · ${v.kind} · ${v.status} · ${v.review}${sourceConcept ? ` · concept ${sourceConcept.number}` : ''}${v.feedback ? ` · ${v.feedback}` : ''}${v.error ? ` — ${v.error}` : ''}` : 'No versions yet. Generate your first model.';
   $('model-summary').textContent = v?.summary || '';
-  for (const [id, key] of [['download', 'glb'], ['blend-download', 'blend']]) { $(id).hidden = v?.status !== 'ready'; if (v?.status === 'ready') { $(id).href = artifact(v.artifacts[key]) + '?download=1'; $(id).download = key === 'glb' ? 'model.glb' : 'scene.blend'; } }
+  for (const [id, key] of [['download', 'glb'], ['blend-download', 'blend']]) { $(id).hidden = v?.status !== 'ready' || (v.checkpoints?.preview && v.review !== 'approved'); if (v?.status === 'ready') { $(id).href = artifact(v.artifacts[key]) + '?download=1'; $(id).download = key === 'glb' ? 'model.glb' : 'scene.blend'; } }
   const options = p.versions.map(v => { const option = document.createElement('option'); option.value = v.id; option.textContent = `v${v.number} · ${v.kind} · ${v.status}`; return option; });
   if (!options.length) { const option = document.createElement('option'); option.textContent = 'No model yet'; options.push(option); }
   $('versions').replaceChildren(...options); if (versionId) $('versions').value = versionId;
   if (signature !== lastState) {
     for (const key of ['name', 'prompt']) { const field = $('edit').elements[key]; if (document.activeElement !== field) field.value = p[key]; }
+    for (const key of ['input', 'concept', 'preview']) { const field = $('checkpoints').elements[key]; if (document.activeElement !== field) field.checked = p.checkpoints[key]; }
+    $('checkpoints').querySelector('.concept-setting').hidden = p.mode !== 'text';
+    $('input-review-state').textContent = `Input review: ${p.inputReview}`;
+    $('input-review').replaceChildren(...(p.checkpoints.input || p.inputCheckpoint || p.inputReview === 'rejected' ? ['approved', 'rejected'].map(decision => button(decision === 'approved' ? 'Accept input' : 'Reject input', () => api(`/projects/${p.id}/input/review`, 'POST', { decision }), projectBusy)) : []));
+    $('concepts').replaceChildren(...p.concepts.slice().reverse().map(c => {
+      const node = c.artifacts.image ? figure(c.artifacts.image, `Concept ${c.number} · ${c.review}${c.feedback ? ' · ' + c.feedback : ''}${p.selectedConceptId === c.id ? ' · selected' : ''}${v?.conceptId === c.id ? ` · source of v${v.number}` : ''}`) : document.createElement('div');
+      if (c.status !== 'ready') node.textContent = `Concept ${c.number} · ${c.status}${c.error ? ' — ' + c.error : ''}`;
+      const actions = document.createElement('div'); actions.className = 'reference-actions';
+      if (c.status === 'ready') for (const decision of ['approved', 'rejected']) actions.append(button(decision === 'approved' ? 'Accept concept & model' : 'Reject concept', async () => { followLatest = decision === 'approved'; const current = await api(`/projects/${p.id}/concepts/${c.id}/review`, 'POST', { decision }); versionId = current.versions.at(-1)?.id || null; }, busy || pendingInput || pendingPreview || c.prompt !== p.prompt));
+      node.append(actions); return node;
+    }));
     $('input-image').replaceChildren(...(p.inputImage ? [figure(p.inputImage, 'Original image input')] : []));
     $('references').replaceChildren(...p.references.map(r => {
       const node = figure(r.file, `${r.label} · ${r.review}`), actions = document.createElement('div'); actions.className = 'reference-actions';
       for (const decision of ['approved', 'rejected']) actions.append(button(decision === 'approved' ? 'Approve reference' : 'Reject reference', () => api(`/projects/${p.id}/references/${r.id}/review`, 'POST', { decision }), projectBusy));
       node.append(actions); return node;
     }));
-    $('reference-state').textContent = pendingRefs ? 'Review each pending reference before modeling. Rejected images will not be used.' : 'References are optional. Text prompts can be modeled directly.';
-    $('history').replaceChildren(...p.activity.slice().reverse().map(e => { const li = document.createElement('li'); const n = p.versions.find(v => v.id === e.versionId)?.number; li.textContent = `${new Date(e.at).toLocaleString()} · ${e.actor} · ${e.type.replaceAll('_', ' ')}${n ? ` · v${n}` : ''}${e.decision ? ` · ${e.decision}` : ''}${e.message ? ` · ${e.message}` : ''}`; return li; }));
+    $('reference-state').textContent = pendingRefs ? 'Review each pending reference before modeling. Rejected images will not be used.' : 'Supplementary references are optional. Text input always needs a generated concept image.';
+    $('history').replaceChildren(...p.activity.slice().reverse().map(e => { const li = document.createElement('li'); const n = p.versions.find(v => v.id === e.versionId)?.number, c = p.concepts.find(c => c.id === e.conceptId)?.number; li.textContent = `${new Date(e.at).toLocaleString()} · ${e.actor} · ${e.type.replaceAll('_', ' ')}${n ? ` · v${n}` : ''}${c ? ` · concept ${c}` : ''}${e.decision ? ` · ${e.decision}` : ''}${e.message ? ` · ${e.message}` : ''}`; return li; }));
     lastState = signature;
   }
   const renderKey = v?.artifacts?.render || '';
@@ -111,22 +131,26 @@ async function refresh() {
 }
 function form(id, action) { $(id).onsubmit = event => { event.preventDefault(); safe(() => action(new FormData(event.target))); }; }
 const create = $('create');
-create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; };
+create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; create.querySelector('.concept-setting').hidden = image; };
 form('create', async data => {
-  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, prompt: data.get('prompt'), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
-  projectId = p.id; localStorage.setItem('gen3d-project', p.id); versionId = null; lastState = ''; create.reset(); create.elements.mode.onchange();
+  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, prompt: data.get('prompt'), checkpoints: checkpointData(data), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
+  projectId = p.id; localStorage.setItem('gen3d-project', p.id); versionId = null; followLatest = false; lastState = ''; create.reset(); create.elements.mode.onchange();
 });
+function checkpointData(data) { return Object.fromEntries(['input', 'concept', 'preview'].map(key => [key, data.has(key)])); }
+form('checkpoints', data => api(`/projects/${projectId}`, 'PATCH', { checkpoints: checkpointData(data) }));
+form('concept-retry', async data => { await api(`/projects/${projectId}/concepts`, 'POST', { feedback: data.get('feedback') }); followLatest = true; });
 form('edit', data => api(`/projects/${projectId}`, 'PATCH', { name: data.get('name'), prompt: data.get('prompt') }));
 form('reference', async data => { await api(`/projects/${projectId}/references`, 'POST', { label: data.get('label'), image: await fileImage(data.get('image')) }); $('reference').reset(); });
 async function generate(kind, feedback) {
+  followLatest = true;
   const p = await api(`/projects/${projectId}/generate`, 'POST', { kind, ...(kind === 'revision' ? { sourceVersionId: versionId, feedback } : {}) });
-  versionId = p.versions.at(-1).id;
+  versionId = p.versions.at(-1)?.id || null;
 }
 form('revise', async data => { await generate('revision', data.get('feedback')); $('revise').reset(); });
 $('generate').onclick = () => safe(() => generate('generate'));
 $('retry').onclick = () => safe(() => generate('retry'));
 for (const [id, decision] of [['approve', 'approved'], ['reject', 'rejected']]) $(id).onclick = () => safe(() => api(`/projects/${projectId}/versions/${versionId}/review`, 'POST', { decision }));
-$('versions').onchange = () => { versionId = $('versions').value; render(); };
+$('versions').onchange = () => { followLatest = false; versionId = $('versions').value; render(); };
 $('fit').onclick = fit;
 await safe(refresh);
 setInterval(() => refresh().catch(() => {}), 1500);

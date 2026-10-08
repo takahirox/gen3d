@@ -21,6 +21,12 @@ export function imageData(value) {
   return { bytes, ext: match[1] === 'jpeg' ? 'jpg' : match[1] };
 }
 
+export function checkpoints(value = {}, previous = { input: false, concept: true, preview: true }) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.entries(value).some(([key, v]) => !['input', 'concept', 'preview'].includes(key) || typeof v !== 'boolean')) throw new AppError('Checkpoint settings must be input, concept and preview booleans');
+  return { ...previous, ...value };
+}
+
 // Only the HTTP server owns this store. MCP clients always use that server's API.
 export class Store {
   constructor(root) {
@@ -32,7 +38,18 @@ export class Store {
       const file = path.join(this.root, entry.name, 'project.json');
       if (!fs.existsSync(file)) continue;
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
+      project.checkpoints ??= checkpoints();
+      project.inputReview ??= 'pending';
+      project.inputCheckpoint ??= project.checkpoints.input;
+      project.concepts ??= [];
+      project.selectedConceptId ??= null;
       this.projects.set(project.id, project);
+      for (const concept of project.concepts) {
+        if (concept.status === 'running') {
+          concept.status = 'failed'; concept.error = 'Server stopped during concept generation. Regenerate manually.';
+          this.event(project, 'server', 'concept_interrupted', { conceptId: concept.id });
+        }
+      }
       for (const version of project.versions) {
         if (version.status === 'running') {
           version.status = 'failed'; version.error = 'Server stopped during generation. Retry to create a new version.';
@@ -64,7 +81,8 @@ export class Store {
     if (!['text', 'image'].includes(input.mode)) throw new AppError('Mode must be text or image');
     const prompt = input.mode === 'text' ? text(input.prompt, 'Prompt') : (input.prompt ? text(input.prompt, 'Prompt') : 'Create a 3D model of the subject in the input image.');
     const image = input.mode === 'image' ? imageData(input.image) : null;
-    const p = { id: randomUUID(), name, mode: input.mode, prompt, inputImage: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const settings = checkpoints(input.checkpoints);
+    const p = { id: randomUUID(), name, mode: input.mode, prompt, inputImage: null, checkpoints: settings, inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, references: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -74,12 +92,18 @@ export class Store {
     this.event(p, actor, 'project_created'); this.save(p); return p;
   }
   idle(p) {
-    if (p.versions.some(v => v.status === 'running')) throw new AppError('Wait for the current generation to finish', 409);
+    if (p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running')) throw new AppError('Wait for the current generation to finish', 409);
   }
   update(id, input, actor) {
     const p = this.get(id); this.idle(p);
     const name = input.name === undefined ? p.name : text(input.name, 'Name', 160);
     const prompt = input.prompt === undefined ? p.prompt : text(input.prompt, 'Prompt');
+    if (input.checkpoints !== undefined && actor !== 'web') throw new AppError('Change checkpoint settings in the web UI', 403);
+    const settings = checkpoints(input.checkpoints, p.checkpoints);
+    if (prompt !== p.prompt) { p.inputReview = 'pending'; p.inputCheckpoint = settings.input; p.selectedConceptId = null; }
+    // Changing settings never silently approves an already waiting checkpoint.
+    if (settings.input && !p.checkpoints.input) { p.inputReview = 'pending'; p.inputCheckpoint = true; }
+    p.checkpoints = settings;
     p.name = name; p.prompt = prompt;
     this.event(p, actor, 'project_updated'); this.save(p); return p;
   }
@@ -106,11 +130,36 @@ export class Store {
     const v = p.versions.find(v => v.id === versionId);
     if (!v || v.status !== 'ready') throw new AppError('Choose a completed version');
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
+    if (v.checkpoints?.preview && actor !== 'web') throw new AppError('Preview checkpoint requires a decision in the web UI', 403);
     v.review = decision; this.event(p, actor, 'model_reviewed', { versionId, decision }); this.save(p); return p;
+  }
+  reviewInput(id, decision, actor) {
+    const p = this.get(id); this.idle(p);
+    if (actor !== 'web') throw new AppError('Input checkpoint requires the web UI', 403);
+    if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
+    p.inputReview = decision;
+    this.event(p, actor, 'input_reviewed', { decision }); this.save(p); return p;
+  }
+  reviewConcept(id, conceptId, decision, actor) {
+    const p = this.get(id); this.idle(p);
+    if (actor !== 'web') throw new AppError('Concept checkpoint requires the web UI', 403);
+    const c = p.concepts.find(c => c.id === conceptId && c.status === 'ready');
+    if (!c || c.prompt !== p.prompt) throw new AppError('Choose a completed concept for the current input');
+    if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
+    c.review = decision;
+    if (decision === 'approved') p.selectedConceptId = c.id;
+    else if (p.selectedConceptId === c.id) p.selectedConceptId = null;
+    this.event(p, actor, 'concept_reviewed', { conceptId, decision }); this.save(p); return p;
+  }
+  canExport(id, versionId) {
+    const p = this.get(id), v = p.versions.find(v => v.id === versionId && v.status === 'ready');
+    if (!v) throw new AppError('Choose a completed version');
+    if (v.checkpoints?.preview && v.review !== 'approved') throw new AppError('Approve the 3D preview in the web UI before export', 409);
+    return v;
   }
   artifact(id, relative) {
     const p = this.get(id);
-    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.versions.flatMap(v => Object.values(v.artifacts || {}))].filter(Boolean);
+    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.versions.flatMap(v => Object.values(v.artifacts || {}))].filter(Boolean);
     if (!files.includes(relative)) throw new AppError('Artifact not found', 404);
     const file = path.resolve(this.dir(id), relative);
     if (!file.startsWith(this.dir(id) + path.sep) || fs.lstatSync(file).isSymbolicLink()

@@ -1,0 +1,19 @@
+{
+  "title": "Issue 8 · uploaded image",
+  "version": "84979318-f9a4-473f-92fd-0a8079737a8e",
+  "canvas": true,
+  "download": "http://127.0.0.1:3433/api/projects/bb35cf2f-81ea-4851-b1f3-5c035d6d1668/artifacts/versions/84979318-f9a4-473f-92fd-0a8079737a8e/model.glb?download=1",
+  "activity": 13,
+  "inputImageVisible": true,
+  "referenceImages": 0,
+  "conceptImages": 0,
+  "projectId": "bb35cf2f-81ea-4851-b1f3-5c035d6d1668",
+  "versionId": "84979318-f9a4-473f-92fd-0a8079737a8e",
+  "glbBytes": 316356,
+  "glbSha256": "8ee4bf2fe8125d358ff6fafa162fb42a278f4f9ad5dc2dec7292f659c59bf17d",
+  "orbit": "passed",
+  "pan": "passed",
+  "zoom": "passed",
+  "exceptions": [],
+  "checkedAt": "2026-10-08T13:43:13.840Z"
+}

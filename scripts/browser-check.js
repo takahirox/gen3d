@@ -42,7 +42,8 @@ try {
   await waitFor(`document.querySelector('#versions')?.options.length > 0 && document.querySelector('#title')?.textContent === ${JSON.stringify(project.name)}`);
   await evaluate(`document.querySelector('#versions').value = ${JSON.stringify(version.id)}; document.querySelector('#versions').dispatchEvent(new Event('change'))`);
   await waitFor('document.querySelector("#viewer-message").hidden && !document.querySelector("#download").hidden');
-  const info = await evaluate(`({ title: document.querySelector('#title').textContent, version: document.querySelector('#versions').value, canvas: !!document.querySelector('#viewer canvas'), download: document.querySelector('#download').href, activity: document.querySelector('#history').children.length, inputImageVisible: !!document.querySelector('#input-image img'), referenceImages: document.querySelectorAll('#references img').length })`);
+  const info = await evaluate(`({ title: document.querySelector('#title').textContent, version: document.querySelector('#versions').value, canvas: !!document.querySelector('#viewer canvas'), download: document.querySelector('#download').href, activity: document.querySelector('#history').children.length, inputImageVisible: !!document.querySelector('#input-image img'), referenceImages: document.querySelectorAll('#references img').length, conceptImages: document.querySelectorAll('#concepts img').length })`);
+  if (project.mode === 'text' && (!version.conceptId || !info.conceptImages)) throw new Error('Text model must have a visible source concept');
   const download = await fetch(info.download); const glb = Buffer.from(await download.arrayBuffer());
   if (!download.ok || glb.subarray(0, 4).toString() !== 'glTF') throw new Error('GLB download failed');
   fs.mkdirSync(output, { recursive: true });

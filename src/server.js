@@ -31,7 +31,7 @@ function sendFile(res, file, download) {
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
 
-export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, env = process.env } = {}) {
+export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, env = process.env } = {}) {
   // A single server owns the data directory, even if a second process starts.
   fs.mkdirSync(dataDir, { recursive: true });
   const lockFile = path.join(path.resolve(dataDir), 'server.lock');
@@ -44,7 +44,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
   let store;
   try { store = new Store(dataDir); }
   catch (e) { fs.unlinkSync(lockFile); throw e; }
-  const runner = new Runner(store, { generate, env });
+  const runner = new Runner(store, { generate, conceptGenerator, env });
   const server = http.createServer(async (req, res) => {
     try {
       const address = server.address();
@@ -66,7 +66,15 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         if (!id && req.method === 'POST') return json(res, 201, store.create(await body(req), actor));
         if (id && parts.length === 3 && req.method === 'GET') return json(res, 200, store.get(id));
         if (id && parts.length === 3 && req.method === 'PATCH') return json(res, 200, store.update(id, await body(req), actor));
-        if (parts[3] === 'artifacts' && req.method === 'GET') return sendFile(res, store.artifact(id, parts.slice(4).join('/')), url.searchParams.has('download'));
+        if (parts[3] === 'artifacts' && req.method === 'GET') {
+          const relative = parts.slice(4).join('/');
+          if (url.searchParams.has('download') && parts[4] === 'versions') store.canExport(id, parts[5]);
+          return sendFile(res, store.artifact(id, relative), url.searchParams.has('download'));
+        }
+        if (req.method === 'POST' && parts[3] === 'input' && parts[4] === 'review') return json(res, 200, store.reviewInput(id, (await body(req)).decision, actor));
+        if (req.method === 'POST' && parts[3] === 'concepts' && parts.length === 4) return json(res, 202, runner.regenerateConcept(id, await body(req), actor));
+        if (req.method === 'POST' && parts[3] === 'concepts' && parts[5] === 'review') return json(res, 200, runner.reviewConcept(id, parts[4], (await body(req)).decision, actor));
+        if (req.method === 'GET' && parts[3] === 'versions' && parts[5] === 'export') return json(res, 200, store.canExport(id, parts[4]).artifacts);
         if (req.method === 'POST' && parts[3] === 'generate') return json(res, 202, runner.start(id, await body(req), actor));
         if (req.method === 'POST' && parts[3] === 'references' && parts.length === 4) return json(res, 201, store.addReference(id, await body(req), actor));
         if (req.method === 'POST' && parts[3] === 'references' && parts[5] === 'review') return json(res, 200, store.reviewReference(id, parts[4], (await body(req)).decision, actor));
