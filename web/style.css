@@ -50,3 +50,7 @@ figcaption { font-size: 12px; color: #a6b6cb; margin: 8px 0; overflow-wrap: anyw
 #empty h1 { font-size: 38px; }
 @media (max-width: 1100px) { .studio { grid-template-columns: minmax(0, 1fr); } .review-panel { border-left: 0; padding-left: 0; border-top: 1px solid #303947; padding-top: 20px; } }
 @media (max-width: 700px) { .layout { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid #303947; } main { padding: 20px; } header a span { display: none; } #viewer { height: 350px; } }
+
+.checkpoints { border: 1px solid #3b485d; border-radius: 6px; margin: 12px 0; padding: 12px; }
+.checkpoints label { display: flex; align-items: center; gap: 8px; }
+.checkpoints input { width: auto; margin: 0; }

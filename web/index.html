@@ -22,6 +22,11 @@
           <label>Input type<select name="mode"><option value="text">Text description</option><option value="image">Image</option></select></label>
           <label id="prompt-label">Description<textarea name="prompt" rows="4" placeholder="A small clay robot with rounded shapes" required></textarea></label>
           <label id="image-label" hidden>Input image<input name="image" type="file" accept="image/png,image/jpeg,image/webp"></label>
+<fieldset class="checkpoints"><legend>Pause for review</legend>
+          <label><input type="checkbox" name="input"> After input</label>
+          <label class="concept-setting"><input type="checkbox" name="concept" checked> After concept image (text)</label>
+          <label><input type="checkbox" name="preview" checked> After 3D preview</label>
+          </fieldset>
           <button type="submit">Create project</button>
         </form>
       </details>
@@ -38,13 +43,21 @@
             <div class="version-toolbar"><label>Version<select id="versions"></select></label><a id="download" class="button" hidden>Download GLB</a><a id="blend-download" hidden>Blender scene</a></div>
             <div id="version-info" class="muted"></div>
             <p id="model-summary" class="muted"></p>
-            <div class="actions"><button id="generate">Generate model</button><button id="retry">Retry from input</button><button id="approve">Approve</button><button id="reject" class="secondary">Reject</button></div>
+            <div class="actions"><button id="generate">Start workflow</button><button id="retry">Retry from input</button><button id="approve">Approve</button><button id="reject" class="secondary">Reject</button></div>
             <form id="revise"><label>Revision request<textarea name="feedback" required rows="3" placeholder="Make the arms longer and change the body to blue"></textarea></label><button type="submit">Revise selected version</button></form>
           </section>
           <section class="review-panel">
             <h2>Input & references</h2>
             <form id="edit"><label>Project name<input name="name" required maxlength="160"></label><label>Modeling instructions<textarea name="prompt" required rows="4"></textarea></label><button type="submit" class="secondary">Save instructions</button></form>
+            <form id="checkpoints"><fieldset class="checkpoints"><legend>Pause for review</legend>
+          <label><input type="checkbox" name="input"> After input</label>
+          <label class="concept-setting"><input type="checkbox" name="concept" checked> After concept image (text)</label>
+          <label><input type="checkbox" name="preview" checked> After 3D preview</label>
+          </fieldset><button type="submit" class="secondary">Save checkpoints</button></form>
+            <p id="input-review-state" class="muted"></p><div id="input-review" class="actions"></div>
             <div id="input-image"></div>
+            <h2 id="concept-heading">Concept images</h2><div id="concepts"></div>
+            <form id="concept-retry"><label>Concept revision<textarea name="feedback" rows="2" placeholder="Change the design before modeling"></textarea></label><button type="submit">Regenerate concept</button></form>
             <div id="references"></div>
             <details><summary>Add a reference for review</summary><form id="reference"><label>Label<input name="label" required maxlength="200"></label><label>Reference image<input name="image" type="file" accept="image/png,image/jpeg,image/webp" required></label><button type="submit">Add reference</button></form></details>
             <p id="reference-state" class="muted"></p>
