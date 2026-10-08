@@ -22,7 +22,7 @@ Verify that:
 - validation claims match checks actually performed and their results
 - failures, skipped checks, and unperformed checks are accurately reported with reasons
 
-This repository currently has no application or build/test setup. For documentation changes, check Markdown and template syntax, local links and anchors, and whitespace. Do not demand invented build commands, new dependencies, an application scaffold, or CI solely to validate documentation. Run existing relevant checks when available; do not claim an unperformed check passed.
+Application checks are `npm test` and `npm run check`; live integration validation additionally requires authenticated Codex and a running Blender bridge. Review evidence of real generation separately from synthetic workflow fixtures, following [local setup](local-setup.md) and [recorded validation](validation.md). For documentation changes, check Markdown and template syntax, local links and anchors, and whitespace. Do not demand invented build commands, new dependencies, an application scaffold, or CI solely to validate documentation. Do not claim an unperformed check passed.
 
 ## Check Pre-Merge Acceptance and Post-Merge Verification
 

@@ -1,0 +1,240 @@
+{
+  "validatedAt": "2026-10-08T09:00:54.591Z",
+  "environment": {
+    "node": "v24.12.0",
+    "codex": "0.161.0",
+    "blender": "5.1.2",
+    "chrome": "154.0.8037.99",
+    "platform": "macOS"
+  },
+  "sharedState": {
+    "mcpRenameVisibleInUI": true,
+    "uiPromptReadableInMCP": true,
+    "pendingReferenceBlockedModeling": true,
+    "referenceImageDisplayedAndApprovedInUI": true,
+    "modelApprovedInUI": true,
+    "imageUploadedInUI": true,
+    "imageGenerationStartedInUI": true
+  },
+  "versions": [
+    {
+      "name": "text",
+      "projectId": "d92cc4dc-6af4-40d8-9b85-8ddbf8a33d83",
+      "versionId": "b503c84a-ae41-4dad-8473-6ce712a97065",
+      "number": 4,
+      "mode": "text",
+      "kind": "retry",
+      "prompt": "Create a charming low-poly clay robot: rounded teal body, round cream head, two dark circular eyes, short orange arms and sturdy teal legs. Stand upright. Use simple recognizable mesh geometry and colored materials. No external assets.",
+      "feedback": "",
+      "sourceVersionId": null,
+      "referenceIds": [],
+      "createdAt": "2026-10-08T08:46:51.873Z",
+      "finishedAt": "2026-10-08T08:48:08.433Z",
+      "durationSeconds": 76.56,
+      "metrics": {
+        "meshes": 11
+      },
+      "summary": "Created an upright low-poly clay robot with a rounded teal body, cream head, dark circular eyes, short orange arms, sturdy teal legs, and broad feet. All 11 mesh parts have matte colored materials, and the scene was inspected through gen3d_blender MCP.",
+      "successfulMcpCalls": [
+        "get_scene_info",
+        "execute_blender_code",
+        "get_scene_info",
+        "execute_blender_code",
+        "get_scene_info"
+      ],
+      "files": {
+        "glb": {
+          "file": "text-model.glb",
+          "bytes": 228588,
+          "sha256": "035298c9b0e2de9de146cc9eb38ca79278c72d314bd7f3dae7d9f11f733f98d8"
+        },
+        "blend": {
+          "file": "text-scene.blend",
+          "bytes": 907870,
+          "sha256": "f96193151d1d8d2f98e7e03bc63b38aee5ae08b5bbad58c608b941e91751f73d"
+        },
+        "render": {
+          "file": "text-preview.png",
+          "bytes": 268482,
+          "sha256": "55997efbb2143fa3540c35ce6d5fe1021d0c77bbd349089a2ead2c8c2ab957e0"
+        },
+        "task": {
+          "file": "text-TASK.md",
+          "bytes": 1579,
+          "sha256": "9a9e1a4dcb372156b8adf0dc8c2b18ed95136eb65bf973df46d50c46eec16dd0"
+        },
+        "audit": {
+          "file": "text-mcp-audit.jsonl",
+          "bytes": 458,
+          "sha256": "c1df79f174e574b19603ab95468da7775e31ad50bf27ab791c07f0b067275de0"
+        }
+      },
+      "browser": {
+        "title": "Text demo · clay robot",
+        "version": "b503c84a-ae41-4dad-8473-6ce712a97065",
+        "canvas": true,
+        "download": "http://127.0.0.1:3333/api/projects/d92cc4dc-6af4-40d8-9b85-8ddbf8a33d83/artifacts/versions/b503c84a-ae41-4dad-8473-6ce712a97065/model.glb?download=1",
+        "activity": 32,
+        "inputImageVisible": false,
+        "referenceImages": 0,
+        "projectId": "d92cc4dc-6af4-40d8-9b85-8ddbf8a33d83",
+        "versionId": "b503c84a-ae41-4dad-8473-6ce712a97065",
+        "glbBytes": 228588,
+        "glbSha256": "035298c9b0e2de9de146cc9eb38ca79278c72d314bd7f3dae7d9f11f733f98d8",
+        "orbit": "passed",
+        "pan": "passed",
+        "zoom": "passed",
+        "exceptions": [],
+        "checkedAt": "2026-10-08T08:49:35.482Z"
+      }
+    },
+    {
+      "name": "revision",
+      "projectId": "d92cc4dc-6af4-40d8-9b85-8ddbf8a33d83",
+      "versionId": "600bb937-cd7f-4018-b7bb-51846074ca94",
+      "number": 6,
+      "mode": "text",
+      "kind": "revision",
+      "prompt": "Create a charming low-poly clay robot: rounded teal body, round cream head, two dark circular eyes, short orange arms and sturdy teal legs. Stand upright. Use simple recognizable mesh geometry and colored materials. No external assets. Keep a friendly character-like silhouette.",
+      "feedback": "Make both orange arms substantially longer, keep the pose, and change the teal torso to vivid blue. Preserve the cream head, eyes and legs.",
+      "sourceVersionId": "b503c84a-ae41-4dad-8473-6ce712a97065",
+      "referenceIds": [
+        "2fccb3dc-5273-4a1d-9287-6418601056df"
+      ],
+      "createdAt": "2026-10-08T08:52:45.633Z",
+      "finishedAt": "2026-10-08T08:53:32.939Z",
+      "durationSeconds": 47.306,
+      "metrics": {
+        "meshes": 11
+      },
+      "summary": "Both orange arms are now 65% longer, preserving their shoulder positions and pose. The torso is vivid blue. The cream head, dark eyes, teal legs, and feet remain unchanged. Verified through gen3d_blender MCP.",
+      "successfulMcpCalls": [
+        "get_scene_info",
+        "execute_blender_code",
+        "execute_blender_code",
+        "get_scene_info"
+      ],
+      "files": {
+        "glb": {
+          "file": "revision-model.glb",
+          "bytes": 228796,
+          "sha256": "5cd8ebf1ba68c70896ce0140c64e3a954af980e418be21b5751070a8e11835a2"
+        },
+        "blend": {
+          "file": "revision-scene.blend",
+          "bytes": 839214,
+          "sha256": "d55b1418c7058c3f3a211664f57f43b2820af11f0b323755df3a21b6f1b949cf"
+        },
+        "render": {
+          "file": "revision-preview.png",
+          "bytes": 269742,
+          "sha256": "09a2c3d143454b9e08cd5486651b2367d322d13404bee4cd3ad85fdf9079c4bd"
+        },
+        "task": {
+          "file": "revision-TASK.md",
+          "bytes": 1734,
+          "sha256": "cdd558c530f0dca7e6bc9a03f30a0f957762c563f763cf17466b025bcd822658"
+        },
+        "audit": {
+          "file": "revision-mcp-audit.jsonl",
+          "bytes": 400,
+          "sha256": "38be9ffcc0850d24cdda6f0fff4f08c2ce8bcc6c6fe6d4e2341a9e1cc3c2271a"
+        }
+      },
+      "browser": {
+        "title": "MCP renamed · clay robot",
+        "version": "600bb937-cd7f-4018-b7bb-51846074ca94",
+        "canvas": true,
+        "download": "http://127.0.0.1:3333/api/projects/d92cc4dc-6af4-40d8-9b85-8ddbf8a33d83/artifacts/versions/600bb937-cd7f-4018-b7bb-51846074ca94/model.glb?download=1",
+        "activity": 48,
+        "inputImageVisible": false,
+        "referenceImages": 1,
+        "projectId": "d92cc4dc-6af4-40d8-9b85-8ddbf8a33d83",
+        "versionId": "600bb937-cd7f-4018-b7bb-51846074ca94",
+        "glbBytes": 228796,
+        "glbSha256": "5cd8ebf1ba68c70896ce0140c64e3a954af980e418be21b5751070a8e11835a2",
+        "orbit": "passed",
+        "pan": "passed",
+        "zoom": "passed",
+        "exceptions": [],
+        "checkedAt": "2026-10-08T08:59:31.913Z"
+      }
+    },
+    {
+      "name": "image",
+      "projectId": "26315c95-9394-4488-8421-f1df125c19dc",
+      "versionId": "0abbc90a-8c6d-465b-9ee5-c55e9e9bf19a",
+      "number": 1,
+      "mode": "image",
+      "kind": "generate",
+      "prompt": "Create a 3D model of the subject in the input image.",
+      "feedback": "",
+      "sourceVersionId": null,
+      "referenceIds": [],
+      "createdAt": "2026-10-08T08:54:08.846Z",
+      "finishedAt": "2026-10-08T08:55:13.155Z",
+      "durationSeconds": 64.309,
+      "metrics": {
+        "meshes": 11
+      },
+      "summary": "Created the robot with a faceted ivory head, slate oval eyes, rounded turquoise body and feet, peach arms, and a chest button. Verified all 11 components are meshes with materials, ready for GLB export.",
+      "successfulMcpCalls": [
+        "get_scene_info",
+        "execute_blender_code",
+        "get_scene_info",
+        "execute_blender_code",
+        "get_scene_info"
+      ],
+      "files": {
+        "glb": {
+          "file": "image-model.glb",
+          "bytes": 406384,
+          "sha256": "4064b75f64c80404ef8c3d995cd002b7357a197f005da0f4e98b3ee582024955"
+        },
+        "blend": {
+          "file": "image-scene.blend",
+          "bytes": 1055847,
+          "sha256": "aa4c0ee56f85adb47126d63fbddc2048de9cfc78f706f98070365f307963a24d"
+        },
+        "render": {
+          "file": "image-preview.png",
+          "bytes": 262124,
+          "sha256": "32d2fef541f65bc18a17b6171637e65f47279da5ce32e708ce4e115160de0193"
+        },
+        "task": {
+          "file": "image-TASK.md",
+          "bytes": 1397,
+          "sha256": "4296978a75711b33454c8a794e5fb49e56469c78a8908021cd7070d1f91325be"
+        },
+        "audit": {
+          "file": "image-mcp-audit.jsonl",
+          "bytes": 458,
+          "sha256": "511f6e3a7a0aa130e2b87d1257412cd3f3ba555854bf19fd7ec771721f028a27"
+        }
+      },
+      "browser": {
+        "title": "Image demo · uploaded robot",
+        "version": "0abbc90a-8c6d-465b-9ee5-c55e9e9bf19a",
+        "canvas": true,
+        "download": "http://127.0.0.1:3333/api/projects/26315c95-9394-4488-8421-f1df125c19dc/artifacts/versions/0abbc90a-8c6d-465b-9ee5-c55e9e9bf19a/model.glb?download=1",
+        "activity": 12,
+        "inputImageVisible": true,
+        "referenceImages": 0,
+        "projectId": "26315c95-9394-4488-8421-f1df125c19dc",
+        "versionId": "0abbc90a-8c6d-465b-9ee5-c55e9e9bf19a",
+        "glbBytes": 406384,
+        "glbSha256": "4064b75f64c80404ef8c3d995cd002b7357a197f005da0f4e98b3ee582024955",
+        "orbit": "passed",
+        "pan": "passed",
+        "zoom": "passed",
+        "exceptions": [],
+        "checkedAt": "2026-10-08T08:55:57.682Z"
+      }
+    }
+  ],
+  "preservation": {
+    "originalGlbSha256Unchanged": true,
+    "sourceSceneCopyMatchesOriginal": true,
+    "originalRenderUnchanged": true
+  }
+}

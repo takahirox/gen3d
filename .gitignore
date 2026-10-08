@@ -1,0 +1,4 @@
+node_modules/
+.gen3d/
+__pycache__/
+*.pyc
