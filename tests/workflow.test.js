@@ -11,6 +11,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createApp } from '../src/server.js';
 import { Store, imageData } from '../src/store.js';
+import { mpfbCode, mpfbResult } from '../src/mpfb.js';
+import { matchingComparison } from '../web/modeling-state.js';
 import { CodexReferenceInspector, requiredViews } from '../src/reference-set.js';
 import { CodexConceptGenerator } from '../src/concept.js';
 import { Runner, subscriptionEnv, codexArgs, validateArtifacts, runProcess } from '../src/runner.js';
@@ -34,6 +36,7 @@ function artifacts(dir) {
   fs.writeFileSync(path.join(dir, 'model.glb'), glb);
   fs.writeFileSync(path.join(dir, 'scene.blend'), 'BLENDER-test-fixture');
   fs.writeFileSync(path.join(dir, 'preview.png'), png);
+  for (const view of ['front', 'side', 'three-quarter']) fs.writeFileSync(path.join(dir, view + '.png'), png);
   fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"execute_blender_code"}\n');
 }
 async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
@@ -1182,4 +1185,135 @@ test('continue mode stops on inspection usage limits without retry and preserves
   p.referenceSets[0].status = 'running'; p.referenceSets[0].consistency.status = 'running'; store.save(p);
   const recovered = new Store(dir).get(p.id).referenceSets[0];
   assert.equal(recovered.status, 'failed'); assert.equal(recovered.consistency.status, 'error'); assert.equal(recovered.consistency.outcome, 'blocked');
+});
+
+
+// Issue #16: mocked workflows exercise policy/state; live Blender evidence is separate.
+const mpfbEvidence = { available: true, module: 'bl_ext.user_default.mpfb', mpfbVersion: '2.0.17', blenderVersion: '5.1.2', api: 'HumanService.create_human', vertices: 19158, polygons: 18486, topologyPreserved: true };
+function humanoidArtifacts(dir, mode) {
+  artifacts(dir);
+  if (mode === 'mpfb') {
+    fs.appendFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"create_mpfb_human"}\n');
+    fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify(mpfbEvidence));
+  }
+}
+
+test('modeling selection validates humanoids, preserves references, persists and defaults legacy scenes to scratch', async t => {
+  const root = temporary(t), store = new Store(root), p = store.create({ ...input, profile: 'character' }, 'web');
+  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => humanoidArtifacts(dir, v.modelingMode) });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const baseline = structuredClone(p.versions[0]), concepts = structuredClone(p.concepts), sets = structuredClone(p.referenceSets);
+  store.update(p.id, { modelingMode: 'mpfb' }, 'mcp');
+  assert.deepEqual(p.concepts, concepts); assert.deepEqual(p.referenceSets, sets); assert.deepEqual(p.versions[0], baseline);
+  runner.start(p.id, { kind: 'retry' }, 'web'); await runner.pending;
+  const assisted = p.versions[1]; assert.equal(assisted.status, 'ready'); assert.equal(assisted.modelingMode, 'mpfb');
+  assert.equal(assisted.referenceFingerprint, baseline.referenceFingerprint); assert.deepEqual(assisted.imageInputs, baseline.imageInputs);
+  assert.equal(assisted.referenceSetId, baseline.referenceSetId); assert.equal(assisted.conceptId, baseline.conceptId);
+  assert.equal(matchingComparison(p.versions, assisted).id, baseline.id);
+  assert.ok(assisted.artifacts.front && assisted.artifacts.side && assisted.artifacts['three-quarter'] && assisted.artifacts.mpfb);
+  assert.match(fs.readFileSync(store.artifact(p.id, assisted.artifacts.task), 'utf8'), /create_mpfb_human/);
+  runner.start(p.id, { kind: 'revision', sourceVersionId: baseline.id, feedback: 'Widen shoulders' }, 'web'); await runner.pending;
+  assert.equal(p.versions[2].modelingMode, 'scratch');
+  store.update(p.id, { modelingMode: 'scratch', profile: 'object', prompt: 'A kettle' }, 'web');
+  runner.start(p.id, { kind: 'revision', sourceVersionId: assisted.id, feedback: 'Widen shoulders' }, 'web'); await runner.pending;
+  assert.equal(p.versions[3].modelingMode, 'mpfb'); assert.equal(p.versions[3].profile, 'character');
+  assert.deepEqual(p.versions[3].imageInputs, assisted.imageInputs);
+  assert.match(fs.readFileSync(store.artifact(p.id, p.versions[3].artifacts.task), 'utf8'), /do not call create_mpfb_human again/);
+  assert.equal(new Store(root).get(p.id).versions[1].modelingMode, 'mpfb');
+  assert.throws(() => store.update(p.id, { modelingMode: 'mpfb' }, 'web'), /Humanoid/);
+  assert.throws(() => store.create({ ...input, modelingMode: 'automatic' }, 'web'), /Modeling mode/);
+  assert.throws(() => store.create({ ...input, profile: 'object', modelingMode: 'mpfb' }, 'web'), /Humanoid/);
+  delete p.modelingMode; delete p.versions[0].modelingMode; store.save(p);
+  const legacy = new Store(root).get(p.id); assert.equal(legacy.modelingMode, 'scratch'); assert.equal(legacy.versions[0].modelingMode, 'scratch');
+});
+
+test('MPFB selection cannot dismiss pending review or bypass consistency policy', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, profile: 'character', checkpoints: { ...input.checkpoints, multiView: true } }, 'web');
+  let generations = 0;
+  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => { generations++; humanoidArtifacts(dir, v.modelingMode); } });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const set = p.referenceSets[0]; store.update(p.id, { modelingMode: 'mpfb', consistencySettings: { enabled: false } }, 'web');
+  assert.equal(set.review, 'pending'); assert.equal(set.consistency.status, 'passed');
+  assert.throws(() => runner.start(p.id, {}, 'mcp'), /Review the multi-view/); assert.equal(generations, 0);
+  runner.reviewReferenceSet(p.id, set.id, 'approved', 'web'); await runner.pending;
+  assert.equal(p.versions[0].modelingMode, 'mpfb'); assert.deepEqual(p.versions[0].consistencySettings, set.consistencySettings);
+});
+
+test('MPFB preflight failures stop before scene clearing and modeling; explicit scratch retry works without MPFB', async t => {
+  for (const error of ['MPFB is missing or disabled. Install and enable MPFB; see docs/mpfb.md.', 'MPFB API is incompatible. See docs/mpfb.md.']) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' }, 'web');
+    const calls = [], operations = [];
+    const runner = new Runner(store, { processRunner: async (cmd, args) => { calls.push(args); return args[0] === 'login' ? 'Logged in using ChatGPT' : 'done'; },
+      blender: async (type, { code }) => {
+        operations.push({ type, code });
+        if (code?.includes("gen3d_mpfb_status()))")) throw new Error(error);
+        if (code?.includes('export_scene.gltf')) artifacts(path.join(store.dir(p.id), 'versions', p.versions.at(-1).id));
+      } });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.versions[0].status, 'failed'); assert.equal(p.versions[0].error, error);
+    assert.equal(calls.length, 1); assert.equal(operations.length, 2);
+    assert.ok(!operations.some(o => o.code?.includes('bpy.data.objects.remove')));
+    assert.ok(p.versions[0].artifacts.task); assert.equal(runner.usageLimited, false);
+    store.update(p.id, { modelingMode: 'scratch' }, 'web');
+    runner.start(p.id, { kind: 'retry' }, 'web'); await runner.pending;
+    assert.equal(p.versions[1].status, 'ready'); assert.equal(p.versions[0].modelingMode, 'mpfb');
+  }
+});
+
+test('MPFB production boundary records validation, attaches uploaded image and exposes local creation only in MPFB jobs', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' }, 'web');
+  const calls = [], operations = [];
+  const runner = new Runner(store, { processRunner: async (cmd, args) => { calls.push(args); return args[0] === 'login' ? 'Logged in using ChatGPT' : 'done'; },
+    blender: async (type, { code }) => {
+      operations.push(code);
+      if (code?.includes('GEN3D_MPFB_RESULT=')) return { output: 'local diagnostic\nGEN3D_MPFB_RESULT=' + JSON.stringify(mpfbEvidence) + '\n' };
+      if (code?.includes('export_scene.gltf')) humanoidArtifacts(path.join(store.dir(p.id), 'versions', p.versions.at(-1).id), 'mpfb');
+    } });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const v = p.versions[0]; assert.equal(v.status, 'ready'); assert.deepEqual(v.mpfb, mpfbEvidence); assert.deepEqual(v.imageInputs, [p.inputImage]);
+  const args = calls.find(a => a[0] === 'exec');
+  assert.ok(args.some(a => a.includes('enabled_tools=') && a.includes('create_mpfb_human')));
+  assert.ok(args.some(a => a.includes('GEN3D_MODELING_MODE = "mpfb"')));
+  assert.equal(operations.filter(c => c?.includes('GEN3D_MPFB_RESULT=')).length, 2);
+  assert.ok(codexArgs('/tmp/job', []).some(a => a.includes('enabled_tools=') && !a.includes('mpfb')));
+  assert.throws(() => mpfbResult({ output: 'no result' }), /no result/);
+  assert.equal(mpfbResult({ output: 'GEN3D_MPFB_RESULT={"available":true}\n' }).available, true);
+  assert.match(mpfbCode('create'), /service.create_human/);
+});
+
+test('MPFB cannot finish with a primitive fallback, omitted creation or unverified topology', async t => {
+  for (const failure of ['no creation', 'no body', 'damaged topology', 'missing render']) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' }, 'web');
+    const runner = new Runner(store, { generate: async (p, v, dir) => {
+      humanoidArtifacts(dir, 'mpfb');
+      if (failure === 'no creation') fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"execute_blender_code"}\n');
+      if (failure === 'no body') fs.unlinkSync(path.join(dir, 'mpfb.json'));
+      if (failure === 'damaged topology') fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ ...mpfbEvidence, topologyPreserved: false }));
+      if (failure === 'missing render') fs.unlinkSync(path.join(dir, 'side.png'));
+    } });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.versions[0].status, 'failed'); assert.throws(() => store.canExport(p.id, p.versions[0].id), /completed/);
+  }
+});
+
+test('comparison only pairs completed opposite modes with exactly matching reference fingerprints', () => {
+  const v = { id: 'a', profile: 'character', referenceFingerprint: 'same', modelingMode: 'mpfb', status: 'ready' };
+  const baseline = { ...v, id: 'b', modelingMode: 'scratch' };
+  assert.equal(matchingComparison([v, baseline], v), baseline);
+  for (const patch of [{ referenceFingerprint: 'different' }, { feedback: 'Change the pose' }, { modelingMode: 'mpfb' }, { status: 'failed' }, { profile: 'object' }]) assert.equal(matchingComparison([v, { ...baseline, ...patch }], v), null);
+  assert.equal(matchingComparison([baseline], { ...v, referenceFingerprint: undefined }), null);
+});
+
+test('HTTP and MCP share explicit modeling selection for image and text inputs and validate object exclusion', async t => {
+  const a = await app(t), client = new Client({ name: 'mpfb-test', version: '1' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/mcp.js')], env: { ...process.env, GEN3D_URL: a.url }, stderr: 'pipe' })); t.after(() => client.close());
+  const created = await client.callTool({ name: 'create_project', arguments: { ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' } });
+  const p = JSON.parse(created.content[0].text); assert.equal(p.modelingMode, 'mpfb');
+  assert.equal((await a.request(`/api/projects/${p.id}`)).data.modelingMode, 'mpfb');
+  await a.request(`/api/projects/${p.id}`, 'PATCH', { modelingMode: 'scratch' });
+  const shared = JSON.parse((await client.callTool({ name: 'get_project', arguments: { projectId: p.id } })).content[0].text); assert.equal(shared.modelingMode, 'scratch');
+  await client.callTool({ name: 'update_project', arguments: { projectId: p.id, modelingMode: 'mpfb' } });
+  assert.equal(a.store.get(p.id).modelingMode, 'mpfb');
+  const denied = await client.callTool({ name: 'update_project', arguments: { projectId: p.id, profile: 'object' } }); assert.equal(denied.isError, true);
+  assert.equal((await a.request(`/api/projects/${p.id}`, 'PATCH', { modelingMode: 'anything' })).status, 400);
 });

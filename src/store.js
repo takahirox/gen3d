@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { modelingMode } from './modeling-mode.js';
 import { crc32 } from 'node:zlib';
 import { Transformer } from '@napi-rs/image';
 import { referenceProfile, validateViewSet, consistencySettings, consistencyAllowsModeling } from './reference-set.js';
@@ -78,6 +79,7 @@ export class Store {
       project.checkpoints.multiView ??= true;
       project.consistencySettings = consistencySettings(project.consistencySettings);
       project.profile ??= referenceProfile(undefined, project.prompt);
+      project.modelingMode = modelingMode(project.modelingMode, project.profile);
       project.referenceSets ??= [];
       project.selectedReferenceSetId ??= null;
       project.inputReview ??= 'pending';
@@ -101,6 +103,7 @@ export class Store {
         }
       }
       for (const version of project.versions) {
+        version.modelingMode ??= 'scratch';
         if (version.status === 'running') {
           version.status = 'failed'; version.error = 'Server stopped during generation. Retry to create a new version.';
           this.event(project, 'server', 'generation_interrupted', { versionId: version.id });
@@ -133,7 +136,7 @@ export class Store {
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
     const profile = referenceProfile(input.profile, prompt);
-    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, modelingMode: modelingMode(input.modelingMode, profile), inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -151,6 +154,7 @@ export class Store {
     const prompt = input.prompt === undefined ? p.prompt : text(input.prompt, 'Prompt');
     const profile = referenceProfile(input.profile ?? (prompt === p.prompt ? p.profile : undefined), prompt);
     if (input.checkpoints !== undefined && actor !== 'web') throw new AppError('Change checkpoint settings in the web UI', 403);
+    const method = modelingMode(input.modelingMode ?? p.modelingMode, profile);
     const settings = checkpoints(input.checkpoints, p.checkpoints);
     const consistency = consistencySettings(input.consistencySettings, p.consistencySettings);
     if (prompt !== p.prompt || profile !== p.profile) { p.inputReview = 'pending'; p.inputCheckpoint = settings.input; p.selectedConceptId = null; p.selectedReferenceSetId = null; }
@@ -159,7 +163,7 @@ export class Store {
     p.checkpoints = settings;
     const consistencyChanged = JSON.stringify(consistency) !== JSON.stringify(p.consistencySettings);
     p.consistencySettings = consistency;
-    p.name = name; p.prompt = prompt; p.profile = profile;
+    p.name = name; p.prompt = prompt; p.profile = profile; p.modelingMode = method;
     this.event(p, actor, 'project_updated');
     if (consistencyChanged) this.event(p, actor, 'consistency_settings_updated', { consistencySettings: { ...consistency } });
     this.save(p); return p;

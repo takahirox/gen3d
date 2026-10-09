@@ -1,0 +1,7 @@
+{
+  "live": true,
+  "selectedVersion": "24912daf-cca1-4066-a8c9-6826b4111e3e",
+  "imageCount": 6,
+  "info": "v2 and v1 use the exact same saved reference images, original text and modeling feedback. Compare silhouette, anatomy, joints, face and materials; summaries describe edits and limitations. Aesthetic quality remains subjective.",
+  "exceptions": []
+}

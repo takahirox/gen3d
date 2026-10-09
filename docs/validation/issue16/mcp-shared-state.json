@@ -1,0 +1,124 @@
+{
+  "live": true,
+  "id": "c7785991-d834-43b5-86a5-ed69f9685758",
+  "modelingMode": "mpfb",
+  "profile": "character",
+  "consistencySettings": {
+    "enabled": true,
+    "onFailure": "continue"
+  },
+  "versions": [
+    {
+      "id": "bc9a3d64-c36a-45ae-b1db-99820803c4e5",
+      "kind": "generate",
+      "sourceVersionId": null,
+      "modelingMode": "scratch",
+      "status": "ready",
+      "referenceSetId": "07033b19-b23e-4067-b366-965922c049cf",
+      "conceptId": "e3886297-d3a8-40a7-a38b-569f623fa132",
+      "imageInputs": [
+        "concepts/e3886297-d3a8-40a7-a38b-569f623fa132/concept.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/front.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/side.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/back.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/three-quarter.png"
+      ],
+      "referenceFingerprint": "e75ca5a086e491ad27a03554d6fb0ac65a12e70547f3a0a7fd468d1b38280738",
+      "continuedDespiteInconsistency": true,
+      "artifacts": {
+        "glb": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/model.glb",
+        "blend": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/scene.blend",
+        "render": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/preview.png",
+        "task": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/TASK.md",
+        "audit": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/mcp-audit.jsonl",
+        "front": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/front.png",
+        "side": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/side.png",
+        "three-quarter": "versions/bc9a3d64-c36a-45ae-b1db-99820803c4e5/three-quarter.png"
+      }
+    },
+    {
+      "id": "24912daf-cca1-4066-a8c9-6826b4111e3e",
+      "kind": "retry",
+      "sourceVersionId": null,
+      "modelingMode": "mpfb",
+      "status": "ready",
+      "referenceSetId": "07033b19-b23e-4067-b366-965922c049cf",
+      "conceptId": "e3886297-d3a8-40a7-a38b-569f623fa132",
+      "imageInputs": [
+        "concepts/e3886297-d3a8-40a7-a38b-569f623fa132/concept.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/front.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/side.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/back.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/three-quarter.png"
+      ],
+      "referenceFingerprint": "e75ca5a086e491ad27a03554d6fb0ac65a12e70547f3a0a7fd468d1b38280738",
+      "continuedDespiteInconsistency": true,
+      "mpfb": {
+        "available": true,
+        "module": "bl_ext.gen3d_validation.mpfb",
+        "mpfbVersion": "2.0.17",
+        "blenderVersion": "5.1.2",
+        "api": "HumanService.create_human",
+        "body": "gen3d_mpfb_body",
+        "vertices": 19158,
+        "polygons": 18486,
+        "evaluatedVertices": 53514,
+        "topologyPreserved": true,
+        "topologyHash": "df191766244b0722cb766ad798f38e4ab3e03d3e8eb9a613cf00144fc41b120d"
+      },
+      "artifacts": {
+        "glb": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/model.glb",
+        "blend": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/scene.blend",
+        "render": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/preview.png",
+        "task": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/TASK.md",
+        "audit": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/mcp-audit.jsonl",
+        "front": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/front.png",
+        "side": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/side.png",
+        "three-quarter": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/three-quarter.png",
+        "mpfb": "versions/24912daf-cca1-4066-a8c9-6826b4111e3e/mpfb.json"
+      }
+    },
+    {
+      "id": "47a6f001-82c3-41d0-b11a-faf904ce9450",
+      "kind": "revision",
+      "sourceVersionId": "24912daf-cca1-4066-a8c9-6826b4111e3e",
+      "modelingMode": "mpfb",
+      "status": "ready",
+      "referenceSetId": "07033b19-b23e-4067-b366-965922c049cf",
+      "conceptId": "e3886297-d3a8-40a7-a38b-569f623fa132",
+      "imageInputs": [
+        "concepts/e3886297-d3a8-40a7-a38b-569f623fa132/concept.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/front.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/side.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/back.png",
+        "reference-sets/07033b19-b23e-4067-b366-965922c049cf/three-quarter.png"
+      ],
+      "referenceFingerprint": "e75ca5a086e491ad27a03554d6fb0ac65a12e70547f3a0a7fd468d1b38280738",
+      "continuedDespiteInconsistency": true,
+      "mpfb": {
+        "available": true,
+        "module": "bl_ext.gen3d_validation.mpfb",
+        "mpfbVersion": "2.0.17",
+        "blenderVersion": "5.1.2",
+        "api": "HumanService.create_human",
+        "body": "gen3d_mpfb_body",
+        "vertices": 19158,
+        "polygons": 18486,
+        "evaluatedVertices": 45561,
+        "topologyPreserved": true,
+        "topologyHash": "df191766244b0722cb766ad798f38e4ab3e03d3e8eb9a613cf00144fc41b120d"
+      },
+      "artifacts": {
+        "glb": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/model.glb",
+        "blend": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/scene.blend",
+        "render": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/preview.png",
+        "task": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/TASK.md",
+        "audit": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/mcp-audit.jsonl",
+        "front": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/front.png",
+        "side": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/side.png",
+        "three-quarter": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/three-quarter.png",
+        "mpfb": "versions/47a6f001-82c3-41d0-b11a-faf904ce9450/mpfb.json"
+      }
+    }
+  ]
+}

@@ -15,6 +15,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-studio-browser-'));
 const assets = path.join(root, 'docs/validation/issue10/prop');
 const checkpoints = { input: false, concept: false, multiView: false, preview: false };
 const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
+let missingMpfb = false;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
 const app = createApp({
   dataDir: path.join(temp, 'data'),
@@ -30,8 +31,15 @@ const app = createApp({
   inspectReferences: async () => inspection,
   generate: async (p, v, dir) => {
     if (releaseModel) await new Promise(resolve => { releaseModel = resolve; });
+    if (v.modelingMode === 'mpfb' && missingMpfb) throw new Error('MPFB is missing or disabled. Install and enable MPFB; see docs/mpfb.md.');
     if (failModel) throw new Error('Fixture Blender bridge unavailable');
     for (const name of ['model.glb', 'scene.blend', 'preview.png', 'mcp-audit.jsonl']) fs.copyFileSync(path.join(assets, 'model-1', name), path.join(dir, name));
+    // Recorded prop files below are UI fixtures, never evidence of MPFB generation.
+    if (v.profile === 'character') for (const view of ['front', 'side', 'three-quarter']) fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, view + '.png'));
+    if (v.modelingMode === 'mpfb') {
+      fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ vertices: 19158, polygons: 18486, topologyPreserved: true }));
+      fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim() + '\n{"tool":"create_mpfb_human"}\n');
+    }
   }
 });
 let chrome, ws, page;
@@ -207,6 +215,30 @@ try {
   await wait('document.querySelector("#view-selection").options.length === 3');
   await stage('views'); assert.ok(await evaluate('document.querySelector("#reference-sets").textContent.includes("skipped")'));
   check('Stop/continued/skipped consistency, effective policy, report access and saved settings');
+
+
+  const humanoid = await request('/projects', 'POST', { name: 'Humanoid mode fixture', mode: 'image', prompt: 'A fictional adult human', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'character', checkpoints });
+  await request(`/projects/${humanoid.id}/generate`, 'POST', {}); await app.runner.pending;
+  await chooseProject(humanoid.id); await wait(visible('stage-model'));
+  assert.ok(await evaluate('!document.querySelector("#modeling").hidden'));
+  missingMpfb = true;
+  await fill('#modeling', { modelingMode: 'mpfb' }); await submit('#modeling');
+  await until(() => app.store.get(humanoid.id).modelingMode === 'mpfb', 'MPFB selection saved');
+  await click('#retry'); await wait('document.querySelector("#version-info").textContent.includes("Install and enable MPFB")');
+  assert.equal(app.store.get(humanoid.id).versions[1].status, 'failed');
+  assert.equal(app.store.get(humanoid.id).versions[0].modelingMode, 'scratch');
+  missingMpfb = false;
+  await click('#retry'); await wait('document.querySelector("#versions").options.length === 3');
+  await until(() => app.store.get(humanoid.id).versions[2].status === 'ready', 'MPFB fixture ready');
+  await wait('document.querySelector("#comparison-images").querySelectorAll("img").length === 6');
+  assert.ok(await evaluate('document.querySelector("#comparison-info").textContent.includes("exact same")'));
+  assert.ok(await evaluate('document.querySelector("#version-info").textContent.includes("MPFB-assisted")'));
+  await stage('input');
+  assert.ok(await evaluate('!document.querySelector("#edit").elements.profile.closest("label").hidden'));
+  await fill('#edit', { profile: 'object' });
+  assert.equal(await evaluate('document.querySelector("#edit").elements.modelingMode.value'), 'scratch');
+  assert.ok(await evaluate('document.querySelector("#edit option[value=mpfb]").disabled'));
+  check('humanoid mode selection, visible missing-MPFB failure, immutable baseline and same-reference render comparison (mocked)');
 
   // Create and upload through the actual browser form.
   await click('#new-project'); await wait('document.querySelector("#create-dialog").open');

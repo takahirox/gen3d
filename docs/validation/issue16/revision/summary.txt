@@ -1,0 +1,3 @@
+Repaired wrists, palms and fingers using native MPFB anatomy while preserving the original body topology. Removed floating trouser fragments near the hands and smoothed the teal shirt openings.
+
+Inspected front, side, back and three-quarter renders. Retained the concept A-pose despite the conflicting side reference. Minor cuff irregularities remain; face, hair and fabric details are still approximations.

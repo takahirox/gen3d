@@ -1,0 +1,22 @@
+{
+  "title": "MPFB comparison",
+  "version": "47a6f001-82c3-41d0-b11a-faf904ce9450",
+  "canvas": true,
+  "download": "http://127.0.0.1:19334/api/projects/c7785991-d834-43b5-86a5-ed69f9685758/artifacts/versions/47a6f001-82c3-41d0-b11a-faf904ce9450/model.glb?download=1",
+  "activity": 75,
+  "inputImageVisible": false,
+  "referenceImages": 0,
+  "conceptImages": 1,
+  "modelingViews": 4,
+  "viewSets": 1,
+  "allReferenceImagesLoaded": true,
+  "projectId": "c7785991-d834-43b5-86a5-ed69f9685758",
+  "versionId": "47a6f001-82c3-41d0-b11a-faf904ce9450",
+  "glbBytes": 5242840,
+  "glbSha256": "34ff768acb16eb1addd0f20f6cc250354529072938ec23dbfcdcaa5a299da809",
+  "orbit": "passed",
+  "pan": "passed",
+  "zoom": "passed",
+  "exceptions": [],
+  "checkedAt": "2026-10-09T09:49:20.902Z"
+}

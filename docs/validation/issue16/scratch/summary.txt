@@ -1,0 +1,3 @@
+Created a mesh-based adult figure with teal shirt, charcoal trousers, dark shoes, short wavy hair, facial features, and separate fingers.
+
+Preserved the base concept’s A-pose despite the side-view arm discrepancy. MCP inspection confirmed assigned materials and valid vertex coordinates.
