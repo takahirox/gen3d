@@ -89,6 +89,7 @@ function render() {
   const pendingInput = ((p.checkpoints.input || p.inputCheckpoint) && p.inputReview !== 'approved') || p.inputReview === 'rejected';
   const busy = status.busy || projectBusy;
   const pendingRefs = p.references.some(r => r.review === 'pending');
+  const regenerableSets = p.referenceSets.filter(s => (s.conceptId === p.selectedConceptId && s.prompt === p.prompt && s.profile === p.profile) || revisionReferenceSet(p, s)).reverse();
   $('project-state').textContent = status.usageLimited ? 'Codex usage limit' : projectBusy ? 'Generating…' : pendingInput ? 'Review input' : pendingConcept ? 'Review concept image' : pendingViews ? 'Review multi-view references' : pendingPreview ? 'Review 3D preview' : pendingRefs ? 'Review references' : v?.status === 'ready' ? `Model ${v.review}` : 'Ready to generate';
   for (const id of ['generate', 'retry']) $(id).disabled = busy || pendingRefs || pendingInput || pendingConcept || pendingViews || pendingPreview || status.usageLimited;
   for (const id of ['approve', 'reject']) $(id).disabled = v?.status !== 'ready';
@@ -96,7 +97,7 @@ function render() {
   $('concept-retry').hidden = p.mode !== 'text'; $('concept-heading').hidden = p.mode !== 'text';
   $('concept-retry').querySelector('button').disabled = busy || pendingInput || pendingPreview || pendingRefs || status.usageLimited;
   $('views-retry').hidden = p.mode !== 'text'; $('views-heading').hidden = p.mode !== 'text';
-  $('views-retry').querySelector('button').disabled = busy || pendingInput || pendingConcept || pendingPreview || pendingRefs || !p.selectedConceptId || status.usageLimited;
+  $('views-retry').querySelector('button').disabled = busy || pendingInput || pendingConcept || pendingPreview || pendingRefs || (!p.selectedConceptId && !regenerableSets.length) || status.usageLimited;
   $('checkpoints').querySelector('button').disabled = projectBusy;
   $('edit').querySelector('button').disabled = projectBusy; $('reference').querySelector('button').disabled = projectBusy;
   $('version-info').textContent = v ? `Version ${v.number} · ${v.kind} · ${v.status} · ${v.review}${sourceConcept ? ` · concept ${sourceConcept.number}` : ''}${v.referenceSetId ? ` · view set ${p.referenceSets.find(s => s.id === v.referenceSetId)?.number}` : ''}${v.feedback ? ` · ${v.feedback}` : ''}${v.error ? ` — ${v.error}` : ''}` : 'No versions yet. Generate your first model.';
@@ -106,6 +107,14 @@ function render() {
   if (!options.length) { const option = document.createElement('option'); option.textContent = 'No model yet'; options.push(option); }
   $('versions').replaceChildren(...options); if (versionId) $('versions').value = versionId;
   if (signature !== lastState) {
+    const viewTarget = $('views-retry').elements.referenceSetId, selectedTarget = viewTarget.value, latestTarget = viewTarget.options[0]?.value;
+    viewTarget.replaceChildren(...regenerableSets.map(set => {
+      const option = document.createElement('option'); option.value = set.id;
+      option.textContent = `View set ${set.number} · concept ${p.concepts.find(c => c.id === set.conceptId)?.number}${set.request?.kind === 'revision' ? ` · revision of v${p.versions.find(v => v.id === set.request.sourceVersionId)?.number}` : ''}`;
+      return option;
+    }));
+    if (!regenerableSets.length) { const option = document.createElement('option'); option.value = ''; option.textContent = 'Selected base concept'; viewTarget.append(option); }
+    if (regenerableSets[0]?.id === latestTarget && regenerableSets.some(s => s.id === selectedTarget)) viewTarget.value = selectedTarget;
     for (const key of ['name', 'prompt', 'profile']) { const field = $('edit').elements[key]; if (document.activeElement !== field) field.value = p[key]; }
     for (const key of ['input', 'concept', 'multiView', 'preview']) { const field = $('checkpoints').elements[key]; if (document.activeElement !== field) field.checked = p.checkpoints[key]; }
     for (const cls of ['concept-setting', 'view-setting']) $('checkpoints').querySelector('.' + cls).hidden = p.mode !== 'text';
@@ -163,7 +172,7 @@ form('create', async data => {
 function checkpointData(data) { return Object.fromEntries(['input', 'concept', 'multiView', 'preview'].map(key => [key, data.has(key)])); }
 form('checkpoints', data => api(`/projects/${projectId}`, 'PATCH', { checkpoints: checkpointData(data) }));
 form('concept-retry', async data => { await api(`/projects/${projectId}/concepts`, 'POST', { feedback: data.get('feedback') }); followLatest = true; });
-form('views-retry', async data => { await api(`/projects/${projectId}/reference-sets`, 'POST', { feedback: data.get('feedback') }); followLatest = true; });
+form('views-retry', async data => { await api(`/projects/${projectId}/reference-sets`, 'POST', { ...(data.get('referenceSetId') ? { referenceSetId: data.get('referenceSetId') } : {}), feedback: data.get('feedback') }); followLatest = true; });
 form('edit', data => api(`/projects/${projectId}`, 'PATCH', { name: data.get('name'), prompt: data.get('prompt'), profile: data.get('profile') }));
 form('reference', async data => { await api(`/projects/${projectId}/references`, 'POST', { label: data.get('label'), image: await fileImage(data.get('image')) }); $('reference').reset(); });
 async function generate(kind, feedback) {

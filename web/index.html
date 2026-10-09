@@ -62,7 +62,7 @@
             <h2 id="concept-heading">Concept images</h2><div id="concepts"></div>
             <form id="concept-retry"><label>Concept revision<textarea name="feedback" rows="2" placeholder="Change the design before modeling"></textarea></label><button type="submit">Regenerate concept</button></form>
             <h2 id="views-heading">Multi-view references</h2><div id="reference-sets"></div>
-            <form id="views-retry"><label>Reference revision<textarea name="feedback" rows="2" placeholder="Fix inconsistent views while preserving the base design"></textarea></label><button type="submit">Regenerate view set</button></form>
+            <form id="views-retry"><label>View set to regenerate<select name="referenceSetId"></select></label><label>Reference revision<textarea name="feedback" rows="2" placeholder="Fix inconsistent views while preserving the base design"></textarea></label><button type="submit">Regenerate view set</button></form>
             <div id="references"></div>
             <details><summary>Add a reference for review</summary><form id="reference"><label>Label<input name="label" required maxlength="200"></label><label>Reference image<input name="image" type="file" accept="image/png,image/jpeg,image/webp" required></label><button type="submit">Add reference</button></form></details>
             <p id="reference-state" class="muted"></p>

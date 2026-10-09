@@ -270,13 +270,19 @@ export class Runner {
   regenerateReferenceSet(id, input, actor) {
     const p = this.store.get(id); this.guard(p, { referenceSets: true });
     if (p.mode !== 'text') throw new AppError('Image input does not need generated reference views');
-    const concept = p.concepts.find(c => c.id === p.selectedConceptId && c.status === 'ready' && c.review === 'approved');
+    const eligible = s => currentReferenceSet(p, s) || revisionReferenceSet(p, s);
+    const sourceSet = input.referenceSetId ? p.referenceSets.find(s => s.id === input.referenceSetId) : p.referenceSets.findLast(eligible);
+    if (input.referenceSetId && !sourceSet) throw new AppError('Reference set not found', 404);
+    if (sourceSet && !eligible(sourceSet)) throw new AppError('Choose a reference set for the selected concept or source revision', 409);
+    const concept = p.concepts.find(c => c.id === (sourceSet?.conceptId || p.selectedConceptId) && c.status === 'ready' && c.review === 'approved');
     if (!concept) throw new AppError('Accept a base concept before generating reference views', 409);
-    const pending = p.referenceSets.filter(s => s.conceptId === concept.id && s.status === 'ready' && s.review === 'pending');
+    const request = structuredClone(sourceSet?.request || { kind: 'generate' });
+    const pending = p.referenceSets.filter(s => s.conceptId === concept.id && s.status === 'ready' && s.review === 'pending'
+      && s.request?.kind === request.kind && s.request.sourceVersionId === request.sourceVersionId && s.request.feedback === request.feedback);
     if (pending.length && actor !== 'web') throw new AppError('Reject pending reference sets in the web UI before regeneration', 403);
     const feedback = input.feedback ? text(input.feedback, 'Reference feedback') : '';
     for (const set of pending) this.store.reviewReferenceSet(id, set.id, 'rejected', actor);
-    return this.startReferenceSet(p, concept, { kind: 'generate' }, actor, feedback);
+    return this.startReferenceSet(p, concept, request, actor, feedback, sourceSet?.id || null);
   }
   reviewReferenceSet(id, setId, decision, actor) {
     const p = this.store.get(id);
@@ -287,9 +293,9 @@ export class Runner {
       && (set.request.kind !== 'revision' || (s.request?.kind === 'revision' && s.request.sourceVersionId === set.request.sourceVersionId && s.request.feedback === set.request.feedback)))) return this.start(id, set.request, actor);
     return p;
   }
-  startReferenceSet(p, concept, request, actor, feedback = '') {
+  startReferenceSet(p, concept, request, actor, feedback = '', parentReferenceSetId = null) {
     this.store.artifact(p.id, concept.artifacts.image);
-    const set = { id: randomUUID(), number: p.referenceSets.length + 1, conceptId: concept.id, prompt: concept.prompt, profile: concept.profile || referenceProfile(undefined, concept.prompt), feedback, request,
+    const set = { id: randomUUID(), number: p.referenceSets.length + 1, parentReferenceSetId, conceptId: concept.id, prompt: concept.prompt, profile: concept.profile || referenceProfile(undefined, concept.prompt), feedback, request,
       provider: this.conceptGenerator.provider || 'custom', status: 'running', review: 'pending', checkpoints: { ...p.checkpoints }, images: [], artifacts: {}, consistency: { status: 'pending', issues: [] }, createdAt: new Date().toISOString(), error: null };
     const dir = path.join(this.store.dir(p.id), 'reference-sets', set.id); fs.mkdirSync(dir, { recursive: true });
     if (currentReferenceSet(p, set)) p.selectedReferenceSetId = null;
