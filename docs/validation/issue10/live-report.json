@@ -1,0 +1,485 @@
+{
+  "live": true,
+  "cli": "0.161.0",
+  "blender": "5.1.2",
+  "projects": [
+    {
+      "id": "33c470e8-5318-4925-a787-56aaccce00a0",
+      "name": "Reference prop",
+      "profile": "object",
+      "state": {
+        "id": "33c470e8-5318-4925-a787-56aaccce00a0",
+        "name": "Reference prop",
+        "mode": "text",
+        "prompt": "A simple stylized teal wooden toy cabinet: rectangular body, four short orange feet, two identical front doors with round orange handles, flat top and plain teal back. No writing, no extra accessories.",
+        "profile": "object",
+        "inputImage": null,
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "inputReview": "approved",
+        "inputCheckpoint": false,
+        "concepts": [
+          {
+            "id": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+            "number": 1,
+            "role": "base-concept",
+            "profile": "object",
+            "prompt": "A simple stylized teal wooden toy cabinet: rectangular body, four short orange feet, two identical front doors with round orange handles, flat top and plain teal back. No writing, no extra accessories.",
+            "feedback": "",
+            "request": {
+              "kind": "generate",
+              "feedback": ""
+            },
+            "provider": "codex",
+            "status": "ready",
+            "review": "approved",
+            "checkpoints": {
+              "input": false,
+              "concept": false,
+              "multiView": false,
+              "preview": false
+            },
+            "artifacts": {
+              "image": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+              "task": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/TASK.md",
+              "audit": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/image-generation.json"
+            },
+            "createdAt": "2026-10-09T00:03:45.829Z",
+            "error": null,
+            "finishedAt": "2026-10-09T00:04:18.364Z"
+          }
+        ],
+        "selectedConceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+        "referenceSets": [
+          {
+            "id": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "number": 1,
+            "conceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+            "prompt": "A simple stylized teal wooden toy cabinet: rectangular body, four short orange feet, two identical front doors with round orange handles, flat top and plain teal back. No writing, no extra accessories.",
+            "profile": "object",
+            "feedback": "",
+            "request": {
+              "kind": "generate",
+              "feedback": ""
+            },
+            "provider": "codex",
+            "status": "ready",
+            "review": "pending",
+            "checkpoints": {
+              "input": false,
+              "concept": false,
+              "multiView": false,
+              "preview": false
+            },
+            "images": [
+              {
+                "id": "8e816c20-043b-44d4-889f-e668476693b3",
+                "role": "modeling-view",
+                "view": "front",
+                "label": "front",
+                "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/front.png",
+                "parentConceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+                "parentImage": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+                "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:05:06.513Z"
+              },
+              {
+                "id": "d74c0f95-b567-4034-8e75-bad0ed5d47b1",
+                "role": "modeling-view",
+                "view": "side",
+                "side": "left",
+                "label": "left side",
+                "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/side.png",
+                "parentConceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+                "parentImage": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+                "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:05:55.961Z"
+              },
+              {
+                "id": "7f755ff8-a90a-418f-8034-d24909769ab7",
+                "role": "modeling-view",
+                "view": "back",
+                "label": "back",
+                "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/back.png",
+                "parentConceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+                "parentImage": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+                "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:06:48.342Z"
+              },
+              {
+                "id": "299d6c30-4bb7-4f09-8415-0bbade7366ef",
+                "role": "modeling-view",
+                "view": "three-quarter",
+                "label": "three-quarter",
+                "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/three-quarter.png",
+                "parentConceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+                "parentImage": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+                "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:07:41.379Z"
+              }
+            ],
+            "artifacts": {
+              "front/TASK.md": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/front/TASK.md",
+              "front/image-generation.json": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/front/image-generation.json",
+              "side/TASK.md": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/side/TASK.md",
+              "side/image-generation.json": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/side/image-generation.json",
+              "back/TASK.md": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/back/TASK.md",
+              "back/image-generation.json": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/back/image-generation.json",
+              "three-quarter/TASK.md": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/three-quarter/TASK.md",
+              "three-quarter/image-generation.json": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/three-quarter/image-generation.json",
+              "CONSISTENCY.md": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/CONSISTENCY.md",
+              "consistency.json": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/consistency.json"
+            },
+            "consistency": {
+              "status": "failed",
+              "issues": [
+                "The requested left-side view shows the cabinet’s right side: the front edge and protruding orange handle appear on the left of the image. A left-side view should place the front edge and handle on the right."
+              ],
+              "provider": "codex",
+              "checkedAt": "2026-10-09T00:07:56.298Z"
+            },
+            "createdAt": "2026-10-09T00:04:18.365Z",
+            "error": "Cross-view contradictions found. Inspect the report and regenerate views from the same base concept.",
+            "finishedAt": "2026-10-09T00:07:56.298Z"
+          }
+        ],
+        "selectedReferenceSetId": null,
+        "references": [],
+        "versions": [],
+        "activity": [
+          {
+            "id": "abe269a4-39e1-4540-9d1d-de95ffc6c91a",
+            "at": "2026-10-09T00:03:45.828Z",
+            "actor": "web",
+            "type": "project_created"
+          },
+          {
+            "id": "f1d59ced-444e-4978-bc13-440cd952c3a6",
+            "at": "2026-10-09T00:03:45.829Z",
+            "actor": "system",
+            "type": "input_auto_accepted"
+          },
+          {
+            "id": "ee58a904-ae8c-4e5a-9ecd-ff0d429edf59",
+            "at": "2026-10-09T00:03:45.829Z",
+            "actor": "web",
+            "type": "concept_generation_started",
+            "conceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe"
+          },
+          {
+            "id": "2a81cb30-bc68-431d-9ecb-8dee3a9935bb",
+            "at": "2026-10-09T00:04:18.364Z",
+            "actor": "codex",
+            "type": "concept_generation_completed",
+            "conceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe"
+          },
+          {
+            "id": "e8abb2f2-6303-4585-8b78-bd1efac61c12",
+            "at": "2026-10-09T00:04:18.364Z",
+            "actor": "system",
+            "type": "concept_auto_accepted",
+            "conceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe"
+          },
+          {
+            "id": "32b8ee71-1c6f-4dba-b219-569c3eaa3da5",
+            "at": "2026-10-09T00:04:18.365Z",
+            "actor": "system",
+            "type": "reference_set_generation_started",
+            "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "conceptId": "d9617514-4e51-42a9-a421-5e8c1b15bebe"
+          },
+          {
+            "id": "81140a56-670b-44b6-88d6-085d667dd4d0",
+            "at": "2026-10-09T00:05:06.513Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "view": "front"
+          },
+          {
+            "id": "498c4243-7042-4e5a-97f3-21a351789ca5",
+            "at": "2026-10-09T00:05:55.961Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "view": "side"
+          },
+          {
+            "id": "ab82fa08-c940-4ba2-b8a6-8f6a1906b7ae",
+            "at": "2026-10-09T00:06:48.342Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "view": "back"
+          },
+          {
+            "id": "b6494528-44da-44b2-92da-82749e278f22",
+            "at": "2026-10-09T00:07:41.379Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "view": "three-quarter"
+          },
+          {
+            "id": "6e581e05-7f73-4ef4-876a-bda915993316",
+            "at": "2026-10-09T00:07:56.298Z",
+            "actor": "codex",
+            "type": "reference_set_inspected",
+            "referenceSetId": "b9dc3f0e-514c-4283-9da1-8f0077f706a7",
+            "consistency": "failed"
+          }
+        ],
+        "updatedAt": "2026-10-09T00:07:56.298Z"
+      }
+    },
+    {
+      "id": "6d29bda9-3a1b-4ea9-aa3c-2531df2add2c",
+      "name": "Reference character",
+      "profile": "character",
+      "state": {
+        "id": "6d29bda9-3a1b-4ea9-aa3c-2531df2add2c",
+        "name": "Reference character",
+        "mode": "text",
+        "prompt": "A simple friendly humanoid clay robot with teal rounded torso, round teal head, two orange circular eyes, two arms and two legs with orange mitten hands and orange boots. No hair, clothing, accessories or writing.",
+        "profile": "character",
+        "inputImage": null,
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": true,
+          "preview": false
+        },
+        "inputReview": "approved",
+        "inputCheckpoint": false,
+        "concepts": [
+          {
+            "id": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+            "number": 1,
+            "role": "base-concept",
+            "profile": "character",
+            "prompt": "A simple friendly humanoid clay robot with teal rounded torso, round teal head, two orange circular eyes, two arms and two legs with orange mitten hands and orange boots. No hair, clothing, accessories or writing.",
+            "feedback": "",
+            "request": {
+              "kind": "generate",
+              "feedback": ""
+            },
+            "provider": "codex",
+            "status": "ready",
+            "review": "approved",
+            "checkpoints": {
+              "input": false,
+              "concept": false,
+              "multiView": true,
+              "preview": false
+            },
+            "artifacts": {
+              "image": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/concept.png",
+              "task": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/TASK.md",
+              "audit": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/image-generation.json"
+            },
+            "createdAt": "2026-10-09T00:07:56.300Z",
+            "error": null,
+            "finishedAt": "2026-10-09T00:08:31.675Z"
+          }
+        ],
+        "selectedConceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+        "referenceSets": [
+          {
+            "id": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "number": 1,
+            "conceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+            "prompt": "A simple friendly humanoid clay robot with teal rounded torso, round teal head, two orange circular eyes, two arms and two legs with orange mitten hands and orange boots. No hair, clothing, accessories or writing.",
+            "profile": "character",
+            "feedback": "",
+            "request": {
+              "kind": "generate",
+              "feedback": ""
+            },
+            "provider": "codex",
+            "status": "ready",
+            "review": "pending",
+            "checkpoints": {
+              "input": false,
+              "concept": false,
+              "multiView": true,
+              "preview": false
+            },
+            "images": [
+              {
+                "id": "9c20c3ca-dea1-4657-a291-993dce5a4d67",
+                "role": "modeling-view",
+                "view": "front",
+                "label": "front",
+                "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/front.png",
+                "parentConceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+                "parentImage": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/concept.png",
+                "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:09:21.160Z"
+              },
+              {
+                "id": "8213f6ab-4078-4c65-b47c-ed9ea85f64b8",
+                "role": "modeling-view",
+                "view": "side",
+                "side": "left",
+                "label": "left side",
+                "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/side.png",
+                "parentConceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+                "parentImage": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/concept.png",
+                "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:10:17.390Z"
+              },
+              {
+                "id": "abee0568-8c14-4113-87ab-0d4ea30ef269",
+                "role": "modeling-view",
+                "view": "back",
+                "label": "back",
+                "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/back.png",
+                "parentConceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+                "parentImage": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/concept.png",
+                "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:11:06.283Z"
+              },
+              {
+                "id": "f4961167-f858-42f4-b2f2-c19877210005",
+                "role": "modeling-view",
+                "view": "three-quarter",
+                "label": "three-quarter",
+                "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/three-quarter.png",
+                "parentConceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+                "parentImage": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/concept.png",
+                "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+                "provider": "codex",
+                "createdAt": "2026-10-09T00:11:55.654Z"
+              }
+            ],
+            "artifacts": {
+              "front/TASK.md": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/front/TASK.md",
+              "front/image-generation.json": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/front/image-generation.json",
+              "side/TASK.md": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/side/TASK.md",
+              "side/image-generation.json": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/side/image-generation.json",
+              "back/TASK.md": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/back/TASK.md",
+              "back/image-generation.json": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/back/image-generation.json",
+              "three-quarter/TASK.md": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/three-quarter/TASK.md",
+              "three-quarter/image-generation.json": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/three-quarter/image-generation.json",
+              "CONSISTENCY.md": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/CONSISTENCY.md",
+              "consistency.json": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/consistency.json"
+            },
+            "consistency": {
+              "status": "failed",
+              "issues": [
+                "The back view shows the boots with the same prominent rounded toe shapes as the front view, making the feet appear to face backward. The side and three-quarter views establish forward-projecting toes; the back view should show the heels instead."
+              ],
+              "provider": "codex",
+              "checkedAt": "2026-10-09T00:12:09.338Z"
+            },
+            "createdAt": "2026-10-09T00:08:31.675Z",
+            "error": "Cross-view contradictions found. Inspect the report and regenerate views from the same base concept.",
+            "finishedAt": "2026-10-09T00:12:09.338Z"
+          }
+        ],
+        "selectedReferenceSetId": null,
+        "references": [],
+        "versions": [],
+        "activity": [
+          {
+            "id": "1d555700-1667-409d-a5e7-dfd7158cf233",
+            "at": "2026-10-09T00:07:56.299Z",
+            "actor": "web",
+            "type": "project_created"
+          },
+          {
+            "id": "61b6e678-4bef-46cd-9e35-97239eb7c491",
+            "at": "2026-10-09T00:07:56.299Z",
+            "actor": "system",
+            "type": "input_auto_accepted"
+          },
+          {
+            "id": "283de537-f090-4f8b-a19a-dd21136e02d6",
+            "at": "2026-10-09T00:07:56.300Z",
+            "actor": "web",
+            "type": "concept_generation_started",
+            "conceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3"
+          },
+          {
+            "id": "7f3e2df2-078e-4393-8891-f49127b42a53",
+            "at": "2026-10-09T00:08:31.675Z",
+            "actor": "codex",
+            "type": "concept_generation_completed",
+            "conceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3"
+          },
+          {
+            "id": "b915b9cc-3e51-46cd-a6e0-791ba0f7c4b1",
+            "at": "2026-10-09T00:08:31.675Z",
+            "actor": "system",
+            "type": "concept_auto_accepted",
+            "conceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3"
+          },
+          {
+            "id": "6a2bf9d0-0ad1-4867-bf70-ba25e03725ab",
+            "at": "2026-10-09T00:08:31.675Z",
+            "actor": "system",
+            "type": "reference_set_generation_started",
+            "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "conceptId": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3"
+          },
+          {
+            "id": "9adbad55-d425-40f9-9ebc-987c6255075c",
+            "at": "2026-10-09T00:09:21.160Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "view": "front"
+          },
+          {
+            "id": "91286e73-7dd4-4222-a78b-6a6cff90fbe2",
+            "at": "2026-10-09T00:10:17.390Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "view": "side"
+          },
+          {
+            "id": "bfe9adf5-f3ce-4c03-87cb-30ce36bdc01b",
+            "at": "2026-10-09T00:11:06.283Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "view": "back"
+          },
+          {
+            "id": "3195c0f1-d512-4e7b-9983-61a24cf21c78",
+            "at": "2026-10-09T00:11:55.654Z",
+            "actor": "codex",
+            "type": "reference_image_saved",
+            "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "view": "three-quarter"
+          },
+          {
+            "id": "a094c45a-17a5-472a-8a3d-9f910ad0faa5",
+            "at": "2026-10-09T00:12:09.338Z",
+            "actor": "codex",
+            "type": "reference_set_inspected",
+            "referenceSetId": "d38fb49f-39e8-4a51-a97d-69ec568df35d",
+            "consistency": "failed"
+          }
+        ],
+        "updatedAt": "2026-10-09T00:12:09.338Z"
+      },
+      "gating": "Review the multi-view reference set in the web UI before modeling"
+    }
+  ],
+  "startedAt": "2026-10-09T00:03:45.827Z",
+  "usageLimited": false,
+  "finishedAt": "2026-10-09T00:12:09.339Z"
+}

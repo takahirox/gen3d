@@ -20,6 +20,9 @@ export function runProcess(command, args, { cwd, env, onLine = () => {}, timeout
         const failedTool = event.type === 'item.completed' && (event.item?.status === 'failed'
           || (typeof event.item?.exit_code === 'number' && event.item.exit_code !== 0) || event.item?.isError === true);
         limitEvent = (['error', 'turn.failed'].includes(event.type) || failedTool) && limitPattern.test(JSON.stringify(event));
+        // Some native image-tool failures are surfaced only in the final message.
+        if (event.type === 'item.completed' && event.item?.type === 'agent_message'
+          && /usage limit (?:reached|exceeded)|you.ve hit.*limit|out of credits|quota exceeded|insufficient_quota|rate_limit_exceeded/i.test(event.item.text || '')) limitEvent = true;
       } catch {
         // JSON events are on stdout; stderr also carries plain CLI failures.
         limitEvent = stream === 'stderr' && limitPattern.test(line) && /error|you.ve hit|insufficient|rate_limit|quota/i.test(line);

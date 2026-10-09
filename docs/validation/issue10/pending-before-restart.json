@@ -1,0 +1,6 @@
+{
+  "status": 409,
+  "body": {
+    "error": "Review the multi-view reference set in the web UI before modeling"
+  }
+}

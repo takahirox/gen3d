@@ -1,0 +1,37 @@
+{
+  "state": "Review multi-view references",
+  "generateDisabled": true,
+  "conceptImages": 1,
+  "views": 8,
+  "labels": [
+    "front",
+    "left side",
+    "back",
+    "three-quarter",
+    "front",
+    "left side",
+    "back",
+    "three-quarter"
+  ],
+  "reviews": [
+    {
+      "text": "Accept views & model",
+      "disabled": false
+    },
+    {
+      "text": "Reject view set",
+      "disabled": false
+    },
+    {
+      "text": "Accept views & model",
+      "disabled": true
+    },
+    {
+      "text": "Reject view set",
+      "disabled": false
+    }
+  ],
+  "multiView": false,
+  "errors": [],
+  "checkedAt": "2026-10-09T00:24:25.605Z"
+}

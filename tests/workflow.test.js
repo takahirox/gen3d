@@ -10,12 +10,15 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createApp } from '../src/server.js';
 import { Store } from '../src/store.js';
+import { CodexReferenceInspector, requiredViews } from '../src/reference-set.js';
 import { CodexConceptGenerator } from '../src/concept.js';
 import { Runner, subscriptionEnv, codexArgs, validateArtifacts, runProcess } from '../src/runner.js';
 
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=', 'base64');
 const image = 'data:image/png;base64,' + png.toString('base64');
-const conceptGenerator = { generate: async () => ({ bytes: png, ext: 'png' }) };
+const generateViews = async ({ onImage }) => { for (const view of requiredViews) await onImage({ view, side: view === 'side' ? 'left' : undefined, bytes: png, ext: 'png' }); };
+const inspectReferences = async () => ({ consistent: true, issues: [] });
+const conceptGenerator = { generate: async () => ({ bytes: png, ext: 'png' }), generateViews };
 function temporary(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-test-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir;
@@ -31,7 +34,7 @@ function artifacts(dir) {
 }
 async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
   const dataDir = temporary(t);
-  const instance = createApp({ dataDir, generate, conceptGenerator });
+  const instance = createApp({ dataDir, generate, conceptGenerator, inspectReferences });
   instance.server.listen(0, '127.0.0.1'); await once(instance.server, 'listening');
   t.after(async () => { await instance.runner.pending; await new Promise(resolve => instance.server.close(resolve)); await instance.closed; });
   const url = `http://127.0.0.1:${instance.server.address().port}`;
@@ -41,7 +44,7 @@ async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
   }
   return { ...instance, url, request, dataDir };
 }
-const input = { name: 'Robot', mode: 'text', prompt: 'A teal robot', checkpoints: { input: false, concept: false, preview: false } };
+const input = { name: 'Robot', mode: 'text', prompt: 'A teal robot', checkpoints: { input: false, concept: false, multiView: false, preview: false } };
 
 test('text and image inputs persist and invalid images leave no project', t => {
   const dir = temporary(t), store = new Store(dir);
@@ -55,7 +58,7 @@ test('text and image inputs persist and invalid images leave no project', t => {
 test('pending concepts gate generation and only human-reviewed references enter snapshots', async t => {
   const store = new Store(temporary(t)), p = store.create(input, 'web');
   store.addReference(p.id, { label: 'AI concept', image }, 'mcp');
-  const runner = new Runner(store, { conceptGenerator, generate: async (p, v, dir) => artifacts(dir) });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator, generate: async (p, v, dir) => artifacts(dir) });
   assert.throws(() => runner.start(p.id, {}, 'web'), /Review all pending/);
   assert.throws(() => store.reviewReference(p.id, p.references[0].id, 'approved', 'mcp'), /web UI/);
   store.reviewReference(p.id, p.references[0].id, 'approved', 'web');
@@ -67,7 +70,7 @@ test('pending concepts gate generation and only human-reviewed references enter 
 
 test('revision copies source scene, preserves artifacts, snapshots prompt and branches from any ready version', async t => {
   const store = new Store(temporary(t)), p = store.create(input, 'web');
-  const runner = new Runner(store, { conceptGenerator, generate: async (p, v, dir) => { if (v.kind === 'revision') assert.equal(fs.readFileSync(path.join(dir, 'source.blend'), 'utf8'), 'BLENDER-test-fixture'); artifacts(dir); } });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator, generate: async (p, v, dir) => { if (v.kind === 'revision') assert.equal(fs.readFileSync(path.join(dir, 'source.blend'), 'utf8'), 'BLENDER-test-fixture'); artifacts(dir); } });
   runner.start(p.id, {}, 'web'); await runner.pending;
   const first = p.versions[0], old = fs.readFileSync(store.artifact(p.id, first.artifacts.glb));
   store.reviewVersion(p.id, first.id, 'approved', 'web');
@@ -83,7 +86,7 @@ test('revision copies source scene, preserves artifacts, snapshots prompt and br
 test('Blender is serialized globally and edits cannot race a job', async t => {
   let release; const barrier = new Promise(resolve => { release = resolve; });
   const store = new Store(temporary(t)), p = store.create(input, 'web'), p2 = store.create(input, 'web');
-  const runner = new Runner(store, { conceptGenerator, generate: async (p, v, dir) => { await barrier; artifacts(dir); } });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator, generate: async (p, v, dir) => { await barrier; artifacts(dir); } });
   runner.start(p.id, {}, 'web');
   assert.throws(() => runner.start(p2.id, {}, 'mcp'), /another version/);
   assert.throws(() => store.update(p.id, { prompt: 'changed' }, 'mcp'), /Wait/);
@@ -94,7 +97,7 @@ test('Blender is serialized globally and edits cannot race a job', async t => {
 test('failures retain useful history, retry gets a new folder and usage limits stop subsequent jobs', async t => {
   let calls = 0;
   const store = new Store(temporary(t)), p = store.create(input, 'web');
-  const runner = new Runner(store, { conceptGenerator, generate: async (p, v, dir) => { if (++calls === 1) throw new Error('Blender disconnected'); artifacts(dir); } });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator, generate: async (p, v, dir) => { if (++calls === 1) throw new Error('Blender disconnected'); artifacts(dir); } });
   runner.start(p.id, {}, 'web'); await runner.pending;
   assert.equal(p.versions[0].status, 'failed');
   runner.start(p.id, { kind: 'retry' }, 'web'); await runner.pending;
@@ -223,14 +226,14 @@ test('missing, malformed or empty geometry artifacts cannot be published as read
   for (const compress of [zstdCompressSync, gzipSync]) { fs.writeFileSync(path.join(dir, 'scene.blend'), compress(blend)); assert.deepEqual(validateArtifacts(dir), { meshes: 1 }); }
   fs.writeFileSync(path.join(dir, 'model.glb'), 'not an actual model'); assert.throws(() => validateArtifacts(dir), /valid GLB/);
   const store = new Store(temporary(t)), p = store.create(input, 'web');
-  const runner = new Runner(store, { conceptGenerator, generate: async (p, v, dir) => { artifacts(dir); fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"get_scene_info"}\n'); } });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator, generate: async (p, v, dir) => { artifacts(dir); fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"get_scene_info"}\n'); } });
   runner.start(p.id, {}, 'web'); return runner.pending.then(() => { assert.equal(p.versions[0].status, 'failed'); assert.match(p.versions[0].error, /No successful/); });
 });
 
 test('text workflow generates a concept first, waits for explicit acceptance, and models the selected image', async t => {
-  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { input: true, concept: true, preview: true } }, 'web');
+  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { input: true, concept: true, multiView: false, preview: true } }, 'web');
   const calls = [];
-  const runner = new Runner(store, { conceptGenerator: { generate: async task => { calls.push('concept'); assert.equal(task.prompt, p.prompt); return { bytes: png, ext: 'png' }; } }, generate: async (project, v, dir) => {
+  const runner = new Runner(store, { inspectReferences, conceptGenerator: { generateViews, generate: async task => { calls.push('concept'); assert.equal(task.prompt, p.prompt); return { bytes: png, ext: 'png' }; } }, generate: async (project, v, dir) => {
     calls.push('model'); assert.equal(v.conceptId, project.selectedConceptId);
     assert.deepEqual(fs.readFileSync(store.artifact(p.id, v.visualInput)), png); artifacts(dir);
   } });
@@ -261,9 +264,9 @@ test('text workflow generates a concept first, waits for explicit acceptance, an
 });
 
 test('rejection and regeneration preserve concepts and never model a rejected design', async t => {
-  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { concept: true, preview: false } }, 'web');
+  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { concept: true, multiView: false, preview: false } }, 'web');
   let modeled = 0;
-  const runner = new Runner(store, { conceptGenerator, generate: async (p, v, dir) => { modeled++; artifacts(dir); } });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator, generate: async (p, v, dir) => { modeled++; artifacts(dir); } });
   runner.start(p.id, {}, 'web'); await runner.pending;
   const first = p.concepts[0], old = fs.readFileSync(store.artifact(p.id, first.artifacts.image));
   assert.throws(() => runner.regenerateConcept(p.id, {}, 'mcp'), /Reject pending/);
@@ -280,7 +283,7 @@ test('rejection and regeneration preserve concepts and never model a rejected de
 test('disabled checkpoints auto-continue and a replaceable generator needs no Blender-flow changes', async t => {
   const store = new Store(temporary(t)), p = store.create(input, 'web');
   let generated = 0;
-  const runner = new Runner(store, { conceptGenerator: { generate: async () => { generated++; return { bytes: png, ext: 'png' }; } }, generate: async (p, v, dir) => artifacts(dir) });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator: { generateViews, generate: async () => { generated++; return { bytes: png, ext: 'png' }; } }, generate: async (p, v, dir) => artifacts(dir) });
   runner.start(p.id, {}, 'web'); await runner.pending;
   const first = p.versions[0]; assert.equal(first.status, 'ready'); assert.equal(first.review, 'approved');
   assert.equal(p.concepts[0].review, 'approved'); assert.ok(p.activity.some(e => e.type === 'concept_auto_accepted'));
@@ -294,8 +297,8 @@ test('disabled checkpoints auto-continue and a replaceable generator needs no Bl
 });
 
 test('image workflow skips concept generation entirely and still respects input and preview reviews', async t => {
-  const store = new Store(temporary(t)), p = store.create({ name: 'Image', mode: 'image', image, checkpoints: { input: true, concept: true, preview: true } }, 'web');
-  const runner = new Runner(store, { conceptGenerator: { generate: () => { throw new Error('Must never generate concept for image input'); } }, generate: async (p, v, dir) => { assert.equal(v.visualInput, p.inputImage); artifacts(dir); } });
+  const store = new Store(temporary(t)), p = store.create({ name: 'Image', mode: 'image', image, checkpoints: { input: true, concept: true, multiView: false, preview: true } }, 'web');
+  const runner = new Runner(store, { inspectReferences, conceptGenerator: { generate: () => { throw new Error('Must never generate concept for image input'); } }, generate: async (p, v, dir) => { assert.equal(v.visualInput, p.inputImage); artifacts(dir); } });
   assert.throws(() => runner.start(p.id, {}, 'web'), /Review the input/);
   store.reviewInput(p.id, 'rejected', 'web'); assert.throws(() => runner.start(p.id, {}, 'web'), /Review the input/);
   store.reviewInput(p.id, 'approved', 'web'); runner.start(p.id, {}, 'web'); await runner.pending;
@@ -309,7 +312,7 @@ test('image workflow skips concept generation entirely and still respects input 
 test('unavailable, invalid and usage-limited concept providers never invoke modeling', async t => {
   for (const fail of [() => { throw new Error('Native image tool unavailable'); }, () => ({ bytes: Buffer.from('invalid'), ext: 'png' }), () => { const e = new Error('Usage limit reached'); e.usageLimited = true; throw e; }]) {
     const store = new Store(temporary(t)), p = store.create(input, 'web');
-    const runner = new Runner(store, { conceptGenerator: { generate: fail }, generate: () => assert.fail('Modeling must not run') });
+    const runner = new Runner(store, { inspectReferences, conceptGenerator: { generate: fail }, generate: () => assert.fail('Modeling must not run') });
     runner.start(p.id, {}, 'web'); await runner.pending;
     assert.equal(p.versions.length, 0); assert.equal(p.concepts[0].status, 'failed'); assert.ok(p.concepts[0].error);
     if (runner.usageLimited) assert.throws(() => runner.regenerateConcept(p.id, {}, 'web'), /usage limit/);
@@ -332,7 +335,7 @@ test('legacy text projects cannot bypass mandatory concepts and interrupted conc
 test('HTTP and MCP expose the same concept state and cannot approve enabled human checkpoints', async t => {
   const a = await app(t), client = new Client({ name: 'concept-test', version: '1' });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/mcp.js')], env: { ...process.env, GEN3D_URL: a.url }, stderr: 'pipe' })); t.after(() => client.close());
-  const p = (await a.request('/api/projects', 'POST', { ...input, checkpoints: { concept: true, preview: true } })).data;
+  const p = (await a.request('/api/projects', 'POST', { ...input, checkpoints: { concept: true, multiView: false, preview: true } })).data;
   await client.callTool({ name: 'generate_model', arguments: { projectId: p.id } }); await a.runner.pending;
   const c = a.store.get(p.id).concepts[0];
   const state = await client.readResource({ uri: `gen3d://projects/${p.id}` });
@@ -383,10 +386,255 @@ test('native image-tool allowance failures reported in the final message stop fu
     if (args[0] === 'login') return 'Logged in using ChatGPT';
     fs.writeFileSync(path.join(options.cwd, 'summary.txt'), 'Image generation failed: usage limit reached.'); return 'Turn completed';
   } });
-  const runner = new Runner(store, { conceptGenerator: generator, generate: () => assert.fail('No modeling after a usage limit') });
+  const runner = new Runner(store, { inspectReferences, conceptGenerator: generator, generate: () => assert.fail('No modeling after a usage limit') });
   runner.start(p.id, {}, 'web'); await runner.pending;
   assert.equal(runner.usageLimited, true); assert.equal(p.versions.length, 0);
   assert.throws(() => runner.start(p.id, {}, 'web'), /usage limit/);
   assert.throws(() => runner.regenerateConcept(p.id, {}, 'web'), /usage limit/);
   await assert.rejects(runProcess(process.execPath, ['-e', `console.log(JSON.stringify({type:'item.completed',item:{type:'command_execution',exit_code:1,status:'completed',aggregated_output:'ERROR: quota exceeded'}}));`]), e => e.usageLimited === true);
+});
+
+test('multi-view checkpoint survives restart/settings changes and requires explicit web approval', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { ...input.checkpoints, multiView: true } }, 'web');
+  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+  runner.start(p.id, {}, 'mcp'); await runner.pending;
+  const set = p.referenceSets[0];
+  assert.equal(set.images.length, 4); assert.equal(set.review, 'pending'); assert.equal(p.versions.length, 0);
+  assert.equal(set.consistency.status, 'passed'); assert.equal(set.conceptId, p.selectedConceptId);
+  assert.throws(() => runner.start(p.id, {}, 'mcp'), /multi-view/);
+  assert.throws(() => runner.reviewReferenceSet(p.id, set.id, 'approved', 'mcp'), /web UI/);
+  assert.throws(() => runner.regenerateReferenceSet(p.id, {}, 'mcp'), /Reject pending/);
+  store.update(p.id, { checkpoints: { multiView: false } }, 'web');
+  const reloaded = new Store(store.root), current = reloaded.get(p.id);
+  const resumed = new Runner(reloaded, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+  assert.equal(current.referenceSets[0].checkpoints.multiView, true);
+  assert.throws(() => resumed.start(p.id, {}, 'web'), /multi-view/);
+  resumed.reviewReferenceSet(p.id, set.id, 'approved', 'web'); await resumed.pending;
+  assert.equal(current.versions[0].status, 'ready'); assert.equal(current.versions[0].referenceSetId, set.id);
+  assert.deepEqual(current.versions[0].modelingImages, current.referenceSets[0].images);
+  assert.equal(current.versions[0].imageInputs.length, 5);
+  assert.ok(current.activity.some(e => e.type === 'reference_set_reviewed' && e.actor === 'web' && e.decision === 'approved'));
+});
+
+test('character and object providers receive the exact base design; all images persist with typed provenance', async t => {
+  for (const profile of ['character', 'object']) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, profile }, 'web');
+    const provider = { provider: 'replacement', generate: conceptGenerator.generate, generateViews: async task => {
+      assert.equal(task.profile, profile); assert.equal(task.prompt, input.prompt);
+      assert.equal(task.conceptId, p.concepts[0].id); assert.deepEqual(fs.readFileSync(task.conceptFile), png);
+      await generateViews(task);
+    } };
+    const runner = new Runner(store, { conceptGenerator: provider, inspectReferences: async task => {
+      assert.equal(task.images.length, 5); assert.deepEqual(task.images.slice(1).map(i => i.label), ['front', 'left side', 'back', 'three-quarter']);
+      return inspectReferences();
+    }, generate: async (p, v, dir) => artifacts(dir) });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const set = p.referenceSets[0]; assert.equal(set.review, 'approved'); assert.equal(p.versions[0].status, 'ready');
+    assert.equal(p.concepts[0].role, 'base-concept'); assert.equal(set.provider, 'replacement');
+    assert.equal(new Set(set.images.map(i => i.file)).size, 4);
+    for (const image of set.images) {
+      assert.equal(image.role, 'modeling-view'); assert.equal(image.parentConceptId, p.concepts[0].id);
+      assert.equal(image.parentImage, p.concepts[0].artifacts.image); assert.deepEqual(fs.readFileSync(store.artifact(p.id, image.file)), png);
+    }
+    const saved = new Store(store.root).get(p.id);
+    assert.deepEqual(saved.referenceSets, JSON.parse(JSON.stringify(p.referenceSets))); assert.equal(saved.versions[0].referenceSetId, set.id);
+  }
+});
+
+test('reference regeneration/rejection retains all earlier sets, decisions and linked model versions', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { ...input.checkpoints, multiView: true } }, 'web');
+  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const first = p.referenceSets[0], bytes = first.images.map(i => fs.readFileSync(store.artifact(p.id, i.file)));
+  runner.regenerateReferenceSet(p.id, { feedback: 'Match the rear feet' }, 'web'); await runner.pending;
+  assert.equal(first.review, 'rejected'); assert.equal(p.versions.length, 0);
+  assert.equal(p.referenceSets[1].feedback, 'Match the rear feet'); assert.equal(p.concepts.length, 1);
+  runner.reviewReferenceSet(p.id, p.referenceSets[1].id, 'approved', 'web'); await runner.pending;
+  const model = p.versions[0];
+  runner.regenerateReferenceSet(p.id, {}, 'web'); await runner.pending;
+  runner.reviewReferenceSet(p.id, p.referenceSets[2].id, 'rejected', 'web');
+  assert.throws(() => runner.start(p.id, {}, 'web'), /Regenerate or explicitly accept/);
+  assert.equal(model.referenceSetId, p.referenceSets[1].id);
+  // A historical revision uses its source set even after a later set is rejected.
+  runner.start(p.id, { kind: 'revision', sourceVersionId: model.id, feedback: 'Taller' }, 'web'); await runner.pending;
+  assert.equal(p.versions[1].referenceSetId, model.referenceSetId);
+  first.images.forEach((i, n) => assert.deepEqual(fs.readFileSync(store.artifact(p.id, i.file)), bytes[n]));
+  assert.ok(p.activity.some(e => e.referenceSetId === first.id && e.decision === 'rejected'));
+});
+
+test('missing/invalid/unavailable views and inspection failures block modeling without falling back to older sets', async t => {
+  const badProviders = [
+    {},
+    { generateViews: async ({ onImage }) => onImage({ view: 'front', bytes: png, ext: 'png' }) },
+    { generateViews: async ({ onImage }) => { await onImage({ view: 'front', bytes: png, ext: 'png' }); throw new Error('Unavailable'); } },
+    { generateViews: async ({ onImage }) => onImage({ view: 'front', bytes: Buffer.from('invalid'), ext: 'png' }) },
+    { generateViews: async ({ onImage }) => { await onImage({ view: 'front', bytes: png, ext: 'png' }); await onImage({ view: 'front', bytes: png, ext: 'png' }); } },
+  ];
+  for (const bad of badProviders) {
+    const store = new Store(temporary(t)), p = store.create(input, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const oldModel = p.versions[0]; runner.conceptGenerator = { generate: conceptGenerator.generate, ...bad };
+    runner.regenerateReferenceSet(p.id, {}, 'web'); await runner.pending;
+    const failed = p.referenceSets[1]; assert.equal(failed.status, 'failed'); assert.ok(failed.error);
+    assert.equal(p.versions.length, 1); assert.equal(oldModel.referenceSetId, p.referenceSets[0].id);
+    assert.throws(() => runner.start(p.id, {}, 'web'), /Regenerate/);
+    for (const image of failed.images) assert.deepEqual(fs.readFileSync(store.artifact(p.id, image.file)), png);
+  }
+  for (const inspect of [async () => { throw new Error('Inspection unavailable'); }, async () => ({ consistent: 'yes', issues: [] })]) {
+    const store = new Store(temporary(t)), p = store.create(input, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences: inspect, generate: () => assert.fail('Never model without inspection') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.referenceSets[0].images.length, 4); assert.equal(p.referenceSets[0].status, 'failed'); assert.equal(p.versions.length, 0);
+  }
+});
+
+test('cross-view contradictions require regeneration from the same base and cannot be approved away', async t => {
+  const store = new Store(temporary(t)), p = store.create(input, 'web');
+  const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => ({ consistent: false, issues: ['Back view is missing a leg'] }), generate: () => assert.fail('No modeling inconsistent views') });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const set = p.referenceSets[0]; assert.equal(set.status, 'ready'); assert.equal(set.consistency.status, 'failed'); assert.equal(set.review, 'pending');
+  assert.equal(p.versions.length, 0); assert.throws(() => runner.reviewReferenceSet(p.id, set.id, 'approved', 'web'), /contradictions/);
+  assert.throws(() => runner.start(p.id, {}, 'web'), /multi-view/);
+  runner.reviewReferenceSet(p.id, set.id, 'rejected', 'web');
+  runner.inspectReferences = inspectReferences; runner.generate = async (p, v, dir) => artifacts(dir);
+  runner.regenerateReferenceSet(p.id, { feedback: 'Restore all legs' }, 'web'); await runner.pending;
+  assert.equal(p.referenceSets[1].conceptId, set.conceptId); assert.equal(p.concepts.length, 1);
+  assert.equal(p.versions[0].referenceSetId, p.referenceSets[1].id);
+});
+
+test('interrupted reference sets preserve partial images and pending reviews persist across restart', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, checkpoints: { ...input.checkpoints, multiView: true } }, 'web');
+  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: () => assert.fail('Pending review blocks modeling') });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const pending = p.referenceSets[0];
+  p.referenceSets.push({ ...structuredClone(pending), id: 'interrupted', status: 'running', images: pending.images.slice(0, 1) }); store.save(p);
+  const recovered = new Store(store.root).get(p.id);
+  assert.equal(recovered.referenceSets[0].review, 'pending'); assert.equal(recovered.referenceSets[1].status, 'failed');
+  assert.equal(recovered.referenceSets[1].images.length, 1); assert.equal(recovered.activity.at(-1).type, 'reference_set_interrupted');
+});
+
+test('HTTP/MCP share view artifacts, pending reviews, regeneration, consistency and derived-model linkage', async t => {
+  const a = await app(t), client = new Client({ name: 'views-test', version: '1' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/mcp.js')], env: { ...process.env, GEN3D_URL: a.url }, stderr: 'pipe' })); t.after(() => client.close());
+  const result = await client.callTool({ name: 'create_project', arguments: { ...input, checkpoints: { ...input.checkpoints, multiView: true } } });
+  const p = JSON.parse(result.content[0].text);
+  await client.callTool({ name: 'generate_model', arguments: { projectId: p.id } }); await a.runner.pending;
+  const state = JSON.parse((await client.readResource({ uri: `gen3d://projects/${p.id}` })).contents[0].text), set = state.referenceSets[0];
+  assert.deepEqual(state.referenceSets, (await a.request(`/api/projects/${p.id}`)).data.referenceSets);
+  assert.equal(state.versions.length, 0);
+  for (const image of set.images) {
+    const response = await fetch(a.url + `/api/projects/${p.id}/artifacts/${image.file}`);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
+    const read = await client.callTool({ name: 'get_reference_image', arguments: { projectId: p.id, imageId: image.id } });
+    assert.equal(read.content[0].type, 'image'); assert.deepEqual(Buffer.from(read.content[0].data, 'base64'), png);
+  }
+  assert.equal((await a.request(`/api/projects/${p.id}/reference-sets/${set.id}/review`, 'POST', { decision: 'approved' }, { 'X-Gen3d-Client': 'mcp' })).status, 403);
+  const denied = await client.callTool({ name: 'regenerate_reference_set', arguments: { projectId: p.id } }); assert.equal(denied.isError, true);
+  await a.request(`/api/projects/${p.id}/reference-sets/${set.id}/review`, 'POST', { decision: 'rejected' });
+  await client.callTool({ name: 'regenerate_reference_set', arguments: { projectId: p.id, feedback: 'Keep all components' } }); await a.runner.pending;
+  const next = a.store.get(p.id).referenceSets[1];
+  await a.request(`/api/projects/${p.id}/reference-sets/${next.id}/review`, 'POST', { decision: 'approved' }); await a.runner.pending;
+  const shared = JSON.parse((await client.callTool({ name: 'get_project', arguments: { projectId: p.id } })).content[0].text);
+  assert.equal(shared.referenceSets[0].review, 'rejected'); assert.equal(shared.versions[0].referenceSetId, next.id);
+});
+
+test('real modeling boundary attaches all required images in order, rejects missing/tampered sets and retains image input', async t => {
+  for (const mode of ['text', 'image']) {
+    const store = new Store(temporary(t)), p = store.create(mode === 'text' ? input : { ...input, mode, image }, 'web');
+    const calls = [];
+    const runner = new Runner(store, { conceptGenerator, inspectReferences,
+      processRunner: async (command, args) => { calls.push(args); return args[0] === 'login' ? 'Logged in using ChatGPT' : 'done'; },
+      blender: async (type, { code }) => { if (code?.includes('export_scene.gltf')) artifacts(path.join(store.dir(p.id), 'versions', p.versions.at(-1).id)); } });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const v = p.versions[0], cli = calls.find(args => args[0] === 'exec');
+    const attachments = cli.flatMap((arg, n) => arg === '--image' ? [cli[n + 1]] : []);
+    assert.deepEqual(attachments, v.imageInputs.map(file => store.artifact(p.id, file)));
+    assert.equal(attachments.length, mode === 'text' ? 5 : 1); assert.equal(v.status, 'ready');
+    if (mode === 'text') {
+      const set = p.referenceSets[0]; assert.match(fs.readFileSync(store.artifact(p.id, v.artifacts.task), 'utf8'), /ALL required modeling views/);
+      await assert.rejects(runner.realGenerate(p, { ...v, referenceSetId: null }, store.dir(p.id)), /reference set/);
+      await assert.rejects(runner.realGenerate(p, { ...v, modelingImages: v.modelingImages.slice(0, 1) }, store.dir(p.id)), /do not match/);
+      set.images.pop(); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)), /complete reference set/);
+      assert.equal(calls.length, 2); // Rejections happened before CLI/Blender calls.
+    }
+  }
+});
+
+test('native multi-view provider uses the same concept and prior views as real image-generation inputs', async t => {
+  const dir = temporary(t), conceptFile = path.join(dir, 'base.png'); fs.writeFileSync(conceptFile, png);
+  const calls = [], received = [];
+  const generator = new CodexConceptGenerator({ processRunner: async (command, args, { cwd, env }) => {
+    assert.equal(env.OPENAI_API_KEY, undefined);
+    if (args[0] === 'login') return 'Logged in using ChatGPT';
+    calls.push(args);
+    const view = path.basename(cwd); fs.writeFileSync(path.join(cwd, view + '.png'), png); return 'done';
+  } });
+  await generator.generateViews({ prompt: input.prompt, profile: 'character', conceptFile, feedback: 'Fix the back heels and left-side direction', dir, onImage: image => received.push(image) });
+  assert.deepEqual(received.map(i => i.view), requiredViews); assert.equal(received[1].side, 'left');
+  calls.forEach((args, n) => {
+    const attachments = args.flatMap((arg, i) => arg === '--image' ? [args[i + 1]] : []);
+    assert.equal(attachments[0], conceptFile); assert.equal(attachments.length, n + 1);
+    assert.ok(args.includes('image_generation'));
+    const task = fs.readFileSync(path.join(dir, requiredViews[n], 'TASK.md'), 'utf8');
+    assert.match(task, /exact agreed base design/); assert.match(task, /neutral A-pose/); assert.match(task, /near-orthographic/); assert.match(task, /This view requirement takes precedence over feedback about another angle/); assert.match(task, new RegExp('Final required output: ' + requiredViews[n] + '.png'));
+  });
+});
+
+test('Codex consistency inspector attaches base and views without Blender tools and requires a structured report', async t => {
+  const dir = temporary(t), images = ['base', ...requiredViews].map(label => ({ label, file: path.join(dir, label + '.png') }));
+  let report = { consistent: false, issues: ['Color changed'] };
+  const inspector = new CodexReferenceInspector({ processRunner: async (command, args, { env }) => {
+    assert.equal(env.OPENAI_API_KEY, undefined); if (args[0] === 'login') return 'Logged in using ChatGPT';
+    assert.equal(args.filter(a => a === '--image').length, 5); assert.ok(args.includes('--output-schema')); assert.ok(args.includes('read-only'));
+    assert.ok(!args.some(a => a.includes('mcp_servers'))); assert.ok(!args.includes('image_generation'));
+    fs.writeFileSync(path.join(dir, 'consistency.json'), JSON.stringify(report)); return 'done';
+  } });
+  assert.deepEqual(await inspector.inspect({ prompt: input.prompt, profile: 'object', images, dir }), report);
+  report = { consistent: 'true', issues: [] }; await assert.rejects(inspector.inspect({ prompt: input.prompt, profile: 'object', images, dir }), /Invalid/);
+});
+
+test('view-generation and consistency usage limits stop subsequent actions without retrying or switching', async t => {
+  for (const stage of ['views', 'inspection']) {
+    const store = new Store(temporary(t)), p = store.create(input, 'web');
+    let calls = 0;
+    const limited = () => { calls++; const e = new Error('Usage limit reached'); e.usageLimited = true; throw e; };
+    const runner = new Runner(store, { conceptGenerator: { ...conceptGenerator, ...(stage === 'views' ? { generateViews: limited } : {}) }, inspectReferences: stage === 'inspection' ? limited : inspectReferences, generate: () => assert.fail('No modeling') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(calls, 1); assert.equal(runner.usageLimited, true); assert.equal(p.versions.length, 0);
+    assert.throws(() => runner.regenerateReferenceSet(p.id, {}, 'web'), /usage limit/); assert.throws(() => runner.regenerateConcept(p.id, {}, 'web'), /usage limit/);
+  }
+});
+
+
+test('final native-tool usage reports stop the process even when the CLI turn completes successfully', async () => {
+  await assert.rejects(runProcess(process.execPath, ['-e', `console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Native image generation failed: usage limit reached.'}})); process.exit(0);`]), e => e.usageLimited === true);
+});
+
+test('valid native images remain accessible when a later CLI failure or usage report blocks the job', async t => {
+  for (const stage of ['concept', 'views']) {
+    const store = new Store(temporary(t)), p = store.create(input, 'web');
+    const provider = new CodexConceptGenerator({ processRunner: async (command, args, { cwd }) => {
+      if (args[0] === 'login') return 'Logged in using ChatGPT';
+      const view = path.basename(cwd), isView = requiredViews.includes(view);
+      fs.writeFileSync(path.join(cwd, isView ? view + '.png' : 'concept.png'), png);
+      if ((stage === 'views' && isView) || stage === 'concept') fs.writeFileSync(path.join(cwd, 'summary.txt'), 'Native image tool failed: usage limit reached.');
+      return 'done';
+    } });
+    const runner = new Runner(store, { conceptGenerator: provider, inspectReferences, generate: () => assert.fail('Usage failure never models') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(runner.usageLimited, true); assert.equal(p.versions.length, 0);
+    const file = stage === 'concept' ? p.concepts[0].artifacts.image : p.referenceSets[0].images[0].file;
+    assert.deepEqual(fs.readFileSync(store.artifact(p.id, file)), png);
+    if (stage === 'views') assert.equal(p.referenceSets[0].images.length, 1);
+  }
+});
+
+test('replacement providers can supply a clearly labeled right-side reference', async t => {
+  const store = new Store(temporary(t)), p = store.create(input, 'web');
+  const runner = new Runner(store, { conceptGenerator: { ...conceptGenerator, generateViews: async ({ onImage }) => {
+    for (const view of requiredViews) await onImage({ view, side: view === 'side' ? 'right' : undefined, bytes: png, ext: 'png' });
+  } }, inspectReferences: async ({ images }) => { assert.equal(images[2].label, 'right side'); return inspectReferences(); }, generate: async (p, v, dir) => artifacts(dir) });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  assert.equal(p.referenceSets[0].images[1].side, 'right'); assert.equal(p.versions[0].status, 'ready');
 });

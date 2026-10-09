@@ -1,0 +1,22 @@
+{
+  "title": "Uploaded cabinet",
+  "version": "9027f57c-7a8f-4b4f-88c7-3bacfc484b95",
+  "canvas": true,
+  "download": "http://127.0.0.1:13333/api/projects/9ef4ab4c-0567-4b16-b939-4ba5c6a488af/artifacts/versions/9027f57c-7a8f-4b4f-88c7-3bacfc484b95/model.glb?download=1",
+  "activity": 14,
+  "inputImageVisible": true,
+  "referenceImages": 0,
+  "conceptImages": 0,
+  "modelingViews": 0,
+  "viewSets": 0,
+  "allReferenceImagesLoaded": true,
+  "projectId": "9ef4ab4c-0567-4b16-b939-4ba5c6a488af",
+  "versionId": "9027f57c-7a8f-4b4f-88c7-3bacfc484b95",
+  "glbBytes": 268612,
+  "glbSha256": "05a0158bae30856bc1aff3f287aedb9f6f02334b21af93c55358defe9c6399ee",
+  "orbit": "passed",
+  "pan": "passed",
+  "zoom": "passed",
+  "exceptions": [],
+  "checkedAt": "2026-10-09T00:24:24.970Z"
+}
