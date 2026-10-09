@@ -41,15 +41,26 @@ try {
   await call('Page.reload');
   await waitFor(`document.querySelector('#versions')?.options.length > 0 && document.querySelector('#title')?.textContent === ${JSON.stringify(project.name)}`);
   await evaluate(`document.querySelector('#versions').value = ${JSON.stringify(version.id)}; document.querySelector('#versions').dispatchEvent(new Event('change'))`);
+  await evaluate('document.querySelector("#nav-model").click()');
   await waitFor('document.querySelector("#viewer-message").hidden && !document.querySelector("#download").hidden');
   const info = await evaluate(`({ title: document.querySelector('#title').textContent, version: document.querySelector('#versions').value, canvas: !!document.querySelector('#viewer canvas'), download: document.querySelector('#download').href, activity: document.querySelector('#history').children.length, inputImageVisible: !!document.querySelector('#input-image img'), referenceImages: document.querySelectorAll('#references img').length, conceptImages: document.querySelectorAll('#concepts img').length, modelingViews: document.querySelectorAll('#reference-sets img').length, viewSets: document.querySelectorAll('#reference-sets section').length, allReferenceImagesLoaded: [...document.querySelectorAll('#concepts img, #reference-sets img')].every(img => img.complete && img.naturalWidth > 0) })`);
-  if (project.mode === 'text' && (!version.conceptId || !info.conceptImages)) throw new Error('Text model must have a visible source concept');
-  if (version.referenceSetId) {
-    await waitFor('[...document.querySelectorAll("#concepts img, #reference-sets img")].every(img => img.complete && img.naturalWidth > 0)');
-    info.allReferenceImagesLoaded = true;
-    const expected = project.referenceSets.reduce((total, set) => total + set.images.length, 0);
-    if (info.modelingViews !== expected || info.viewSets !== project.referenceSets.length) throw new Error('Every generated view/set must remain visible, including history');
+  // Browse every artifact through the stage selectors, including automatic and
+  // historical/partial sets, rather than requiring all images in one long page.
+  info.conceptImages = 0; info.modelingViews = 0; info.viewSets = project.referenceSets.length;
+  for (const concept of project.concepts) {
+    await evaluate(`(() => { document.querySelector('#nav-concept').click(); const select = document.querySelector('#concept-selection'); select.value = ${JSON.stringify(concept.id)}; select.dispatchEvent(new Event('change')); })()`);
+    if (concept.artifacts.image) { await waitFor('document.querySelector("#concepts img")?.naturalWidth > 0'); info.conceptImages++; }
   }
+  for (const set of project.referenceSets) {
+    await evaluate(`(() => { document.querySelector('#nav-views').click(); const select = document.querySelector('#view-selection'); select.value = ${JSON.stringify(set.id)}; select.dispatchEvent(new Event('change')); })()`);
+    await waitFor('[...document.querySelectorAll("#reference-sets img")].every(img => img.complete && img.naturalWidth > 0)');
+    const count = await evaluate('document.querySelectorAll("#reference-sets .image-grid figure:not(.base-view)").length');
+    if (count !== set.images.length) throw new Error('Historical view images are missing');
+    info.modelingViews += count;
+  }
+  info.allReferenceImagesLoaded = true;
+  if (project.mode === 'text' && (!version.conceptId || !info.conceptImages)) throw new Error('Text model must have an accessible source concept');
+  await evaluate('document.querySelector("#nav-model").click()');
   const download = await fetch(info.download); const glb = Buffer.from(await download.arrayBuffer());
   if (!download.ok || glb.subarray(0, 4).toString() !== 'glTF') throw new Error('GLB download failed');
   fs.mkdirSync(output, { recursive: true });
