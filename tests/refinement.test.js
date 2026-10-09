@@ -290,6 +290,37 @@ test('existing input/concept/multi-view checkpoints block enabled refinement and
 });
 
 
+test('real modeling clears camera metadata for consecutive projects and retry, preserving it for revisions', async t => {
+  const preparations = [];
+  const ctx = setup(t, { generate: undefined,
+    processRunner: async (command, args) => args[0] === 'login' ? 'Logged in using ChatGPT' : 'done',
+    blender: async (command, { code } = {}) => {
+      if (command !== 'execute_code') return {};
+      if (code.includes('export_scene.gltf')) {
+        const dir = JSON.parse(code.match(/^out = (.+)$/m)[1]);
+        model(dir, {});
+      } else preparations.push(code);
+      return {};
+    }
+  }, { refinementSettings: { enabled: false } });
+  assert.equal((await run(ctx)).status, 'ready');
+  const next = ctx.store.create({ ...defaults, refinementSettings: { enabled: false } }, 'web');
+  assert.equal((await run({ ...ctx, p: next })).status, 'ready');
+  ctx.runner.start(next.id, { kind: 'retry' }, 'web'); await ctx.runner.pending;
+  assert.equal(next.versions.at(-1).status, 'ready');
+  ctx.runner.start(next.id, { kind: 'revision', sourceVersionId: next.versions.at(-1).id, feedback: 'Adjust framing' }, 'web'); await ctx.runner.pending;
+  assert.equal(next.versions.at(-1).status, 'ready');
+  assert.equal(preparations.length, 4);
+  for (const code of preparations.slice(0, 3)) {
+    for (const property of ['direction', 'directions', 'framing']) {
+      assert.ok(code.includes(`del bpy.context.scene['gen3d_reference_camera_${property}']`));
+    }
+    assert.doesNotMatch(code, /open_mainfile/);
+  }
+  assert.match(preparations[3], /open_mainfile.*source\.blend/);
+  assert.doesNotMatch(preparations[3], /del bpy\.context\.scene/);
+});
+
 test('a real runner modeling usage failure saves available Blender work once without retrying Codex or masking its error', async t => {
   for (const exportFails of [false, true]) {
     let turns = 0, exports = 0;

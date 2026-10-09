@@ -673,7 +673,7 @@ export class Runner {
     }
     const code = v.kind === 'revision'
       ? `import bpy\nbpy.ops.wm.open_mainfile(filepath=${JSON.stringify(path.join(dir, 'source.blend'))}, use_scripts=False)\nfor o in list(bpy.data.objects):\n    if o.name.startswith('gen3d_') and o.type in {'CAMERA', 'LIGHT'}:\n        bpy.data.objects.remove(o, do_unlink=True)`
-      : "import bpy\nfor o in list(bpy.data.objects):\n    bpy.data.objects.remove(o, do_unlink=True)\nif 'gen3d_reference_camera_direction' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_direction']\nif 'gen3d_reference_camera_directions' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_directions']";
+      : "import bpy\nfor o in list(bpy.data.objects):\n    bpy.data.objects.remove(o, do_unlink=True)\nif 'gen3d_reference_camera_direction' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_direction']\nif 'gen3d_reference_camera_directions' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_directions']\nif 'gen3d_reference_camera_framing' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_framing']";
     await this.blender('execute_code', { code }, { port: Number(this.env.GEN3D_BLENDER_PORT || 9877) });
     try {
       await this.run(command, codexArgs(dir, images, { ...this.env, GEN3D_MODELING_MODE: v.modelingMode || 'scratch' }), { cwd: dir, env, onLine: line => {

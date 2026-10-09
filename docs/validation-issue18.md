@@ -65,3 +65,13 @@ Fixed the three blocking review findings: verification now follows structured ge
 - `node scripts/refinement-export-check.js`: passed with real Blender 5.1.2, using deterministic edits and the production exporter. A material-only change and a camera-only change each changed the input render while all five stage mesh hashes stayed identical. Scale **42** and target center **[1, 2, 3]** remained in fresh camera renders and after reopening/exporting the saved scene. All four reference views honored independent scale/center overrides. Invalid overrides failed explicitly. See the [Blender report](validation/issue18/review-fixes/blender-report.json) and [initial](validation/issue18/review-fixes/initial.png), [material edit](validation/issue18/review-fixes/material.png), and [camera edit](validation/issue18/review-fixes/camera.png) renders.
 
 These follow-up checks did not run a fresh authenticated Codex modeling/visual-inspection trial. The runner/MPFB cases and browser cases use injected outputs; the exporter check uses real Blender. They verify corrections and retained gates, without claiming aesthetic improvement or a human approval result.
+
+## Fresh-job framing reset follow-up
+
+Fresh generation and retry now clear `gen3d_reference_camera_framing` alongside camera directions, preventing a shared Blender scene from carrying another project's optional center/scale overrides into new comparison renders. Existing-scene revisions preserve the saved overrides.
+
+- `npm test`: **120 passed, 0 failed**. The added mocked runner regression exercises consecutive projects, retry and an existing-scene revision through the production modeling boundary.
+- `npm run check`: passed.
+- `node scripts/refinement-export-check.js`: passed with real Blender **5.1.2**. The check captures the production preparation code with mocked authentication/image validation, then executes it and the production exporter in Blender. A revision retained scale **42** and center **[1, 2, 3]**. Subsequent generation and retry cleared both direction properties and framing, then rendered a new cube without framing overrides at the bounds-based scale **2.6** and center **[0, 0, 0]**. See the [saved Blender report](validation/issue18/framing-reset/blender-report.json).
+
+No Codex modeling/inspection turn or human visual review was performed for this reset fix; these checks establish state isolation and framing behavior without claiming visual quality improvement.
