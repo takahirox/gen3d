@@ -11,6 +11,12 @@ Validated on 2026-10-09 in the assigned worktree using Node.js 24.12.0. No requi
 
 Automated modeling checks use synthetic artifacts and mocked CLI/Blender calls. They assert the exact five image attachments at the final modeling boundary; they do not demonstrate real model generation.
 
+### Publication after image-validation fix
+
+On 2026-10-09, publication validation after commit `d16c612` ran `npm ci` (zero reported vulnerabilities), `npm test` (86 passed, zero failed/skipped), `npm run check`, and `git diff 3f11d54 HEAD --check`; all passed. The additional regressions cover decoding PNG/JPEG/WebP and rejecting signature-preserving truncation/corruption before inspection/modeling in every consistency mode and at the final modeling boundary. Original image bytes are preserved for modeling inputs.
+
+The browser and live Codex/Blender checks recorded below preceded this image-validation fix and were not rerun during publication. No fresh image generation or live consistency inspection was performed during publication.
+
 ## Browser checks
 
 A disposable headless Google Chrome profile used the actual HTTP server and Web UI with synthetic reference-image fixtures, an injected failed inspection, and copied historical model artifacts. These checks verified:
