@@ -1,0 +1,8 @@
+Preserve the existing MPFB body and refine its shape toward the approved lean adult proportions: reduce calf bulk, soften knee transitions, refine shoulders and chest, and match torso-to-leg proportions.
+Refine the existing face to match the reference jaw, nose, lips, brows, and visible eyes; replace the pale skin material with warm medium skin and natural surface variation.
+Reshape the hair into the approved fuller, short wavy hairstyle with side and nape coverage, and change its material to dark brown-black.
+Refine the T-shirt geometry to remove pronounced breast-like chest bulges and rigid horizontal ridges; add a defined crewneck, sleeve seams, hem, and restrained fabric folds. Match the darker muted teal fabric.
+Refine the trousers into a slim straight charcoal fit with natural knee and ankle folds; add the visible fly, pockets, seams, and rear pockets.
+Refine the shoes into dark low-top sneakers with visible laces, panel seams, and separate soles, reducing the current bulky simplified shape.
+Adjust arms, hands, and feet to match the relaxed reference A-pose, including greater arm clearance from the torso, softly curved fingers, and the reference foot spacing and outward rotation.
+Align the side camera so the figure faces image-right, and align the three-quarter camera to show the same side and direction as its reference. Lower the three-quarter camera to the reference viewing height and match full-body framing.

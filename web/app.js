@@ -142,7 +142,7 @@ function render() {
   $('revise').querySelector('button').disabled = !!blocked || v?.status !== 'ready';
   $('concept-retry').querySelector('button').disabled = !!(busy || pendingInput || pendingPreview || pendingRefs || status.usageLimited);
   $('views-retry').querySelector('button').disabled = !!(busy || pendingInput || pendingConcept || pendingPreview || pendingRefs || status.usageLimited || !p.selectedConceptId && !p.referenceSets.some(s => revisionReferenceSet(p, s)));
-  for (const id of ['edit', 'modeling', 'checkpoints', 'consistency', 'reference']) $(id).querySelector('button').disabled = projectBusy;
+  for (const id of ['edit', 'modeling', 'checkpoints', 'consistency', 'refinement', 'reference']) $(id).querySelector('button').disabled = projectBusy;
   for (const key of ['name', 'prompt', 'profile', 'modelingMode']) { if (!$('edit').dataset.dirty) $('edit').elements[key].value = p[key]; }
   $('edit').elements.prompt.required = p.mode === 'text'; $('edit').elements.profile.closest('label').hidden = false;
   $('modeling').hidden = p.profile !== 'character';
@@ -154,6 +154,10 @@ function render() {
   $('consistency').hidden = p.mode !== 'text';
   for (const key of ['enabled', 'onFailure']) if (!$('consistency').dataset.dirty) $('consistency').elements[key].value = String(p.consistencySettings[key]);
   syncConsistency($('consistency'));
+  if (!$('refinement').dataset.dirty) {
+    $('refinement').elements.refinementEnabled.value = String(p.refinementSettings?.enabled || false);
+    $('refinement').elements.maxIterations.value = p.refinementSettings?.maxIterations || 2;
+  }
   $('input-review-state').textContent = `Input review: ${p.inputReview}${pendingInput ? ' · Explicit approval required.' : ''}`;
   $('input-review').replaceChildren(...(p.checkpoints.input || p.inputCheckpoint || p.inputReview === 'rejected' ? ['approved', 'rejected'].map(decision => button(decision === 'approved' ? 'Accept input' : 'Reject input', () => api(`/projects/${p.id}/input/review`, 'POST', { decision }), projectBusy)) : []));
   $('input-image').replaceChildren(...(p.inputImage ? [figure(p.inputImage, 'Original image input')] : []));
@@ -210,6 +214,7 @@ function render() {
   if (pendingRefs && stage === 'input') $('references').closest('details').open = true;
   selectOptions('versions', p.versions, v?.id, v => `v${v.number} · ${modelingLabel(v.modelingMode)} · ${v.kind} · ${v.status}`);
   $('version-info').textContent = describe(v, 'Version') + (v ? ` · ${modelingLabel(v.modelingMode)} · ${v.kind}${v.sourceVersionId ? ` · revision of v${p.versions.find(source => source.id === v.sourceVersionId)?.number ?? '?'}` : ''}` : '') + (v?.continuedDespiteInconsistency ? ' · WARNING: modeling continued despite failed consistency inspection' : v?.consistency?.status === 'skipped' ? ' · Consistency inspection skipped' : '');
+  if (v?.refinement && v.refinement.status !== 'off') $('version-info').textContent += ` · Refinement: ${v.refinement.status}${v.refinement.error && !v.error ? ' · ' + v.refinement.error : ''}`;
   $('version-info').classList.toggle('error', v?.status === 'failed');
   $('model-summary').textContent = v?.summary || 'No modeling summary yet.';
   const sourceConcept = p.concepts.find(c => c.id === v?.conceptId), sourceSet = p.referenceSets.find(s => s.id === v?.referenceSetId);
@@ -224,6 +229,21 @@ function render() {
   }
   const renderKey = v?.artifacts?.render || '', renderSignature = `${p.id}/${v?.id}/${renderKey}`;
   if ($('render-image').dataset.file !== renderSignature) { $('render-image').dataset.file = renderSignature; $('render-image').replaceChildren(renderKey ? figure(renderKey, `Rendered view · v${v.number}`) : placeholder('A completed model will include a rendered preview.')); }
+  const refinement = v?.refinement;
+  $('refinement-history').hidden = !refinement || refinement.status === 'off';
+  $('refinement-info').textContent = refinement ? `Refinement: ${refinement.status} · maximum ${refinement.maxIterations} revision cycles. ${refinement.error || ''} ${refinement.stopCriterion || ''}` : '';
+  $('refinement-review').hidden = refinement?.status !== 'running' || v?.status !== 'running';
+  $('refinement-review').disabled = !!refinement?.reviewRequested;
+  $('refinement-cycles').replaceChildren(...(refinement?.iterations || []).map(cycle => {
+    const details = document.createElement('details'), summary = document.createElement('summary');
+    summary.textContent = `${cycle.number === 0 ? 'Initial model' : 'Revision cycle ' + cycle.number} · ${cycle.stage} · ${cycle.status}`; details.append(summary);
+    const provenance = document.createElement('p'); provenance.textContent = `Original inputs: ${cycle.imageInputs.join(', ')}. Source scene: ${cycle.sourceScene || 'initial generation'}. ${cycle.geometryChanged ? 'Mesh change verified; aesthetic improvement is unmeasured.' : ''} ${cycle.error || ''}`; details.append(provenance);
+    const images = document.createElement('div'); images.className = 'image-grid';
+    images.append(...cycle.imageInputs.map(file => figure(file, 'Original approved reference')), ...cycle.views.filter(view => cycle.artifacts[view + '.png']).map(view => figure(cycle.artifacts[view + '.png'], `Cycle ${cycle.number}: ${view}`))); details.append(images);
+    if (cycle.report) { const pre = document.createElement('pre'); pre.textContent = JSON.stringify(cycle.report, null, 2); details.append(pre); }
+    for (const [name, file] of Object.entries(cycle.artifacts)) { const link = document.createElement('a'), line = document.createElement('p'); link.href = artifact(file) + (/\.(blend|glb)$/.test(file) ? '?download=1' : ''); link.textContent = name; link.target = '_blank'; link.rel = 'noopener'; line.append(link); details.append(line); }
+    return details;
+  }));
   const other = matchingComparison(p.versions, v);
   $('comparison').hidden = !v || v.profile !== 'character' || v.status !== 'ready';
   $('comparison-info').textContent = other ? `v${v.number} and v${other.number} use the exact same saved reference images, original text and modeling feedback. Compare silhouette, anatomy, joints, face and materials; summaries describe edits and limitations. Aesthetic quality remains subjective.` : 'These views use the same camera directions and framing rule. Choose the other modeling mode and Retry from input to create a comparison using the same approved images.';
@@ -248,13 +268,16 @@ function form(id, action) { $(id).oninput = () => { $(id).dataset.dirty = 'true'
 const create = $('create');
 create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; for (const cls of ['concept-setting', 'view-setting', 'consistency-settings']) create.querySelector('.' + cls).hidden = image; syncConsistency(create); syncModeling(create); };
 form('create', async data => {
-  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), modelingMode: data.get('modelingMode') || 'scratch', checkpoints: checkpointData(data), consistencySettings: consistencyData(data, create), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
+  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), modelingMode: data.get('modelingMode') || 'scratch', checkpoints: checkpointData(data), refinementSettings: refinementData(data), consistencySettings: consistencyData(data, create), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
   projectId = p.id; localStorage.setItem('gen3d-project', p.id); conceptId = viewId = versionId = null; stagePinned = false; lastState = ''; $('create-dialog').close(); create.reset();
   for (const f of document.querySelectorAll('#workspace form')) { f.reset(); delete f.dataset.dirty; } create.elements.mode.onchange();
 });
 function syncConsistency(form) { form.elements.onFailure.disabled = form.elements.enabled.value === 'false'; }
 function consistencyData(data, form) { return { enabled: data.get('enabled') === 'true', onFailure: form.elements.onFailure.value }; }
 for (const form of [create, $('consistency')]) form.elements.enabled.onchange = () => syncConsistency(form);
+function refinementData(data) { return { enabled: data.get('refinementEnabled') === 'true', maxIterations: Number(data.get('maxIterations')) }; }
+form('refinement', data => api(`/projects/${projectId}`, 'PATCH', { refinementSettings: refinementData(data) }));
+$('refinement-review').onclick = () => safe(() => api(`/projects/${projectId}/versions/${versionId || project()?.versions.at(-1)?.id}/refinement-review`, 'POST', {}));
 form('consistency', data => api(`/projects/${projectId}`, 'PATCH', { consistencySettings: consistencyData(data, $('consistency')) }));
 function checkpointData(data) { return Object.fromEntries(['input', 'concept', 'multiView', 'preview'].map(key => [key, data.has(key)])); }
 form('checkpoints', data => api(`/projects/${projectId}`, 'PATCH', { checkpoints: checkpointData(data) }));

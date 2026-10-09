@@ -1,0 +1,43 @@
+{
+  "acceptable": false,
+  "summary": "The render retains the robot’s main parts, but differs in framing, head proportions, arm placement, and material visibility. Severe overexposure obscures several approved details.",
+  "revisionInstructions": [
+    "Reduce camera magnification so the robot occupies approximately the reference’s central framing, with more space above and below. Match the reference’s elevated three-quarter angle and visible torso side.",
+    "Reduce the head relative to the torso and flatten its lower contour to match the reference’s rounded, slightly squat shape.",
+    "Move the arms upward toward the shoulders and match the reference’s compact peach oval shapes.",
+    "Reduce lighting intensity or exposure and adjust materials to restore the off-white head, muted turquoise body, peach arms and button, and dark gray eyes.",
+    "Preserve both eyes and the single chest button while restoring their clear contrast and the reference’s visible low-poly facets."
+  ],
+  "views": [
+    {
+      "view": "input",
+      "observations": [
+        {
+          "category": "silhouette",
+          "status": "discrepancy",
+          "detail": "The robot fills substantially more of the frame, extending approximately from y=69–462 versus y=123–393 in the reference. The view also appears more frontal, with less torso-side visibility."
+        },
+        {
+          "category": "proportions",
+          "status": "discrepancy",
+          "detail": "The head appears taller and larger relative to the torso, with a more spherical outline than the reference’s squatter head and flatter lower contour."
+        },
+        {
+          "category": "partPlacement",
+          "status": "discrepancy",
+          "detail": "The arms sit lower relative to the head and shoulder junctions; their lower ends extend farther down the torso than in the reference."
+        },
+        {
+          "category": "features",
+          "status": "discrepancy",
+          "detail": "Both eyes and the single chest button are present; no clearly missing or extra parts are visible. However, their contrast and the head’s polygonal facets are largely lost in the bright rendering."
+        },
+        {
+          "category": "colorsMaterials",
+          "status": "discrepancy",
+          "detail": "The head and much of the torso and arms are nearly white from overexposure. The reference clearly shows an off-white head, muted turquoise body and feet, peach arms and button, and dark gray eyes."
+        }
+      ]
+    }
+  ]
+}

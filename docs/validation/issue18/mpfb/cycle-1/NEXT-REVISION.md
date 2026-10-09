@@ -1,0 +1,10 @@
+Preserve the existing MPFB body if present; adjust its shape toward the reference's lean adult build, with less bulky thighs and knees, smoother natural leg contours, fuller upper arms, and a more defined neck and shoulders.
+Refine the existing face geometry and materials to match the reference's adult facial structure, visible brown eyes, dark eyebrows, defined nose, lips, and jaw; replace the pale skin appearance with warm medium skin.
+Reshape the existing hair into short, dark, swept wavy hair with a raised front and natural side and nape contours. Remove the hanging forehead strands and gray, rope-like surface treatment.
+Refine the T-shirt geometry with a fitted crew-neck band, shoulder seams, sleeve hems, bottom hem, and natural fabric folds. Reduce the flared side hem and match the deeper muted teal fabric.
+Refine the trousers into dark charcoal jeans with the reference's fly, front pocket openings, rear patch pockets, seams, and restrained folds at the knees and ankles. Remove the broad horizontal knee bulges.
+Refine the shoes into dark low-top sneakers with visible laces, panel seams, and distinct soles; replace the smooth gray slipper-like appearance.
+Refine hands and fingers to the reference's natural relaxed curvature and separation, avoiding rigid, widely spread fingers in the side and three-quarter views.
+Align the side camera so the character faces image-right, matching the approved side reference. Align the three-quarter camera to the approved image-right-facing angle and reduce its elevated downward view.
+Match reference framing with the character filling more of the image vertically, and use comparable camera height and perspective across all views. Establish a visible floor contact so the shoes do not appear suspended.
+Match the reference's relaxed A-pose with slightly greater arm clearance from the torso and naturally outward-oriented feet, while retaining straight, balanced standing posture.
