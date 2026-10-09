@@ -4,6 +4,20 @@ import { runProcess, subscriptionEnv } from './codex.js';
 import { AppError } from './store.js';
 
 export const requiredViews = ['front', 'side', 'back', 'three-quarter'];
+export function consistencySettings(value = {}, previous = { enabled: true, onFailure: 'stop' }) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.entries(value).some(([key, v]) => key === 'enabled' ? typeof v !== 'boolean'
+      : key === 'onFailure' ? !['stop', 'continue'].includes(v) : true)) throw new AppError('Consistency settings must be enabled (boolean) and onFailure (stop or continue)');
+  return { ...previous, ...value };
+}
+
+export function consistencyAllowsModeling(set) {
+  const settings = consistencySettings(set.consistencySettings);
+  return set.consistency?.status === 'passed'
+    || (set.consistency?.status === 'failed' && settings.enabled && settings.onFailure === 'continue')
+    || (set.consistency?.status === 'skipped' && !settings.enabled);
+}
+
 export function referenceProfile(value, prompt) {
   if (value !== undefined && !['character', 'object'].includes(value)) throw new AppError('Profile must be character or object');
   return value || (/\b(character|humanoid|person|robot|man|woman|boy|girl|warrior|knight|wizard|elf|outfit)\b/i.test(prompt) ? 'character' : 'object');
@@ -12,7 +26,8 @@ export function referenceProfile(value, prompt) {
 export function validateViewSet(set) {
   if (!requiredViews.every(view => set.images.filter(i => i.role === 'modeling-view' && i.view === view).length === 1)
     || new Set(set.images.map(i => i.file)).size !== set.images.length
-    || set.images.some(i => i.parentConceptId !== set.conceptId)
+    || set.images.some(i => i.parentConceptId !== set.conceptId || i.referenceSetId !== set.id
+      || path.posix.dirname(i.file) !== `reference-sets/${set.id}`)
     || !['left', 'right'].includes(set.images.find(i => i.view === 'side')?.side)) throw new AppError('A complete reference set requires distinct front, labeled left/right side, back and three-quarter images from the chosen concept', 409);
 }
 

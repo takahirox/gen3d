@@ -54,3 +54,6 @@ figcaption { font-size: 12px; color: #a6b6cb; margin: 8px 0; overflow-wrap: anyw
 .checkpoints { border: 1px solid #3b485d; border-radius: 6px; margin: 12px 0; padding: 12px; }
 .checkpoints label { display: flex; align-items: center; gap: 8px; }
 .checkpoints input { width: auto; margin: 0; }
+
+.consistency-settings { border: 1px solid #3b485d; border-radius: 6px; margin: 12px 0; padding: 12px; }
+.warning { background: #462b24; color: #ffd5c5; padding: 12px; border-radius: 6px; }
