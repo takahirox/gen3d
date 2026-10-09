@@ -7,7 +7,7 @@ export { runProcess, subscriptionEnv } from './codex.js';
 import { CodexConceptGenerator } from './concept.js';
 import { gunzipSync, zstdDecompressSync } from 'node:zlib';
 import { AppError, text, imageData, currentConcept, currentReferenceSet, revisionReferenceSet } from './store.js';
-import { CodexModelInspector, validateComparison, stopCriterion } from './refinement.js';
+import { CodexModelInspector, validateComparison, requiredRevisionTargets, stopCriterion } from './refinement.js';
 import { modelingMode } from './modeling-mode.js';
 import { mpfbCode, mpfbResult } from './mpfb.js';
 import { blenderCall } from './blender.js';
@@ -43,11 +43,11 @@ export function taskPrompt(project, version) {
       : 'The set passed a separate Codex consistency inspection. If you discover a contradiction, stop and report it before modeling; do not silently discard views or redesign the base.';
   return `You are creating a real 3D model in a dedicated Blender scene using ONLY gen3d_blender MCP for modeling.
 First call get_scene_info. Work in small steps through the available Blender MCP tools.
-${version.kind === 'revision' ? 'The app has loaded source.blend into Blender. Revise the existing geometry according to feedback; preserve the subject.' : version.modelingMode === 'mpfb' ? 'The app has cleared the scene. Call mpfb_status, then create_mpfb_human to create the real continuous MPFB body via the installed HumanService.create_human API.' : 'The app has cleared the scene. Create mesh geometry from scratch for the requested subject.'}
+${version.kind === 'revision' ? (version.refinementCycle ? 'The app has loaded source.blend into Blender. Revise the existing scene according to the required changes in feedback; preserve the subject.' : 'The app has loaded source.blend into Blender. Revise the existing geometry according to feedback; preserve the subject.') : version.modelingMode === 'mpfb' ? 'The app has cleared the scene. Call mpfb_status, then create_mpfb_human to create the real continuous MPFB body via the installed HumanService.create_human API.' : 'The app has cleared the scene. Create mesh geometry from scratch for the requested subject.'}
 ${version.referenceSetId ? `The first attached image is the agreed base concept. The next images are ALL required modeling views: ${version.modelingImages.map(i => i.label).join(', ')}. Inspect and model from all of them, preserving identity, parts, proportions, colors, materials and asymmetry. ${inspection} Reference set: ${version.referenceSetId}.` : 'The first attached image is the uploaded visual design input. Analyze and model its silhouette, shapes and colors.'}
 ${version.modelingMode === 'mpfb' ? `MPFB-assisted humanoid mode is explicitly selected. ${version.kind === 'revision' ? 'The saved scene already contains the MPFB body. Preserve it; do not call create_mpfb_human again.' : 'You MUST call create_mpfb_human once through this MCP bridge; a missing or incompatible add-on is an error, never a reason to switch methods.'}
 Adapt the original MPFB body using its shape keys/targets, proportional vertex edits and transforms to match ALL approved images and the original text: height, shoulder/hip width, limbs, joints, body/face shape, pose, styling and materials. Keep the connected base topology and gen3d_mpfb_* properties. Do not replace, hide or remesh the body into spheres/boxes. Helpers must stay masked for export. Local installed hair/clothes/bodypart assets are optional; discover the installed API before using them, never download or require MakeHuman's socket service. Face identity, skin/hair and garments are approximations; report missing local assets and features you cannot reconstruct. Prefer GLB-compatible Principled materials. Report the actual body/face/proportion edits and limitations in the summary.` : 'Existing Blender modeling mode is selected; MPFB is not required.'}
-${version.refinementSettings?.enabled ? `Refinement is enabled. Orient ALL subjects upright +Z, front -Y, left +X. ${version.referenceSetId ? "Set bpy.context.scene['gen3d_reference_camera_directions'] to a dictionary mapping EVERY required view (front, side, back, three-quarter) to a 3-number direction FROM subject center TOWARD a camera. Inspect each original view and match its visible facing direction and elevation, including the labeled side. With the generator's left-side convention (front points to image right), a matching camera is [-1,0,0] for a subject facing -Y; do not mirror the subject to correct camera alignment. Front is normally [0,-1,0], back [0,1,0]; inspect the three-quarter image to choose its sign/elevation rather than assuming it. Preserve/update these camera choices during revisions. Missing view directions are errors." : "Set bpy.context.scene['gen3d_reference_camera_direction'] to a 3-number vector FROM the model center TOWARD a camera matching the uploaded input image's visible viewpoint (e.g. front [0,-1,0], left [1,0,0], three-quarter [1,-1,0.35]). Inspect the image to choose it, preserve/update it during revisions; do not assume unseen views. The app uses orthographic framing and saves the camera directions."} ${version.refinementCycle ? 'This is an automated refinement cycle, revising source.blend in the SAME scene lineage. Make concrete mesh geometry changes addressing the saved comparison; do not merely repeat prompts or rename objects. Preserve the original approved image inputs, design, MPFB body, topology and exports.' : ''}`.trim() : ''}
+${version.refinementSettings?.enabled ? `Refinement is enabled. Orient ALL subjects upright +Z, front -Y, left +X. ${version.referenceSetId ? "Set bpy.context.scene['gen3d_reference_camera_directions'] to a dictionary mapping EVERY required view (front, side, back, three-quarter) to a 3-number direction FROM subject center TOWARD a camera. Inspect each original view and match its visible facing direction and elevation, including the labeled side. With the generator's left-side convention (front points to image right), a matching camera is [-1,0,0] for a subject facing -Y; do not mirror the subject to correct camera alignment. Front is normally [0,-1,0], back [0,1,0]; inspect the three-quarter image to choose its sign/elevation rather than assuming it. Preserve/update these camera choices during revisions. Missing view directions are errors." : "Set bpy.context.scene['gen3d_reference_camera_direction'] to a 3-number vector FROM the model center TOWARD a camera matching the uploaded input image's visible viewpoint (e.g. front [0,-1,0], left [1,0,0], three-quarter [1,-1,0.35]). Inspect the image to choose it, preserve/update it during revisions; do not assume unseen views. The app uses orthographic framing and saves the camera directions."} Save optional per-view framing corrections in bpy.context.scene['gen3d_reference_camera_framing'], mapping view labels (or input for an upload) to dictionaries with center (three finite world coordinates) and orthoScale (positive finite number). These overrides survive export and subsequent revisions; omit an entry to use bounds-based framing. ${version.refinementCycle ? 'This is an automated refinement cycle, revising source.blend in the SAME scene lineage. Make concrete changes of EVERY required type listed in the revision instructions (geometry, materials and/or camera); mesh changes are required only for geometry corrections. For material-only or camera-only corrections preserve geometry. Do not merely repeat prompts or rename objects. Preserve the original approved image inputs, design, MPFB body, topology and exports.' : ''}`.trim() : ''}
 For humanoids, orient the subject upright along +Z, front facing -Y and left side facing +X, so the app can render comparable front, left-side and three-quarter views.
 Remaining images are supplementary approved references.
 Concept version: ${version.conceptId || 'user-uploaded image'}. The original text is supplementary design context; never bypass the image.
@@ -146,7 +146,10 @@ for label, direction in [('front', (0, -1, 0)), ('side', (1, 0, 0)), ('three-qua
     bpy.ops.render.render(write_still=True)
 ` : ''}
 ${refinementSettings?.enabled ? `camera.data.type = 'ORTHO'
-camera.data.ortho_scale = max(hi.z - lo.z, hi.x - lo.x, hi.y - lo.y) * 1.3
+default_scale = max(hi.z - lo.z, hi.x - lo.x, hi.y - lo.y) * 1.3
+framings = scene.get('gen3d_reference_camera_framing', {})
+if not hasattr(framings, 'get'):
+    raise RuntimeError('Invalid reference camera framing map')
 ${modelingImages.length ? `directions = scene.get('gen3d_reference_camera_directions')
 view_labels = ${JSON.stringify(modelingImages.map(i => i.view))}
 if directions is None or any(label not in directions for label in view_labels):
@@ -159,13 +162,24 @@ render_views = []
 for label, direction in views:
     if len(direction) != 3 or not all(math.isfinite(float(x)) for x in direction) or Vector(direction).length < 0.01:
         raise RuntimeError('Invalid reference camera direction for ' + label)
-    camera.location = center + Vector(direction).normalized() * radius * 3.8
-    camera.rotation_euler = (center - camera.location).to_track_quat('-Z', 'Y').to_euler()
+    framing = framings.get(label, {})
+    if not hasattr(framing, 'get'):
+        raise RuntimeError('Invalid reference camera framing for ' + label)
+    target = framing.get('center', list(center))
+    scale = framing.get('orthoScale', default_scale)
+    if len(target) != 3 or not all(math.isfinite(float(x)) for x in target) or not isinstance(scale, (int, float)) or isinstance(scale, bool) or not math.isfinite(scale) or scale <= 0:
+        raise RuntimeError('Invalid reference camera framing for ' + label)
+    target = Vector(target)
+    camera.data.ortho_scale = scale
+    camera.location = target + Vector(direction).normalized() * radius * 3.8
+    camera.rotation_euler = (target - camera.location).to_track_quat('-Z', 'Y').to_euler()
     scene.render.filepath = out + '/' + label + '.png'
     bpy.ops.render.render(write_still=True)
-    render_views.append({'view': label, 'direction': direction, 'projection': 'orthographic', 'orthoScale': camera.data.ortho_scale, 'center': list(center)})
+    render_views.append({'view': label, 'direction': direction, 'projection': 'orthographic', 'orthoScale': camera.data.ortho_scale, 'center': list(target)})
 with open(out + '/cameras.json', 'w') as f:
     json.dump(render_views, f)
+# Persist the actual reference camera as well as the direction/framing properties.
+bpy.ops.wm.save_as_mainfile(filepath=out + '/scene.blend', compress=False)
 ` : ''}
 print(json.dumps({'meshCount': len(meshes), 'vertexCount': sum(len(o.data.vertices) for o in meshes)}))
 `;
@@ -188,6 +202,54 @@ export function validateArtifacts(dir) {
   if (blend.subarray(0, 7).toString() !== 'BLENDER') throw new Error('Invalid Blender scene');
   if (!fs.readFileSync(path.join(dir, 'preview.png')).subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) throw new Error('Invalid render');
   return { meshes: scene.meshes.length };
+}
+
+function materialEvidence(dir) {
+  // Hash exported surface state, including embedded textures and assignments,
+  // independently of mesh positions, camera changes and display names.
+  const glb = fs.readFileSync(path.join(dir, 'model.glb'));
+  const jsonLength = glb.readUInt32LE(12);
+  const scene = JSON.parse(glb.toString('utf8', 20, 20 + jsonLength).trim());
+  const binary = glb.subarray(28 + jsonLength);
+  const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().filter(key => !['name', 'extras'].includes(key)).map(key => [key, canonical(value[key])])) : value;
+  const images = (scene.images || []).map(image => {
+    const view = scene.bufferViews?.[image.bufferView];
+    return { mimeType: image.mimeType, sha256: view ? createHash('sha256').update(binary.subarray(view.byteOffset || 0, (view.byteOffset || 0) + view.byteLength)).digest('hex') : null };
+  });
+  const surfaces = { materials: scene.materials || [], textures: scene.textures || [], samplers: scene.samplers || [], images,
+    assignments: (scene.meshes || []).map(mesh => mesh.primitives.map(primitive => primitive.material ?? null)) };
+  return { sha256: createHash('sha256').update(JSON.stringify(canonical(surfaces))).digest('hex') };
+}
+
+function verifyRevision(beforeDir, afterDir, report) {
+  const changed = {};
+  const readHash = (dir, file) => {
+    const hash = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')).sha256;
+    if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error(`Invalid refinement evidence: ${file}`);
+    return hash;
+  };
+  for (const [target, file] of [['geometry', 'geometry.json'], ['materials', 'materials.json']]) {
+    changed[target] = readHash(beforeDir, file) !== readHash(afterDir, file);
+  }
+  const targets = requiredRevisionTargets(report);
+  if (targets.includes('camera')) {
+    const cameras = dir => {
+      const views = JSON.parse(fs.readFileSync(path.join(dir, 'cameras.json'), 'utf8'));
+      if (!Array.isArray(views) || !views.length || views.some(v => typeof v.view !== 'string' || v.projection !== 'orthographic'
+        || !Number.isFinite(v.orthoScale) || v.orthoScale <= 0 || ![v.center, v.direction].every(a => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite)))) throw new Error('Invalid refinement camera evidence');
+      return views.map(({ view, projection, orthoScale, center, direction }) => {
+        const length = Math.hypot(...direction);
+        if (length < 0.01) throw new Error('Invalid refinement camera direction');
+        return { view, projection, orthoScale, center, direction: direction.map(n => n / length) };
+      }).sort((a, b) => a.view.localeCompare(b.view));
+    };
+    const before = cameras(beforeDir), after = cameras(afterDir);
+    if (JSON.stringify(before.map(v => v.view)) !== JSON.stringify(after.map(v => v.view))) throw new Error('Refinement camera evidence changed required viewpoints');
+    changed.camera = JSON.stringify(before) !== JSON.stringify(after);
+  }
+  for (const target of targets) if (!changed[target]) throw new Error(`Refinement produced no verified ${target === 'geometry' ? 'mesh geometry' : target} change; repeated prompts do not count as refinement.`);
+  return { revisionTargets: targets, geometryChanged: changed.geometry, materialsChanged: changed.materials, ...(changed.camera !== undefined ? { cameraChanged: changed.camera } : {}) };
 }
 
 export class Runner {
@@ -481,6 +543,7 @@ export class Runner {
   validateModel(p, v, dir) {
     if (fs.existsSync(path.join(dir, 'summary.txt'))) v.summary = fs.readFileSync(path.join(dir, 'summary.txt'), 'utf8').slice(0, 4000);
     v.metrics = validateArtifacts(dir);
+    if (v.refinementSettings?.enabled) fs.writeFileSync(path.join(dir, 'materials.json'), JSON.stringify(materialEvidence(dir), null, 2));
     const audit = fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
     if (v.modelingMode === 'mpfb') {
       if (v.kind !== 'revision' && !audit.some(e => e.tool === 'create_mpfb_human')) throw new Error('No successful Codex MPFB base creation was recorded');
@@ -518,7 +581,7 @@ export class Runner {
     const before = Object.keys(cycle.artifacts).length;
     const prefix = path.relative(this.store.dir(p.id), dir).split(path.sep).join('/');
     // Known files only; never expose unrelated Codex workspace output.
-    const files = ['scene.blend', 'model.glb', 'preview.png', 'mpfb.json', 'TASK.md', 'mcp-audit.jsonl', 'summary.txt', 'source.blend', 'geometry.json', 'cameras.json', 'COMPARISON.md', 'comparison-schema.json', 'comparison.json', 'REVISION.md', 'NEXT-REVISION.md', 'partial-export-error.json', ...[...new Set([...cycle.views, 'front', 'side', 'back', 'three-quarter', 'input'])].map(view => view + '.png')];
+    const files = ['scene.blend', 'model.glb', 'preview.png', 'mpfb.json', 'TASK.md', 'mcp-audit.jsonl', 'summary.txt', 'source.blend', 'geometry.json', 'materials.json', 'cameras.json', 'COMPARISON.md', 'comparison-schema.json', 'comparison.json', 'REVISION.md', 'NEXT-REVISION.md', 'partial-export-error.json', ...[...new Set([...cycle.views, 'front', 'side', 'back', 'three-quarter', 'input'])].map(view => view + '.png')];
     for (const file of files) if (fs.existsSync(path.join(dir, file)) && fs.lstatSync(path.join(dir, file)).isFile()) cycle.artifacts[file] = `${prefix}/${file}`;
     if (!onlyNew || Object.keys(cycle.artifacts).length !== before) this.store.save(p);
   }
@@ -538,7 +601,8 @@ export class Runner {
       this.store.event(p, 'system', 'refinement_cycle_started', { versionId: v.id, cycle: number }); this.store.save(p);
       try {
         if (number) {
-          const instructions = state.iterations[number - 1].report.revisionInstructions.join('\n');
+          const previousReport = state.iterations[number - 1].report;
+          const instructions = `Required changes: ${requiredRevisionTargets(previousReport).join(', ')}.\n${previousReport.revisionInstructions.join('\n')}`;
           fs.writeFileSync(path.join(dir, 'REVISION.md'), instructions);
           fs.copyFileSync(path.join(previousDir, 'scene.blend'), path.join(dir, 'source.blend'));
           const revision = { ...v, kind: 'revision', refinementCycle: number, feedback: `${v.feedback || ''}\nConcrete discrepancies from comparison cycle ${number - 1}:\n${instructions}`, artifacts: {}, mpfb: undefined };
@@ -546,10 +610,7 @@ export class Runner {
           this.publishCycle(p, v, cycle, dir);
           await this.generate(p, revision, dir);
           this.validateModel(p, revision, dir);
-          const before = JSON.parse(fs.readFileSync(path.join(previousDir, 'geometry.json'), 'utf8')).sha256;
-          const after = JSON.parse(fs.readFileSync(path.join(dir, 'geometry.json'), 'utf8')).sha256;
-          if (!/^[a-f0-9]{64}$/.test(before) || !/^[a-f0-9]{64}$/.test(after) || before === after) throw new Error('Refinement produced no verified mesh geometry change; repeated prompts do not count as refinement.');
-          cycle.geometryChanged = true;
+          Object.assign(cycle, verifyRevision(previousDir, dir, previousReport));
           // Only validated usable outputs become the selected final preview/export.
           v.artifacts = revision.artifacts; v.metrics = revision.metrics; v.summary = revision.summary; v.mpfb = revision.mpfb;
         }

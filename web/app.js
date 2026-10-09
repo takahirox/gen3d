@@ -237,11 +237,11 @@ function render() {
   $('refinement-cycles').replaceChildren(...(refinement?.iterations || []).map(cycle => {
     const details = document.createElement('details'), summary = document.createElement('summary');
     summary.textContent = `${cycle.number === 0 ? 'Initial model' : 'Revision cycle ' + cycle.number} · ${cycle.stage} · ${cycle.status}`; details.append(summary);
-    const provenance = document.createElement('p'); provenance.textContent = `Original inputs: ${cycle.imageInputs.join(', ')}. Source scene: ${cycle.sourceScene || 'initial generation'}. ${cycle.geometryChanged ? 'Mesh change verified; aesthetic improvement is unmeasured.' : ''} ${cycle.error || ''}`; details.append(provenance);
+    const provenance = document.createElement('p'); provenance.textContent = `Original inputs: ${cycle.imageInputs.join(', ')}. Source scene: ${cycle.sourceScene || 'initial generation'}. ${cycle.geometryChanged ? 'Mesh change verified; aesthetic improvement is unmeasured.' : ''} ${cycle.materialsChanged ? 'Material change verified.' : ''} ${cycle.cameraChanged ? 'Camera change verified.' : ''} ${cycle.error || ''}`; details.append(provenance);
     const images = document.createElement('div'); images.className = 'image-grid';
     images.append(...cycle.imageInputs.map(file => figure(file, 'Original approved reference')), ...cycle.views.filter(view => cycle.artifacts[view + '.png']).map(view => figure(cycle.artifacts[view + '.png'], `Cycle ${cycle.number}: ${view}`))); details.append(images);
     if (cycle.report) { const pre = document.createElement('pre'); pre.textContent = JSON.stringify(cycle.report, null, 2); details.append(pre); }
-    for (const [name, file] of Object.entries(cycle.artifacts)) { const link = document.createElement('a'), line = document.createElement('p'); link.href = artifact(file) + (/\.(blend|glb)$/.test(file) ? '?download=1' : ''); link.textContent = name; link.target = '_blank'; link.rel = 'noopener'; line.append(link); details.append(line); }
+    for (const [name, file] of Object.entries(cycle.artifacts)) { const link = document.createElement('a'), line = document.createElement('p'); link.href = artifact(file); link.textContent = name; link.target = '_blank'; link.rel = 'noopener'; line.append(link); details.append(line); }
     return details;
   }));
   const other = matchingComparison(p.versions, v);

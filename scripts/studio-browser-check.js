@@ -16,7 +16,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-studio-browser-'));
 const assets = path.join(root, 'docs/validation/issue10/prop');
 const checkpoints = { input: false, concept: false, multiView: false, preview: false };
 const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
-let missingMpfb = false, refinementPass = true;
+let missingMpfb = false, refinementPass = true, partialModelState;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
 const app = createApp({
   dataDir: path.join(temp, 'data'),
@@ -49,6 +49,10 @@ const app = createApp({
     if (v.modelingMode === 'mpfb') {
       fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ vertices: 19158, polygons: 18486, topologyPreserved: true }));
       fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim() + '\n{"tool":"create_mpfb_human"}\n');
+    }
+    if (partialModelState) {
+      partialModelState.entered(); await partialModelState.gate;
+      throw new Error('Fixture failure after partial model export');
     }
   }
 });
@@ -264,6 +268,13 @@ try {
   assert.ok(await evaluate('document.querySelector("#download").hidden'));
   const reportLink = await evaluate('Array.from(document.querySelectorAll("#refinement-cycles a")).find(a => a.textContent === "comparison.json").href');
   assert.ok((await fetch(reportLink)).ok);
+  async function inspectHistoryModels() {
+    const links = await evaluate('Array.from(document.querySelectorAll("#refinement-cycles a")).filter(a => /\\.(glb|blend)$/.test(a.textContent)).map(a => a.href)');
+    assert.ok(links.length >= 2);
+    for (const href of links) { assert.equal(new URL(href).search, ''); assert.equal((await fetch(href)).status, 200); }
+  }
+  await inspectHistoryModels();
+  assert.equal((await fetch(reportLink.replace('comparison.json', 'model.glb') + '?download=1')).status, 409);
   await evaluate('document.querySelector("#refinement-history").scrollIntoView()');
   await screenshot('refinement-history');
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
@@ -279,6 +290,27 @@ try {
   assert.ok(await evaluate('document.querySelector("#download").hidden'));
   refinementPass = true;
   check('refinement Off default, saved enable/cycle limit, original references, cycle renders/reports/mesh evidence and final human review (mocked)');
+
+  let releasePartial, enteredPartial;
+  const partialGate = new Promise(resolve => { releasePartial = resolve; });
+  const partialStarted = new Promise(resolve => { enteredPartial = resolve; });
+  partialModelState = { gate: partialGate, entered: enteredPartial };
+  const partialModel = await request('/projects', 'POST', { name: 'Partial model history', mode: 'image', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'object', checkpoints, refinementSettings: { enabled: true, maxIterations: 1 } });
+  try {
+    await request(`/projects/${partialModel.id}/generate`, 'POST', {}); await partialStarted;
+    await chooseProject(partialModel.id); await stage('model');
+    await wait('Array.from(document.querySelectorAll("#refinement-cycles a")).some(a => a.textContent === "model.glb")');
+    await inspectHistoryModels();
+    assert.ok(await evaluate('document.querySelector("#download").hidden'));
+    const partialLink = await evaluate('Array.from(document.querySelectorAll("#refinement-cycles a")).find(a => a.textContent === "model.glb").href');
+    assert.equal((await fetch(partialLink + '?download=1')).status, 400);
+    releasePartial(); await app.runner.pending;
+    await wait('document.querySelector("#version-info").textContent.includes("failed")');
+    await inspectHistoryModels();
+    assert.equal((await fetch(partialLink + '?download=1')).status, 400);
+    assert.ok(await evaluate('document.querySelector("#download").hidden'));
+  } finally { releasePartial(); await app.runner.pending; partialModelState = null; }
+  check('actual running and failed GLB/Blender history links return 200; final download remains gated (mocked)');
 
   // Create and upload through the actual browser form.
   await click('#new-project'); await wait('document.querySelector("#create-dialog").open');

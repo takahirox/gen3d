@@ -1,0 +1,31 @@
+{
+  "fixture": "Injected providers replay recorded Issue #10 images/models; no live generation",
+  "viewports": [
+    "1440 × 1050",
+    "390 × 844"
+  ],
+  "checks": [
+    "automatic text workflow, dominant GLB preview, source links and exports",
+    "orbit, pan, zoom and fit-to-model",
+    "GLB and Blender scene download",
+    "existing browser validator adapted to stage selectors (recorded fixture assets)",
+    "concept and base/front/side/back/three-quarter images accessible after automatic generation",
+    "MCP polling updates header while preserving unsaved form edits",
+    "input, concept, view and preview approval/rejection/regeneration; settings cannot dismiss pending checkpoint",
+    "revision requests, historic concept/view/model selection stable during MCP generation and polling",
+    "Stop/continued/skipped consistency, effective policy, report access and saved settings",
+    "humanoid mode selection, visible missing-MPFB failure, immutable baseline and same-reference render comparison (mocked)",
+    "refinement Off default, saved enable/cycle limit, original references, cycle renders/reports/mesh evidence and final human review (mocked)",
+    "actual running and failed GLB/Blender history links return 200; final download remains gated (mocked)",
+    "browser project creation/image upload, reduced image path, model rejection/retry and MCP supplementary review",
+    "generation errors, failed stage states and empty GLB presentation",
+    "inspection errors and partially generated image sets remain accessible",
+    "refresh restores selected project and current artifact",
+    "390px responsive stages without overflow; keyboard stage navigation, focus retention and dialog dismissal",
+    "input edits offer a new workflow and retain earlier artifacts",
+    "discoverable history/settings shortcuts and reconnect status",
+    "failed GLB load and unavailable WebGL retain render and downloads"
+  ],
+  "exceptions": [],
+  "checkedAt": "2026-10-09T16:33:58.630Z"
+}

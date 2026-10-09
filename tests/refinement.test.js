@@ -16,13 +16,15 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 const image = 'data:image/png;base64,' + png.toString('base64');
 const defaults = { name: 'Test', mode: 'image', image, profile: 'object', refinementSettings: { enabled: true, maxIterations: 1 }, checkpoints: { concept: false, multiView: false, preview: false } };
 function temporary(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-refinement-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir; }
-function model(dir, v, { same = false } = {}) {
-  const json = Buffer.from(JSON.stringify({ asset: { version: '2.0' }, meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }] }).padEnd(128, ' '));
+function model(dir, v, { same = false, materialChanged = false, cameraChanged = false } = {}) {
+  const scene = JSON.stringify({ asset: { version: '2.0' }, materials: [{ pbrMetallicRoughness: { baseColorFactor: materialChanged && v.refinementCycle ? [1, 0, 0, 1] : [0, 0, 1, 1] } }], meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }] });
+  const json = Buffer.from(scene.padEnd(Math.ceil(scene.length / 4) * 4, ' '));
   const glb = Buffer.alloc(20 + json.length); glb.write('glTF'); glb.writeUInt32LE(2, 4); glb.writeUInt32LE(glb.length, 8); glb.writeUInt32LE(json.length, 12); glb.writeUInt32LE(0x4e4f534a, 16); json.copy(glb, 20);
   fs.writeFileSync(path.join(dir, 'model.glb'), glb);
   fs.writeFileSync(path.join(dir, 'scene.blend'), 'BLENDER-synthetic-' + (v.refinementCycle || 0));
   for (const name of ['preview', 'input', 'front', 'side', 'back', 'three-quarter']) fs.writeFileSync(path.join(dir, name + '.png'), png);
   fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: ((same || !v.refinementCycle) ? 'a' : 'b').repeat(64) }));
+  fs.writeFileSync(path.join(dir, 'cameras.json'), JSON.stringify([{ view: 'input', direction: [0, -1, 0], projection: 'orthographic', center: [0, 0, 0], orthoScale: cameraChanged && v.refinementCycle ? 42 : 4 }]));
   fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), JSON.stringify({ tool: v.modelingMode === 'mpfb' && v.kind !== 'revision' ? 'create_mpfb_human' : 'execute_blender_code' }) + '\n' + JSON.stringify({ tool: 'execute_blender_code' }) + '\n');
   if (v.modelingMode === 'mpfb') fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ topologyPreserved: true, vertices: 1500, polygons: 1500 }));
 }
@@ -91,6 +93,63 @@ test('bounded discrepancies terminate at cycle cap; immediate pass does not revi
   const passing = await run(setup(t)); assert.equal(passing.refinement.status, 'passed'); assert.equal(passing.refinement.iterations.length, 1);
 });
 
+test('material-only and camera-only revisions re-evaluate without claiming geometry changes', async t => {
+  for (const target of ['materials', 'camera']) {
+    for (const mode of ['scratch', 'mpfb']) {
+      let inspections = 0;
+      const profile = mode === 'mpfb' ? 'character' : 'object';
+      const ctx = setup(t, { generate: async (p, v, dir) => {
+        model(dir, v, { same: true, materialChanged: target === 'materials', cameraChanged: target === 'camera' });
+        if (v.refinementCycle) {
+          assert.match(taskPrompt(p, v), /mesh changes are required only for geometry corrections/);
+          assert.match(fs.readFileSync(path.join(dir, 'REVISION.md'), 'utf8'), new RegExp(`Required changes: ${target}`));
+        }
+      }, inspectModel: async ({ dir }) => {
+        const report = comparison(['input'], profile, inspections++ > 0);
+        report.revisionTargets = report.acceptable ? [] : [target];
+        if (!report.acceptable) {
+          report.views[0].observations.forEach(o => o.status = 'acceptable');
+          const observation = report.views[0].observations.find(o => o.category === (target === 'materials' ? 'colorsMaterials' : 'silhouette'));
+          observation.status = 'discrepancy'; observation.detail = target === 'materials' ? 'Body should be red.' : 'Camera crops the silhouette.';
+          report.revisionInstructions = [target === 'materials' ? 'Make the existing material red.' : 'Set input camera orthoScale to 42.'];
+        } else if (target === 'camera') assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'cameras.json')))[0].orthoScale, 42);
+        return report;
+      } }, { profile, modelingMode: mode });
+      const v = await run(ctx), cycle = v.refinement.iterations[1];
+      assert.equal(v.refinement.status, 'passed'); assert.equal(inspections, 2);
+      assert.equal(cycle.geometryChanged, false); assert.equal(cycle[target + 'Changed'], true);
+      assert.deepEqual(cycle.revisionTargets, [target]); assert.ok(cycle.artifacts['materials.json']);
+      assert.match(v.artifacts.blend, /refinement\/1\/scene.blend/);
+    }
+  }
+});
+
+test('revision verification requires every requested change and rejects irrelevant changes or absent evidence', async t => {
+  for (const branch of ['materials', 'camera', 'mixed', 'camera-missing', 'camera-invalid']) {
+    let inspections = 0;
+    const targets = branch === 'mixed' ? ['geometry', 'materials'] : [branch.startsWith('camera') ? 'camera' : 'materials'];
+    const ctx = setup(t, { generate: async (p, v, dir) => {
+      model(dir, v); // Geometry changes cannot stand in for missing material/camera changes.
+      if (v.refinementCycle && branch === 'camera-missing') fs.unlinkSync(path.join(dir, 'cameras.json'));
+      if (v.refinementCycle && branch === 'camera-invalid') fs.writeFileSync(path.join(dir, 'cameras.json'), '[]');
+    }, inspectModel: async () => { inspections++; return { ...comparison(['input'], 'object', false), revisionTargets: targets }; } });
+    const v = await run(ctx);
+    assert.equal(v.refinement.status, 'failed'); assert.equal(inspections, 1);
+    assert.equal(v.review, 'pending'); assert.doesNotMatch(v.artifacts.blend, /refinement/);
+    assert.match(v.refinement.error, /no verified|camera evidence|ENOENT/);
+  }
+});
+
+test('legacy material-only reports use material evidence while legacy geometry reports retain the mesh guard', async t => {
+  let inspections = 0;
+  const ctx = setup(t, { generate: async (p, v, dir) => model(dir, v, { same: true, materialChanged: true }), inspectModel: async () => {
+    const report = comparison(['input'], 'object', inspections++ > 0);
+    if (!report.acceptable) { report.views[0].observations[1].status = 'acceptable'; report.views[0].observations[4].status = 'discrepancy'; report.revisionInstructions = ['Correct the body color.']; }
+    return report;
+  } });
+  assert.equal((await run(ctx)).refinement.status, 'passed'); assert.equal(inspections, 2);
+});
+
 test('inspection/modeling/usage/no-change failures retain validated model and partial files without automatic retries', async t => {
   for (const branch of ['inspection', 'modeling', 'usage', 'same', 'missing-view', 'mpfb-topology']) {
     let inspections = 0, generations = 0;
@@ -155,6 +214,8 @@ test('comparison validation requires every view/category, truthful verdict and u
     const bad = comparison(); mutate(bad); assert.throws(() => validateComparison(bad, ['input'], 'object'));
   }
   assert.throws(() => validateComparison(comparison(), ['input'], 'character'));
+  for (const targets of [null, ['unknown'], ['camera', 'camera'], ['materials']]) assert.throws(() => validateComparison({ ...comparison(), revisionTargets: targets }, ['input'], 'object'), /revision targets/);
+  assert.throws(() => validateComparison({ ...comparison(['input'], 'object', false), revisionTargets: [] }, ['input'], 'object'), /revision targets/);
 });
 
 test('real inspector invocation attaches references and renders together, saves bounded schema and has no Blender tools', async t => {
