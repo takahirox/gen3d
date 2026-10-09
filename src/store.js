@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { refinementSettings } from './refinement.js';
 import { modelingMode } from './modeling-mode.js';
 import { crc32 } from 'node:zlib';
 import { Transformer } from '@napi-rs/image';
@@ -79,6 +80,7 @@ export class Store {
       project.checkpoints.multiView ??= true;
       project.consistencySettings = consistencySettings(project.consistencySettings);
       project.profile ??= referenceProfile(undefined, project.prompt);
+      project.refinementSettings = refinementSettings(project.refinementSettings);
       project.modelingMode = modelingMode(project.modelingMode, project.profile);
       project.referenceSets ??= [];
       project.selectedReferenceSetId ??= null;
@@ -105,6 +107,10 @@ export class Store {
       for (const version of project.versions) {
         version.modelingMode ??= 'scratch';
         if (version.status === 'running') {
+          if (version.refinement?.status === 'running') {
+            version.refinement.status = 'interrupted'; version.refinement.error = 'Server stopped; no automatic resume.';
+            for (const cycle of version.refinement.iterations) if (cycle.status === 'running') cycle.status = 'interrupted';
+          }
           version.status = 'failed'; version.error = 'Server stopped during generation. Retry to create a new version.';
           this.event(project, 'server', 'generation_interrupted', { versionId: version.id });
         }
@@ -136,7 +142,7 @@ export class Store {
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
     const profile = referenceProfile(input.profile, prompt);
-    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, modelingMode: modelingMode(input.modelingMode, profile), inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, modelingMode: modelingMode(input.modelingMode, profile), inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -157,12 +163,15 @@ export class Store {
     const method = modelingMode(input.modelingMode ?? p.modelingMode, profile);
     const settings = checkpoints(input.checkpoints, p.checkpoints);
     const consistency = consistencySettings(input.consistencySettings, p.consistencySettings);
+    const refinement = refinementSettings(input.refinementSettings, p.refinementSettings);
     if (prompt !== p.prompt || profile !== p.profile) { p.inputReview = 'pending'; p.inputCheckpoint = settings.input; p.selectedConceptId = null; p.selectedReferenceSetId = null; }
     // Changing settings never silently approves an already waiting checkpoint.
     if (settings.input && !p.checkpoints.input) { p.inputReview = 'pending'; p.inputCheckpoint = true; }
     p.checkpoints = settings;
     const consistencyChanged = JSON.stringify(consistency) !== JSON.stringify(p.consistencySettings);
     p.consistencySettings = consistency;
+    if (JSON.stringify(refinement) !== JSON.stringify(p.refinementSettings)) this.event(p, actor, 'refinement_settings_updated', { refinementSettings: refinement });
+    p.refinementSettings = refinement;
     p.name = name; p.prompt = prompt; p.profile = profile; p.modelingMode = method;
     this.event(p, actor, 'project_updated');
     if (consistencyChanged) this.event(p, actor, 'consistency_settings_updated', { consistencySettings: { ...consistency } });
@@ -234,7 +243,7 @@ export class Store {
   }
   artifact(id, relative) {
     const p = this.get(id);
-    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => Object.values(v.artifacts || {}))].filter(Boolean);
+    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => [...Object.values(v.artifacts || {}), ...(v.refinement?.iterations || []).flatMap(c => Object.values(c.artifacts || {}))])].filter(Boolean);
     if (!files.includes(relative)) throw new AppError('Artifact not found', 404);
     const file = path.resolve(this.dir(id), relative);
     if (!file.startsWith(this.dir(id) + path.sep) || !fs.lstatSync(file).isFile()

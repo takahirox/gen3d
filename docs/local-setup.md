@@ -129,3 +129,7 @@ GEN3D_PROJECT_ID=<project-uuid> node scripts/browser-check.js
 ```
 
 Set `GEN3D_CHROME_URL` for a different debugging port, `GEN3D_VERSION_ID` for an earlier completed version, and `GEN3D_BROWSER_OUTPUT` for the screenshot/report directory. The check verifies actual GLB loading/download and changed screenshots after orbit, pan and zoom; it does not launch generation or spend Codex allowance. Live generation itself requires an authenticated subscription and running Blender. See [Issue #10 validation actually performed](validation-issue10.md) and [historical MVP evidence](validation.md).
+
+## Optional visual refinement
+
+Enable refinement and choose 1–5 maximum revision cycles in Review & settings; default Off preserves existing behavior. Each comparison/revision consumes the local ChatGPT Codex allowance. Scratch and MPFB humanoid jobs retain original approved references and checkpoints. See [refinement settings, stop reasons, artifacts and API](refinement.md) and [Issue #18 validation](validation-issue18.md).

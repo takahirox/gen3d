@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
+import { categories, anatomyCategories } from '../src/refinement.js';
 import { createApp } from '../src/server.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,7 +16,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-studio-browser-'));
 const assets = path.join(root, 'docs/validation/issue10/prop');
 const checkpoints = { input: false, concept: false, multiView: false, preview: false };
 const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
-let missingMpfb = false;
+let missingMpfb = false, refinementPass = true, partialModelState;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
 const app = createApp({
   dataDir: path.join(temp, 'data'),
@@ -29,16 +30,29 @@ const app = createApp({
     }
   },
   inspectReferences: async () => inspection,
+  inspectModel: async ({ dir, renders, profile }) => {
+    const acceptable = refinementPass && path.basename(dir) === '1';
+    return { acceptable, summary: acceptable ? 'Fixture visual pass.' : 'Fixture torso discrepancy.', revisionInstructions: acceptable ? [] : ['Narrow the torso mesh.'],
+      views: renders.map(r => ({ view: r.view, observations: [...categories, ...(profile === 'character' ? anatomyCategories : [])].map((category, i) => ({ category, status: !acceptable && i === 1 ? 'discrepancy' : 'acceptable', detail: 'Synthetic browser fixture observation.' })) })) };
+  },
   generate: async (p, v, dir) => {
     if (releaseModel) await new Promise(resolve => { releaseModel = resolve; });
     if (v.modelingMode === 'mpfb' && missingMpfb) throw new Error('MPFB is missing or disabled. Install and enable MPFB; see docs/mpfb.md.');
     if (failModel) throw new Error('Fixture Blender bridge unavailable');
     for (const name of ['model.glb', 'scene.blend', 'preview.png', 'mcp-audit.jsonl']) fs.copyFileSync(path.join(assets, 'model-1', name), path.join(dir, name));
+    if (v.refinementSettings?.enabled) {
+      fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: (v.refinementCycle ? 'b' : 'a').repeat(64) }));
+      for (const view of ['input', 'front', 'side', 'back', 'three-quarter']) fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, view + '.png'));
+    }
     // Recorded prop files below are UI fixtures, never evidence of MPFB generation.
     if (v.profile === 'character') for (const view of ['front', 'side', 'three-quarter']) fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, view + '.png'));
     if (v.modelingMode === 'mpfb') {
       fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ vertices: 19158, polygons: 18486, topologyPreserved: true }));
       fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim() + '\n{"tool":"create_mpfb_human"}\n');
+    }
+    if (partialModelState) {
+      partialModelState.entered(); await partialModelState.gate;
+      throw new Error('Fixture failure after partial model export');
     }
   }
 });
@@ -239,6 +253,64 @@ try {
   assert.equal(await evaluate('document.querySelector("#edit").elements.modelingMode.value'), 'scratch');
   assert.ok(await evaluate('document.querySelector("#edit option[value=mpfb]").disabled'));
   check('humanoid mode selection, visible missing-MPFB failure, immutable baseline and same-reference render comparison (mocked)');
+
+  const refining = await request('/projects', 'POST', { name: 'Refinement fixture', mode: 'image', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'object', checkpoints: { ...checkpoints, preview: true } });
+  await chooseProject(refining.id); await click('#show-settings');
+  assert.equal(await evaluate('document.querySelector("#refinement").elements.refinementEnabled.value'), 'false');
+  await fill('#refinement', { refinementEnabled: 'true', maxIterations: 1 }); await submit('#refinement');
+  await until(() => app.store.get(refining.id).refinementSettings.enabled, 'refinement enabled');
+  await click('#generate'); await until(() => app.store.get(refining.id).versions[0]?.status === 'ready', 'refinement complete');
+  await stage('model'); await wait('document.querySelector("#refinement-info").textContent.includes("passed")');
+  await evaluate('document.querySelector("#refinement-history").open = true; document.querySelectorAll("#refinement-cycles details").forEach(e => e.open = true)');
+  assert.equal(await evaluate('document.querySelectorAll("#refinement-cycles details").length'), 2);
+  assert.equal(await evaluate('document.querySelectorAll("#refinement-cycles img").length'), 4);
+  assert.ok(await evaluate('document.querySelector("#refinement-cycles").textContent.includes("Mesh change verified")'));
+  assert.ok(await evaluate('document.querySelector("#download").hidden'));
+  const reportLink = await evaluate('Array.from(document.querySelectorAll("#refinement-cycles a")).find(a => a.textContent === "comparison.json").href');
+  assert.ok((await fetch(reportLink)).ok);
+  async function inspectHistoryModels() {
+    const links = await evaluate('Array.from(document.querySelectorAll("#refinement-cycles a")).filter(a => /\\.(glb|blend)$/.test(a.textContent)).map(a => a.href)');
+    assert.ok(links.length >= 2);
+    for (const href of links) { assert.equal(new URL(href).search, ''); assert.equal((await fetch(href)).status, 200); }
+  }
+  await inspectHistoryModels();
+  assert.equal((await fetch(reportLink.replace('comparison.json', 'model.glb') + '?download=1')).status, 409);
+  await evaluate('document.querySelector("#refinement-history").scrollIntoView()');
+  await screenshot('refinement-history');
+  await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
+  await screenshot('refinement-narrow');
+  await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await click('#approve'); await wait('!document.querySelector("#download").hidden');
+  refinementPass = false;
+  await click('#retry');
+  await until(() => app.store.get(refining.id).versions[1]?.status === 'ready', 'refinement cap');
+  await wait('document.querySelector("#version-info").textContent.includes("iteration-limit")');
+  assert.ok(await evaluate('document.querySelector("#version-info").textContent.includes("unresolved discrepancies")'));
+  assert.ok(await evaluate('document.querySelector("#download").hidden'));
+  refinementPass = true;
+  check('refinement Off default, saved enable/cycle limit, original references, cycle renders/reports/mesh evidence and final human review (mocked)');
+
+  let releasePartial, enteredPartial;
+  const partialGate = new Promise(resolve => { releasePartial = resolve; });
+  const partialStarted = new Promise(resolve => { enteredPartial = resolve; });
+  partialModelState = { gate: partialGate, entered: enteredPartial };
+  const partialModel = await request('/projects', 'POST', { name: 'Partial model history', mode: 'image', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'object', checkpoints, refinementSettings: { enabled: true, maxIterations: 1 } });
+  try {
+    await request(`/projects/${partialModel.id}/generate`, 'POST', {}); await partialStarted;
+    await chooseProject(partialModel.id); await stage('model');
+    await wait('Array.from(document.querySelectorAll("#refinement-cycles a")).some(a => a.textContent === "model.glb")');
+    await inspectHistoryModels();
+    assert.ok(await evaluate('document.querySelector("#download").hidden'));
+    const partialLink = await evaluate('Array.from(document.querySelectorAll("#refinement-cycles a")).find(a => a.textContent === "model.glb").href');
+    assert.equal((await fetch(partialLink + '?download=1')).status, 400);
+    releasePartial(); await app.runner.pending;
+    await wait('document.querySelector("#version-info").textContent.includes("failed")');
+    await inspectHistoryModels();
+    assert.equal((await fetch(partialLink + '?download=1')).status, 400);
+    assert.ok(await evaluate('document.querySelector("#download").hidden'));
+  } finally { releasePartial(); await app.runner.pending; partialModelState = null; }
+  check('actual running and failed GLB/Blender history links return 200; final download remains gated (mocked)');
 
   // Create and upload through the actual browser form.
   await click('#new-project'); await wait('document.querySelector("#create-dialog").open');

@@ -7,6 +7,7 @@ export { runProcess, subscriptionEnv } from './codex.js';
 import { CodexConceptGenerator } from './concept.js';
 import { gunzipSync, zstdDecompressSync } from 'node:zlib';
 import { AppError, text, imageData, currentConcept, currentReferenceSet, revisionReferenceSet } from './store.js';
+import { CodexModelInspector, validateComparison, requiredRevisionTargets, stopCriterion } from './refinement.js';
 import { modelingMode } from './modeling-mode.js';
 import { mpfbCode, mpfbResult } from './mpfb.js';
 import { blenderCall } from './blender.js';
@@ -42,10 +43,11 @@ export function taskPrompt(project, version) {
       : 'The set passed a separate Codex consistency inspection. If you discover a contradiction, stop and report it before modeling; do not silently discard views or redesign the base.';
   return `You are creating a real 3D model in a dedicated Blender scene using ONLY gen3d_blender MCP for modeling.
 First call get_scene_info. Work in small steps through the available Blender MCP tools.
-${version.kind === 'revision' ? 'The app has loaded source.blend into Blender. Revise the existing geometry according to feedback; preserve the subject.' : version.modelingMode === 'mpfb' ? 'The app has cleared the scene. Call mpfb_status, then create_mpfb_human to create the real continuous MPFB body via the installed HumanService.create_human API.' : 'The app has cleared the scene. Create mesh geometry from scratch for the requested subject.'}
+${version.kind === 'revision' ? (version.refinementCycle ? 'The app has loaded source.blend into Blender. Revise the existing scene according to the required changes in feedback; preserve the subject.' : 'The app has loaded source.blend into Blender. Revise the existing geometry according to feedback; preserve the subject.') : version.modelingMode === 'mpfb' ? 'The app has cleared the scene. Call mpfb_status, then create_mpfb_human to create the real continuous MPFB body via the installed HumanService.create_human API.' : 'The app has cleared the scene. Create mesh geometry from scratch for the requested subject.'}
 ${version.referenceSetId ? `The first attached image is the agreed base concept. The next images are ALL required modeling views: ${version.modelingImages.map(i => i.label).join(', ')}. Inspect and model from all of them, preserving identity, parts, proportions, colors, materials and asymmetry. ${inspection} Reference set: ${version.referenceSetId}.` : 'The first attached image is the uploaded visual design input. Analyze and model its silhouette, shapes and colors.'}
 ${version.modelingMode === 'mpfb' ? `MPFB-assisted humanoid mode is explicitly selected. ${version.kind === 'revision' ? 'The saved scene already contains the MPFB body. Preserve it; do not call create_mpfb_human again.' : 'You MUST call create_mpfb_human once through this MCP bridge; a missing or incompatible add-on is an error, never a reason to switch methods.'}
 Adapt the original MPFB body using its shape keys/targets, proportional vertex edits and transforms to match ALL approved images and the original text: height, shoulder/hip width, limbs, joints, body/face shape, pose, styling and materials. Keep the connected base topology and gen3d_mpfb_* properties. Do not replace, hide or remesh the body into spheres/boxes. Helpers must stay masked for export. Local installed hair/clothes/bodypart assets are optional; discover the installed API before using them, never download or require MakeHuman's socket service. Face identity, skin/hair and garments are approximations; report missing local assets and features you cannot reconstruct. Prefer GLB-compatible Principled materials. Report the actual body/face/proportion edits and limitations in the summary.` : 'Existing Blender modeling mode is selected; MPFB is not required.'}
+${version.refinementSettings?.enabled ? `Refinement is enabled. Orient ALL subjects upright +Z, front -Y, left +X. ${version.referenceSetId ? "Set bpy.context.scene['gen3d_reference_camera_directions'] to a dictionary mapping EVERY required view (front, side, back, three-quarter) to a 3-number direction FROM subject center TOWARD a camera. Inspect each original view and match its visible facing direction and elevation, including the labeled side. With the generator's left-side convention (front points to image right), a matching camera is [-1,0,0] for a subject facing -Y; do not mirror the subject to correct camera alignment. Front is normally [0,-1,0], back [0,1,0]; inspect the three-quarter image to choose its sign/elevation rather than assuming it. Preserve/update these camera choices during revisions. Missing view directions are errors." : "Set bpy.context.scene['gen3d_reference_camera_direction'] to a 3-number vector FROM the model center TOWARD a camera matching the uploaded input image's visible viewpoint (e.g. front [0,-1,0], left [1,0,0], three-quarter [1,-1,0.35]). Inspect the image to choose it, preserve/update it during revisions; do not assume unseen views. The app uses orthographic framing and saves the camera directions."} Save optional per-view framing corrections in bpy.context.scene['gen3d_reference_camera_framing'], mapping view labels (or input for an upload) to dictionaries with center (three finite world coordinates) and orthoScale (positive finite number). These overrides survive export and subsequent revisions; omit an entry to use bounds-based framing. ${version.refinementCycle ? 'This is an automated refinement cycle, revising source.blend in the SAME scene lineage. Make concrete changes of EVERY required type listed in the revision instructions (geometry, materials and/or camera); mesh changes are required only for geometry corrections. For material-only or camera-only corrections preserve geometry. Do not merely repeat prompts or rename objects. Preserve the original approved image inputs, design, MPFB body, topology and exports.' : ''}`.trim() : ''}
 For humanoids, orient the subject upright along +Z, front facing -Y and left side facing +X, so the app can render comparable front, left-side and three-quarter views.
 Remaining images are supplementary approved references.
 Concept version: ${version.conceptId || 'user-uploaded image'}. The original text is supplementary design context; never bypass the image.
@@ -66,8 +68,8 @@ ${version.feedback || 'Build the subject described by the project input.'}
 `;
 }
 
-export function exportCode(dir, { profile } = {}) {
-  return `import bpy, math, json
+export function exportCode(dir, { profile, refinementSettings, modelingImages = [] } = {}) {
+  return `import bpy, math, json, hashlib
 from mathutils import Vector
 out = ${JSON.stringify(dir)}
 meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH' and not o.hide_render and len(o.data.vertices) > 0]
@@ -80,6 +82,21 @@ hi = Vector([max(p[i] for p in points) for i in range(3)])
 center = (lo + hi) / 2
 radius = max((hi - lo).length / 2, 0.1)
 scene = bpy.context.scene
+${refinementSettings?.enabled ? `# Evidence from evaluated mesh geometry, independent of camera/lights/file metadata.
+depsgraph = bpy.context.evaluated_depsgraph_get()
+geometry = []
+for obj in meshes:
+    evaluated = obj.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    geometry.append(json.dumps({'vertices': [list(evaluated.matrix_world @ v.co) for v in mesh.vertices], 'polygons': [list(p.vertices) for p in mesh.polygons]}, sort_keys=True))
+    evaluated.to_mesh_clear()
+with open(out + '/geometry.json', 'w') as f:
+    json.dump({'sha256': hashlib.sha256(json.dumps(sorted(geometry)).encode()).hexdigest()}, f)
+` : ''}
+${refinementSettings?.enabled ? `for obj in list(bpy.data.objects):
+    if obj.name.startswith('gen3d_') and obj.type in {'CAMERA', 'LIGHT'}:
+        bpy.data.objects.remove(obj, do_unlink=True)
+` : ''}
 camera_data = bpy.data.cameras.new('gen3d_review_camera')
 camera = bpy.data.objects.new('gen3d_review_camera', camera_data)
 scene.collection.objects.link(camera)
@@ -120,13 +137,49 @@ bpy.context.view_layer.objects.active = meshes[0]
 bpy.ops.wm.save_as_mainfile(filepath=out + '/scene.blend', compress=False)
 bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', use_selection=True, export_apply=True)
 bpy.ops.render.render(write_still=True)
-${profile === 'character' ? `camera.data.type = 'ORTHO'
+${profile === 'character' && (!refinementSettings?.enabled || !modelingImages.length) ? `camera.data.type = 'ORTHO'
 camera.data.ortho_scale = max(hi.z - lo.z, hi.x - lo.x, hi.y - lo.y) * 1.3
 for label, direction in [('front', (0, -1, 0)), ('side', (1, 0, 0)), ('three-quarter', (1, -1, 0.35))]:
     camera.location = center + Vector(direction).normalized() * radius * 3.8
     camera.rotation_euler = (center - camera.location).to_track_quat('-Z', 'Y').to_euler()
     scene.render.filepath = out + '/' + label + '.png'
     bpy.ops.render.render(write_still=True)
+` : ''}
+${refinementSettings?.enabled ? `camera.data.type = 'ORTHO'
+default_scale = max(hi.z - lo.z, hi.x - lo.x, hi.y - lo.y) * 1.3
+framings = scene.get('gen3d_reference_camera_framing', {})
+if not hasattr(framings, 'get'):
+    raise RuntimeError('Invalid reference camera framing map')
+${modelingImages.length ? `directions = scene.get('gen3d_reference_camera_directions')
+view_labels = ${JSON.stringify(modelingImages.map(i => i.view))}
+if directions is None or any(label not in directions for label in view_labels):
+    raise RuntimeError('Refinement requires explicit camera directions for EVERY original modeling view')
+views = [(label, list(directions[label])) for label in view_labels]` : `direction = scene.get('gen3d_reference_camera_direction')
+if direction is None or len(direction) != 3 or not all(math.isfinite(float(x)) for x in direction) or Vector(direction).length < 0.01:
+    raise RuntimeError('Uploaded-image refinement requires an explicit reference-aligned gen3d_reference_camera_direction')
+views = [('input', list(direction))]`}
+render_views = []
+for label, direction in views:
+    if len(direction) != 3 or not all(math.isfinite(float(x)) for x in direction) or Vector(direction).length < 0.01:
+        raise RuntimeError('Invalid reference camera direction for ' + label)
+    framing = framings.get(label, {})
+    if not hasattr(framing, 'get'):
+        raise RuntimeError('Invalid reference camera framing for ' + label)
+    target = framing.get('center', list(center))
+    scale = framing.get('orthoScale', default_scale)
+    if len(target) != 3 or not all(math.isfinite(float(x)) for x in target) or not isinstance(scale, (int, float)) or isinstance(scale, bool) or not math.isfinite(scale) or scale <= 0:
+        raise RuntimeError('Invalid reference camera framing for ' + label)
+    target = Vector(target)
+    camera.data.ortho_scale = scale
+    camera.location = target + Vector(direction).normalized() * radius * 3.8
+    camera.rotation_euler = (target - camera.location).to_track_quat('-Z', 'Y').to_euler()
+    scene.render.filepath = out + '/' + label + '.png'
+    bpy.ops.render.render(write_still=True)
+    render_views.append({'view': label, 'direction': direction, 'projection': 'orthographic', 'orthoScale': camera.data.ortho_scale, 'center': list(target)})
+with open(out + '/cameras.json', 'w') as f:
+    json.dump(render_views, f)
+# Persist the actual reference camera as well as the direction/framing properties.
+bpy.ops.wm.save_as_mainfile(filepath=out + '/scene.blend', compress=False)
 ` : ''}
 print(json.dumps({'meshCount': len(meshes), 'vertexCount': sum(len(o.data.vertices) for o in meshes)}))
 `;
@@ -151,12 +204,61 @@ export function validateArtifacts(dir) {
   return { meshes: scene.meshes.length };
 }
 
+function materialEvidence(dir) {
+  // Hash exported surface state, including embedded textures and assignments,
+  // independently of mesh positions, camera changes and display names.
+  const glb = fs.readFileSync(path.join(dir, 'model.glb'));
+  const jsonLength = glb.readUInt32LE(12);
+  const scene = JSON.parse(glb.toString('utf8', 20, 20 + jsonLength).trim());
+  const binary = glb.subarray(28 + jsonLength);
+  const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().filter(key => !['name', 'extras'].includes(key)).map(key => [key, canonical(value[key])])) : value;
+  const images = (scene.images || []).map(image => {
+    const view = scene.bufferViews?.[image.bufferView];
+    return { mimeType: image.mimeType, sha256: view ? createHash('sha256').update(binary.subarray(view.byteOffset || 0, (view.byteOffset || 0) + view.byteLength)).digest('hex') : null };
+  });
+  const surfaces = { materials: scene.materials || [], textures: scene.textures || [], samplers: scene.samplers || [], images,
+    assignments: (scene.meshes || []).map(mesh => mesh.primitives.map(primitive => primitive.material ?? null)) };
+  return { sha256: createHash('sha256').update(JSON.stringify(canonical(surfaces))).digest('hex') };
+}
+
+function verifyRevision(beforeDir, afterDir, report) {
+  const changed = {};
+  const readHash = (dir, file) => {
+    const hash = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')).sha256;
+    if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error(`Invalid refinement evidence: ${file}`);
+    return hash;
+  };
+  for (const [target, file] of [['geometry', 'geometry.json'], ['materials', 'materials.json']]) {
+    changed[target] = readHash(beforeDir, file) !== readHash(afterDir, file);
+  }
+  const targets = requiredRevisionTargets(report);
+  if (targets.includes('camera')) {
+    const cameras = dir => {
+      const views = JSON.parse(fs.readFileSync(path.join(dir, 'cameras.json'), 'utf8'));
+      if (!Array.isArray(views) || !views.length || views.some(v => typeof v.view !== 'string' || v.projection !== 'orthographic'
+        || !Number.isFinite(v.orthoScale) || v.orthoScale <= 0 || ![v.center, v.direction].every(a => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite)))) throw new Error('Invalid refinement camera evidence');
+      return views.map(({ view, projection, orthoScale, center, direction }) => {
+        const length = Math.hypot(...direction);
+        if (length < 0.01) throw new Error('Invalid refinement camera direction');
+        return { view, projection, orthoScale, center, direction: direction.map(n => n / length) };
+      }).sort((a, b) => a.view.localeCompare(b.view));
+    };
+    const before = cameras(beforeDir), after = cameras(afterDir);
+    if (JSON.stringify(before.map(v => v.view)) !== JSON.stringify(after.map(v => v.view))) throw new Error('Refinement camera evidence changed required viewpoints');
+    changed.camera = JSON.stringify(before) !== JSON.stringify(after);
+  }
+  for (const target of targets) if (!changed[target]) throw new Error(`Refinement produced no verified ${target === 'geometry' ? 'mesh geometry' : target} change; repeated prompts do not count as refinement.`);
+  return { revisionTargets: targets, geometryChanged: changed.geometry, materialsChanged: changed.materials, ...(changed.camera !== undefined ? { cameraChanged: changed.camera } : {}) };
+}
+
 export class Runner {
-  constructor(store, { generate, conceptGenerator, inspectReferences, processRunner = runProcess, blender = blenderCall, env = process.env } = {}) {
+  constructor(store, { generate, conceptGenerator, inspectReferences, inspectModel, processRunner = runProcess, blender = blenderCall, env = process.env } = {}) {
     this.store = store; this.env = env; this.active = false; this.usageLimited = false;
     this.generate = generate || ((p, v, dir) => this.realGenerate(p, v, dir));
     this.conceptGenerator = conceptGenerator || new CodexConceptGenerator({ env });
     this.inspectReferences = inspectReferences || (task => new CodexReferenceInspector({ env }).inspect(task));
+    this.inspectModel = inspectModel || (task => new CodexModelInspector({ env, processRunner }).inspect(task));
     this.run = processRunner; this.blender = blender;
     this.pending = null;
   }
@@ -212,6 +314,8 @@ export class Runner {
     if (!visualInput) throw new AppError('A visual input image is required before modeling', 409);
     this.store.imageArtifact(id, visualInput);
     const v = { id: randomUUID(), number: p.versions.length + 1, kind, sourceVersionId: source?.id || null, prompt: kind === 'revision' ? source.prompt : p.prompt, feedback, conceptId: concept?.id || null, referenceSetId: set?.id || null, modelingImages: set ? structuredClone(set.images) : [], visualInput, checkpoints: { ...p.checkpoints }, referenceIds: p.references.filter(r => r.review === 'approved').map(r => r.id), status: 'running', review: 'pending', artifacts: {}, createdAt: new Date().toISOString(), error: null };
+    v.refinementSettings = { ...p.refinementSettings };
+    v.refinement = { status: v.refinementSettings.enabled ? 'running' : 'off', maxIterations: v.refinementSettings.maxIterations, stopCriterion, iterations: [] };
     v.profile = kind === 'revision' ? source.profile || concept?.profile || referenceProfile(undefined, source.prompt) : p.profile;
     v.modelingMode = modelingMode(kind === 'revision' ? source.modelingMode || 'scratch' : p.modelingMode, v.profile);
     v.imageInputs = this.modelingInputs(p, v);
@@ -409,35 +513,136 @@ export class Runner {
     }
   }
   async complete(p, v, dir) {
+    let initial, watcher;
+    if (v.refinementSettings.enabled) {
+      initial = { number: 0, status: 'running', stage: 'modeling', views: v.modelingImages.length ? v.modelingImages.map(i => i.view) : ['input'], sourceScene: v.sourceVersionId ? p.versions.find(source => source.id === v.sourceVersionId)?.artifacts.blend : null, referenceFingerprint: v.referenceFingerprint, imageInputs: [...v.imageInputs], artifacts: {}, createdAt: new Date().toISOString() };
+      v.refinement.iterations.push(initial);
+      watcher = this.watchCycle(p, v, initial, dir);
+    }
     try {
       await this.generate(p, v, dir);
-      if (fs.existsSync(path.join(dir, 'summary.txt'))) v.summary = fs.readFileSync(path.join(dir, 'summary.txt'), 'utf8').slice(0, 4000);
-      v.metrics = validateArtifacts(dir);
-      const audit = fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
-      if (v.modelingMode === 'mpfb') {
-        if (v.kind !== 'revision' && !audit.some(e => e.tool === 'create_mpfb_human')) throw new Error('No successful Codex MPFB base creation was recorded');
-        v.mpfb = JSON.parse(fs.readFileSync(path.join(dir, 'mpfb.json'), 'utf8'));
-        if (v.mpfb.topologyPreserved !== true || !Number.isInteger(v.mpfb.vertices) || v.mpfb.vertices < 1000
-          || !Number.isInteger(v.mpfb.polygons) || v.mpfb.polygons < 1000) throw new Error('MPFB body verification failed');
-      }
-      if (!audit.some(e => e.tool === 'execute_blender_code')) throw new Error('No successful Codex Blender MCP modeling operation was recorded');
-      v.artifacts = Object.fromEntries([['glb', 'model.glb'], ['blend', 'scene.blend'], ['render', 'preview.png'], ['task', 'TASK.md'], ['audit', 'mcp-audit.jsonl']].map(([key, file]) => [key, `versions/${v.id}/${file}`]));
-      if (v.profile === 'character') for (const view of ['front', 'side', 'three-quarter']) {
-        imageData('data:image/png;base64,' + fs.readFileSync(path.join(dir, view + '.png')).toString('base64'));
-        v.artifacts[view] = `versions/${v.id}/${view}.png`;
-      }
-      if (v.modelingMode === 'mpfb') v.artifacts.mpfb = `versions/${v.id}/mpfb.json`;
+      this.validateModel(p, v, dir);
+      watcher?.close();
+      if (v.refinementSettings.enabled) await this.refine(p, v, dir);
       v.status = 'ready';
-      if (!v.checkpoints.preview) { v.review = 'approved'; this.store.event(p, 'system', 'model_auto_accepted', { versionId: v.id }); }
+      if (!v.checkpoints.preview && !v.refinement.reviewRequested && !['failed', 'usage-limit'].includes(v.refinement.status)) { v.review = 'approved'; this.store.event(p, 'system', 'model_auto_accepted', { versionId: v.id }); }
       this.store.event(p, 'codex', 'generation_completed', { versionId: v.id, meshes: v.metrics.meshes });
     } catch (e) {
       v.status = 'failed'; v.error = e.message;
+      if (initial) { initial.status = 'failed'; initial.error = e.message; initial.finishedAt = new Date().toISOString(); }
+      if (v.refinementSettings.enabled && v.refinement.status === 'running') { v.refinement.status = e.usageLimited ? 'usage-limit' : 'failed'; v.refinement.error = e.message; }
       if (fs.existsSync(path.join(dir, 'summary.txt'))) v.summary = fs.readFileSync(path.join(dir, 'summary.txt'), 'utf8').slice(0, 4000);
       if (e.usageLimited) this.usageLimited = true;
       this.store.event(p, 'system', 'generation_failed', { versionId: v.id, message: e.message });
     } finally {
-      for (const [key, file] of [['task', 'TASK.md'], ['audit', 'mcp-audit.jsonl'], ['mpfb', 'mpfb.json']]) if (fs.existsSync(path.join(dir, file))) v.artifacts[key] = `versions/${v.id}/${file}`;
+      watcher?.close();
+      if (initial) this.publishCycle(p, v, initial, dir);
+      for (const [key, file] of [['glb', 'model.glb'], ['blend', 'scene.blend'], ['render', 'preview.png'], ['task', 'TASK.md'], ['audit', 'mcp-audit.jsonl'], ['mpfb', 'mpfb.json']]) if (fs.existsSync(path.join(dir, file))) v.artifacts[key] ??= `versions/${v.id}/${file}`;
       v.finishedAt = new Date().toISOString(); this.store.save(p); this.active = false; }
+  }
+  validateModel(p, v, dir) {
+    if (fs.existsSync(path.join(dir, 'summary.txt'))) v.summary = fs.readFileSync(path.join(dir, 'summary.txt'), 'utf8').slice(0, 4000);
+    v.metrics = validateArtifacts(dir);
+    if (v.refinementSettings?.enabled) fs.writeFileSync(path.join(dir, 'materials.json'), JSON.stringify(materialEvidence(dir), null, 2));
+    const audit = fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    if (v.modelingMode === 'mpfb') {
+      if (v.kind !== 'revision' && !audit.some(e => e.tool === 'create_mpfb_human')) throw new Error('No successful Codex MPFB base creation was recorded');
+      v.mpfb = JSON.parse(fs.readFileSync(path.join(dir, 'mpfb.json'), 'utf8'));
+      if (v.mpfb.topologyPreserved !== true || !Number.isInteger(v.mpfb.vertices) || v.mpfb.vertices < 1000
+        || !Number.isInteger(v.mpfb.polygons) || v.mpfb.polygons < 1000) throw new Error('MPFB body verification failed');
+    }
+    if (!audit.some(e => e.tool === 'execute_blender_code')) throw new Error('No successful Codex Blender MCP modeling operation was recorded');
+    v.artifacts = Object.fromEntries([['glb', 'model.glb'], ['blend', 'scene.blend'], ['render', 'preview.png'], ['task', 'TASK.md'], ['audit', 'mcp-audit.jsonl']].map(([key, file]) => [key, `${path.relative(this.store.dir(p.id), dir).split(path.sep).join('/')}/${file}`]));
+    if (v.profile === 'character') for (const view of ['front', 'side', 'three-quarter']) {
+      imageData('data:image/png;base64,' + fs.readFileSync(path.join(dir, view + '.png')).toString('base64'));
+      v.artifacts[view] = `${path.relative(this.store.dir(p.id), dir).split(path.sep).join('/')}/${view}.png`;
+    }
+    if (v.modelingMode === 'mpfb') v.artifacts.mpfb = `${path.relative(this.store.dir(p.id), dir).split(path.sep).join('/')}/mpfb.json`;
+  }
+  requestRefinementReview(id, versionId, actor) {
+    if (actor !== 'web') throw new AppError('Refinement review interruption requires the web UI', 403);
+    const p = this.store.get(id), v = p.versions.find(v => v.id === versionId);
+    if (!v || v.status !== 'running' || v.refinement?.status !== 'running') throw new AppError('Choose a running refinement', 409);
+    v.refinement.reviewRequested = true;
+    v.checkpoints.preview = true;
+    this.store.event(p, actor, 'refinement_review_requested', { versionId }); this.store.save(p);
+    return p;
+  }
+  watchCycle(p, v, cycle, dir) {
+    this.publishCycle(p, v, cycle, dir);
+    // Publish known files while Blender/Codex are working, including partial renders.
+    // Poll the small whitelist: native file watchers can miss an immediate file
+    // creation on some filesystems. The timer exists only for this operation.
+    const timer = setInterval(() => this.publishCycle(p, v, cycle, dir, true), 250);
+    timer.unref();
+    return { close: () => clearInterval(timer) };
+  }
+  publishCycle(p, v, cycle, dir, onlyNew = false) {
+    const before = Object.keys(cycle.artifacts).length;
+    const prefix = path.relative(this.store.dir(p.id), dir).split(path.sep).join('/');
+    // Known files only; never expose unrelated Codex workspace output.
+    const files = ['scene.blend', 'model.glb', 'preview.png', 'mpfb.json', 'TASK.md', 'mcp-audit.jsonl', 'summary.txt', 'source.blend', 'geometry.json', 'materials.json', 'cameras.json', 'COMPARISON.md', 'comparison-schema.json', 'comparison.json', 'REVISION.md', 'NEXT-REVISION.md', 'partial-export-error.json', ...[...new Set([...cycle.views, 'front', 'side', 'back', 'three-quarter', 'input'])].map(view => view + '.png')];
+    for (const file of files) if (fs.existsSync(path.join(dir, file)) && fs.lstatSync(path.join(dir, file)).isFile()) cycle.artifacts[file] = `${prefix}/${file}`;
+    if (!onlyNew || Object.keys(cycle.artifacts).length !== before) this.store.save(p);
+  }
+  async refine(p, v, initialDir) {
+    const state = v.refinement;
+    const views = v.modelingImages.length ? v.modelingImages.map(i => i.view) : ['input'];
+    const references = v.imageInputs.map((file, i) => ({ label: i === 0 ? (v.referenceSetId ? 'original base concept' : 'original uploaded input') : v.modelingImages[i - 1]?.label || 'approved supplementary reference', file: this.store.imageArtifact(p.id, file) }));
+    let previousDir = initialDir;
+    for (let number = 0; number <= state.maxIterations; number++) {
+      if (state.reviewRequested) { state.status = 'review-requested'; if (number === 0) { state.iterations[0].status = 'review-requested'; state.iterations[0].finishedAt = new Date().toISOString(); } break; }
+      const dir = number === 0 ? initialDir : path.join(initialDir, 'refinement', String(number));
+      fs.mkdirSync(dir, { recursive: true });
+      const cycle = number === 0 ? state.iterations[0] : { number, status: 'running', stage: number ? 'revising' : 'comparing', views, sourceScene: number ? state.iterations.at(-1).artifacts['scene.blend'] : (v.sourceVersionId ? `versions/${v.sourceVersionId}/scene.blend` : null), referenceFingerprint: v.referenceFingerprint, imageInputs: [...v.imageInputs], artifacts: {}, createdAt: new Date().toISOString() };
+      if (number) state.iterations.push(cycle);
+      cycle.stage = number ? 'revising' : 'comparing';
+      const watcher = this.watchCycle(p, v, cycle, dir);
+      this.store.event(p, 'system', 'refinement_cycle_started', { versionId: v.id, cycle: number }); this.store.save(p);
+      try {
+        if (number) {
+          const previousReport = state.iterations[number - 1].report;
+          const instructions = `Required changes: ${requiredRevisionTargets(previousReport).join(', ')}.\n${previousReport.revisionInstructions.join('\n')}`;
+          fs.writeFileSync(path.join(dir, 'REVISION.md'), instructions);
+          fs.copyFileSync(path.join(previousDir, 'scene.blend'), path.join(dir, 'source.blend'));
+          const revision = { ...v, kind: 'revision', refinementCycle: number, feedback: `${v.feedback || ''}\nConcrete discrepancies from comparison cycle ${number - 1}:\n${instructions}`, artifacts: {}, mpfb: undefined };
+          fs.writeFileSync(path.join(dir, 'TASK.md'), taskPrompt(p, revision));
+          this.publishCycle(p, v, cycle, dir);
+          await this.generate(p, revision, dir);
+          this.validateModel(p, revision, dir);
+          Object.assign(cycle, verifyRevision(previousDir, dir, previousReport));
+          // Only validated usable outputs become the selected final preview/export.
+          v.artifacts = revision.artifacts; v.metrics = revision.metrics; v.summary = revision.summary; v.mpfb = revision.mpfb;
+        }
+        cycle.stage = 'comparing'; this.publishCycle(p, v, cycle, dir);
+        if (state.reviewRequested) { cycle.status = 'review-requested'; state.status = 'review-requested'; break; }
+        const renders = views.map(view => {
+          if (!cycle.artifacts[view + '.png']) throw new Error(`Missing required comparison render: ${view}`);
+          try { return { view, label: `model render: ${view}`, file: this.store.imageArtifact(p.id, cycle.artifacts[view + '.png']) }; }
+          catch (e) { throw new Error(`Invalid required comparison render ${view}: ${e.message}`); }
+        });
+        const report = validateComparison(await this.inspectModel({ prompt: v.prompt, profile: v.profile, images: references, renders, dir }), views, v.profile);
+        cycle.report = report;
+        fs.writeFileSync(path.join(dir, 'comparison.json'), JSON.stringify(report, null, 2));
+        fs.writeFileSync(path.join(dir, 'NEXT-REVISION.md'), report.revisionInstructions.join('\n'));
+        cycle.status = report.acceptable ? 'passed' : 'discrepancies';
+        this.store.event(p, 'codex', 'model_compared', { versionId: v.id, cycle: number, acceptable: report.acceptable });
+        if (state.reviewRequested) { state.status = 'review-requested'; break; }
+        if (report.acceptable) { state.status = 'passed'; break; }
+        if (number === state.maxIterations) { state.status = 'iteration-limit'; state.error = 'Maximum revision cycles reached with unresolved discrepancies; no quality improvement is claimed.'; break; }
+        previousDir = dir;
+      } catch (e) {
+        cycle.status = 'failed'; cycle.error = e.message;
+        state.status = e.usageLimited ? 'usage-limit' : 'failed'; state.error = e.message;
+        v.error = `Refinement stopped: ${e.message}. The last validated model is retained.`;
+        if (e.usageLimited) this.usageLimited = true;
+        // Partial failure must be inspected before it is approved/exported.
+        v.checkpoints.preview = true;
+        break;
+      } finally { watcher.close(); cycle.finishedAt = new Date().toISOString(); this.publishCycle(p, v, cycle, dir); }
+    }
+    state.finishedAt = new Date().toISOString();
+    this.store.event(p, 'system', 'refinement_stopped', { versionId: v.id, outcome: state.status, message: state.error }); this.store.save(p);
   }
   async realGenerate(p, v, dir) {
     // Defend the final Blender boundary as well as the workflow entry point.
@@ -468,18 +673,32 @@ export class Runner {
     }
     const code = v.kind === 'revision'
       ? `import bpy\nbpy.ops.wm.open_mainfile(filepath=${JSON.stringify(path.join(dir, 'source.blend'))}, use_scripts=False)\nfor o in list(bpy.data.objects):\n    if o.name.startswith('gen3d_') and o.type in {'CAMERA', 'LIGHT'}:\n        bpy.data.objects.remove(o, do_unlink=True)`
-      : "import bpy\nfor o in list(bpy.data.objects):\n    bpy.data.objects.remove(o, do_unlink=True)";
+      : "import bpy\nfor o in list(bpy.data.objects):\n    bpy.data.objects.remove(o, do_unlink=True)\nif 'gen3d_reference_camera_direction' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_direction']\nif 'gen3d_reference_camera_directions' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_directions']\nif 'gen3d_reference_camera_framing' in bpy.context.scene:\n    del bpy.context.scene['gen3d_reference_camera_framing']";
     await this.blender('execute_code', { code }, { port: Number(this.env.GEN3D_BLENDER_PORT || 9877) });
-    await this.run(command, codexArgs(dir, images, { ...this.env, GEN3D_MODELING_MODE: v.modelingMode || 'scratch' }), { cwd: dir, env, onLine: line => {
-      // Store progress types, not raw CLI output (which can contain host data).
-      try {
-        const event = JSON.parse(line);
-        if (event.type === 'item.completed' && ['mcp_tool_call', 'agent_message'].includes(event.item?.type)) {
-          this.store.event(p, 'codex', event.item.type === 'mcp_tool_call' ? 'blender_operation' : 'modeling_update', { versionId: v.id, tool: event.item.tool || undefined });
-          this.store.save(p);
+    try {
+      await this.run(command, codexArgs(dir, images, { ...this.env, GEN3D_MODELING_MODE: v.modelingMode || 'scratch' }), { cwd: dir, env, onLine: line => {
+        // Store progress types, not raw CLI output (which can contain host data).
+        try {
+          const event = JSON.parse(line);
+          if (event.type === 'item.completed' && ['mcp_tool_call', 'agent_message'].includes(event.item?.type)) {
+            this.store.event(p, 'codex', event.item.type === 'mcp_tool_call' ? 'blender_operation' : 'modeling_update', { versionId: v.id, tool: event.item.tool || undefined });
+            this.store.save(p);
+          }
+        } catch { /* Non-JSON diagnostics are not published. */ }
+      } });
+    } catch (e) {
+      // Saving the scene consumes no Codex allowance. Preserve available work
+      // after a failed/limited modeling turn without retrying that turn.
+      if (v.refinementSettings?.enabled) {
+        try {
+          await this.blender('execute_code', { code: exportCode(dir, v) }, { port: Number(this.env.GEN3D_BLENDER_PORT || 9877) });
+          this.store.event(p, 'system', 'partial_model_saved', { versionId: v.id, cycle: v.refinementCycle || 0 });
+        } catch (saveError) {
+          fs.writeFileSync(path.join(dir, 'partial-export-error.json'), JSON.stringify({ error: saveError.message }, null, 2));
         }
-      } catch { /* Non-JSON diagnostics are not published. */ }
-    } });
+      }
+      throw e;
+    }
     if (v.modelingMode === 'mpfb') {
       const evidence = mpfbResult(await this.blender('execute_code', { code: mpfbCode('verify') }, { port: Number(this.env.GEN3D_BLENDER_PORT || 9877) }));
       fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify(evidence, null, 2));

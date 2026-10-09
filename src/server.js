@@ -7,7 +7,7 @@ import { Store, AppError } from './store.js';
 import { Runner } from './runner.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.json': 'application/json', '.jsonl': 'text/plain', '.md': 'text/plain' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.json': 'application/json', '.jsonl': 'text/plain', '.md': 'text/plain', '.txt': 'text/plain' };
 async function body(req) {
   let size = 0; const chunks = [];
   for await (const chunk of req) {
@@ -31,7 +31,7 @@ function sendFile(res, file, download) {
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
 
-export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, inspectReferences, env = process.env } = {}) {
+export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, inspectReferences, inspectModel, env = process.env } = {}) {
   // A single server owns the data directory, even if a second process starts.
   fs.mkdirSync(dataDir, { recursive: true });
   const lockFile = path.join(path.resolve(dataDir), 'server.lock');
@@ -44,7 +44,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
   let store;
   try { store = new Store(dataDir); }
   catch (e) { fs.unlinkSync(lockFile); throw e; }
-  const runner = new Runner(store, { generate, conceptGenerator, inspectReferences, env });
+  const runner = new Runner(store, { generate, conceptGenerator, inspectReferences, inspectModel, env });
   const server = http.createServer(async (req, res) => {
     try {
       const address = server.address();
@@ -77,6 +77,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         if (req.method === 'POST' && parts[3] === 'reference-sets' && parts.length === 4) return json(res, 202, runner.regenerateReferenceSet(id, await body(req), actor));
         if (req.method === 'POST' && parts[3] === 'reference-sets' && parts[5] === 'review') return json(res, 200, runner.reviewReferenceSet(id, parts[4], (await body(req)).decision, actor));
         if (req.method === 'GET' && parts[3] === 'versions' && parts[5] === 'export') return json(res, 200, store.canExport(id, parts[4]).artifacts);
+        if (req.method === 'POST' && parts[3] === 'versions' && parts[5] === 'refinement-review') return json(res, 200, runner.requestRefinementReview(id, parts[4], actor));
         if (req.method === 'POST' && parts[3] === 'generate') return json(res, 202, runner.start(id, await body(req), actor));
         if (req.method === 'POST' && parts[3] === 'references' && parts.length === 4) return json(res, 201, store.addReference(id, await body(req), actor));
         if (req.method === 'POST' && parts[3] === 'references' && parts[5] === 'review') return json(res, 200, store.reviewReference(id, parts[4], (await body(req)).decision, actor));

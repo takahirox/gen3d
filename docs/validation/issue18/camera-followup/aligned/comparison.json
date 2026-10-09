@@ -1,0 +1,73 @@
+{
+  "acceptable": false,
+  "summary": "All four render views were compared with their corresponding approved references, with the base concept providing design context. View directions are broadly correct, but the renders show a stockier body, altered facial and hair shapes, simplified clothing and shoes, and substantially lighter materials. This is an AI visual judgment, not measured accuracy.",
+  "revisionInstructions": [
+    "Preserve the existing MPFB body and adjust its proportions toward the approved lean build: narrow the waist and hips, reduce thigh and calf bulk, and restore the reference shoulder-to-waist taper.",
+    "Adjust the existing arm pose outward to match the front, back, and three-quarter references; match the relaxed finger curvature and hand orientation while retaining the neutral stance.",
+    "Refine the existing head and face toward the approved jaw, chin, nose, brow, and eye shapes; add visible dark eyebrows, iris contrast, and natural lip coloration.",
+    "Replace the short gray-looking hair appearance with dark, fuller, wavy hair geometry and materials, including the approved swept front and fuller rear coverage.",
+    "Change skin to warm medium tan, the shirt to muted darker teal, trousers to dark charcoal, and shoes to near-black; retain matte fabric and subtle natural skin variation.",
+    "Reshape the shirt to a natural fitted drape, remove pronounced breast-like chest bulges and horizontal torso ridges, and add the crew-neck binding, shoulder seams, sleeve hems, bottom hem, and restrained fabric folds.",
+    "Refine trousers into the approved straight-leg silhouette with natural knee and ankle folds; add front fly and pocket details, rear pockets, and seams.",
+    "Refine the existing shoes into low-top lace-up sneakers with distinct uppers, tongues, laces, and soles; reduce the block-like sole profile.",
+    "Match each camera to its corresponding reference: increase subject occupancy within the square frame, preserve full-body visibility, and adjust the three-quarter yaw to show the broader approved torso view."
+  ],
+  "views": [
+    {
+      "view": "front",
+      "observations": [
+        {"category": "silhouette", "status": "discrepancy", "detail": "The waist, hips, and lower legs appear thicker, producing a stockier outline than the lean reference."},
+        {"category": "proportions", "status": "discrepancy", "detail": "Shoulder-to-waist taper is reduced and calves are disproportionately bulky."},
+        {"category": "partPlacement", "status": "discrepancy", "detail": "Camera faces forward correctly, but the subject occupies less frame height than in the reference."},
+        {"category": "features", "status": "discrepancy", "detail": "Missing visible shirt seam and hem construction, trouser fly and pockets, and sneaker laces; extra pronounced horizontal torso ridges are present."},
+        {"category": "colorsMaterials", "status": "discrepancy", "detail": "Skin is pale, shirt is light cyan-teal, and trousers and shoes are gray rather than the approved darker palette."},
+        {"category": "anatomy", "status": "discrepancy", "detail": "Rounded breast-like chest bulges and heavy calf contours differ from the reference's lean male anatomy."},
+        {"category": "face", "status": "discrepancy", "detail": "The face lacks the reference's dark brow and eye contrast and has a narrower, more pointed lower-face shape."},
+        {"category": "limbs", "status": "discrepancy", "detail": "Legs are fuller, and hands have straighter, less naturally curved fingers than the reference."},
+        {"category": "pose", "status": "discrepancy", "detail": "Arms hang closer to the torso than the approved relaxed A-pose."}
+      ]
+    },
+    {
+      "view": "side",
+      "observations": [
+        {"category": "silhouette", "status": "discrepancy", "detail": "Chest projection and calf fullness are exaggerated; the shirt's rear hem flares outward."},
+        {"category": "proportions", "status": "discrepancy", "detail": "The lower leg is heavier and the hair mass smaller than in the approved profile."},
+        {"category": "partPlacement", "status": "discrepancy", "detail": "The right-facing profile direction matches, but full-body framing leaves larger margins than the reference."},
+        {"category": "features", "status": "discrepancy", "detail": "Missing visible trouser pocket stitching, shoe laces, and garment construction; extra angular rear shirt flare is present."},
+        {"category": "colorsMaterials", "status": "discrepancy", "detail": "Pale skin, light shirt, gray trousers, and gray shoes do not match the warm skin and dark clothing reference."},
+        {"category": "anatomy", "status": "discrepancy", "detail": "The chest has an abrupt rounded protrusion and the calf contour is excessively swollen."},
+        {"category": "face", "status": "discrepancy", "detail": "Nose, lips, and chin form a sharper, simplified profile; hair lacks the approved wavy volume."},
+        {"category": "limbs", "status": "discrepancy", "detail": "Fingers are widely spread and straight compared with the reference's relaxed grouped fingers."},
+        {"category": "pose", "status": "acceptable", "detail": "The upright stance, downward arm direction, and forward-facing feet broadly match the side reference."}
+      ]
+    },
+    {
+      "view": "back",
+      "observations": [
+        {"category": "silhouette", "status": "discrepancy", "detail": "The back waist and calves are fuller, reducing the reference's lean taper."},
+        {"category": "proportions", "status": "discrepancy", "detail": "Hip and calf volume is too large relative to the upper body."},
+        {"category": "partPlacement", "status": "discrepancy", "detail": "Rear camera direction is correct, but the subject is framed smaller than the reference."},
+        {"category": "features", "status": "discrepancy", "detail": "Missing rear trouser pockets, stitching, and shirt construction; extra broad horizontal back ridges appear."},
+        {"category": "colorsMaterials", "status": "discrepancy", "detail": "The shirt is too light, trousers and shoes are insufficiently dark, and hair appears gray on top."},
+        {"category": "anatomy", "status": "discrepancy", "detail": "Bulging calves and strongly segmented back contours differ from the natural reference."},
+        {"category": "face", "status": "uncertain", "detail": "Facial features are hidden in this rear view."},
+        {"category": "limbs", "status": "discrepancy", "detail": "Leg contours are heavier and the hands appear narrower with less relaxed finger curvature."},
+        {"category": "pose", "status": "discrepancy", "detail": "Arms are held closer to the body than in the approved rear A-pose."}
+      ]
+    },
+    {
+      "view": "three-quarter",
+      "observations": [
+        {"category": "silhouette", "status": "discrepancy", "detail": "The torso looks compact and the legs bulky; shoe outlines are blockier than the approved sneakers."},
+        {"category": "proportions", "status": "discrepancy", "detail": "Waist and calf thickness exceed the reference, with reduced upper-body taper."},
+        {"category": "partPlacement", "status": "discrepancy", "detail": "The render turns farther toward profile, showing a narrower torso, and occupies less frame height than the reference."},
+        {"category": "features", "status": "discrepancy", "detail": "Missing garment seams, trouser pocket and fly details, and sneaker laces; extra chest bulges and torso ridges remain visible."},
+        {"category": "colorsMaterials", "status": "discrepancy", "detail": "Skin and shirt are too light, hair has gray highlights, and trousers and shoes lack the approved dark tones and surface detail."},
+        {"category": "anatomy", "status": "discrepancy", "detail": "Chest shaping and heavy lower legs do not preserve the approved lean adult anatomy."},
+        {"category": "face", "status": "discrepancy", "detail": "Facial structure is simplified and lacks the reference's defined brows, eyes, jaw, and fuller dark wavy hairstyle."},
+        {"category": "limbs", "status": "discrepancy", "detail": "Calves are too thick and fingers are splayed rather than gently curved."},
+        {"category": "pose", "status": "discrepancy", "detail": "Arm spread is narrower than the reference's neutral A-pose."}
+      ]
+    }
+  ]
+}

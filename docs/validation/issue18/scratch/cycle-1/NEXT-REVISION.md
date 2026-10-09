@@ -1,0 +1,4 @@
+Adjust the camera distance or orthographic scale so the robot occupies approximately the reference’s framing: head near 24% and feet near 77% of image height, rather than 14% and 91%. Preserve the elevated three-quarter viewing direction.
+Reduce the arms’ outward bulk and bring them closer to the torso, especially the image-left arm, to reproduce the reference’s narrower silhouette and partial occlusion.
+Restore the reference’s ivory head, turquoise torso and legs, peach arms and chest button, and dark gray eyes. Reduce lighting intensity or exposure to preserve these colors and visible surface shading.
+Restore the visibly faceted surface treatment on the head and arms, and retain softly beveled torso and foot edges.
