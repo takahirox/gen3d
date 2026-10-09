@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { crc32 } from 'node:zlib';
+import { Transformer } from '@napi-rs/image';
 import { referenceProfile, validateViewSet, consistencySettings, consistencyAllowsModeling } from './reference-set.js';
 
 export class AppError extends Error {
@@ -19,6 +21,26 @@ export function imageData(value) {
     : match[1] === 'jpeg' ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
       : bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP';
   if (!valid || bytes.length > 10_000_000) throw new AppError('Invalid or oversized image');
+  try {
+    // Decoders can tolerate missing trailers. Require a complete container too.
+    if (match[1] === 'png') {
+      let offset = 8, ended = false;
+      while (offset + 12 <= bytes.length) {
+        const start = offset, size = bytes.readUInt32BE(offset), type = bytes.toString('ascii', offset + 4, offset + 8);
+        offset += 12 + size;
+        if (offset > bytes.length) throw new Error('Truncated PNG chunk');
+        if (crc32(bytes.subarray(start + 4, offset - 4)) !== bytes.readUInt32BE(offset - 4)) throw new Error('Corrupted PNG chunk');
+        if (type === 'IEND') { ended = size === 0 && offset === bytes.length; break; }
+      }
+      if (!ended) throw new Error('Missing PNG end');
+    } else if (match[1] === 'jpeg') {
+      if (bytes.at(-2) !== 255 || bytes.at(-1) !== 217) throw new Error('Missing JPEG end');
+    } else if (bytes.length < 12 || bytes.readUInt32LE(4) + 8 !== bytes.length) throw new Error('Truncated WebP container');
+    // Read every pixel, not just metadata/signatures. Preserve the original bytes.
+    if (!new Transformer(bytes).rawPixelsSync().length) throw new Error('Empty image');
+  } catch {
+    throw new AppError('Invalid image contents');
+  }
   return { bytes, ext: match[1] === 'jpeg' ? 'jpg' : match[1] };
 }
 

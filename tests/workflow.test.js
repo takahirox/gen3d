@@ -5,16 +5,20 @@ import path from 'node:path';
 import os from 'node:os';
 import { once } from 'node:events';
 import http from 'node:http';
-import { zstdCompressSync, gzipSync } from 'node:zlib';
+import { zstdCompressSync, gzipSync, crc32 } from 'node:zlib';
+import { Transformer } from '@napi-rs/image';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createApp } from '../src/server.js';
-import { Store } from '../src/store.js';
+import { Store, imageData } from '../src/store.js';
 import { CodexReferenceInspector, requiredViews } from '../src/reference-set.js';
 import { CodexConceptGenerator } from '../src/concept.js';
 import { Runner, subscriptionEnv, codexArgs, validateArtifacts, runProcess } from '../src/runner.js';
 
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
+const badCrcPng = Buffer.from(png); badCrcPng[45] ^= 255;
+const badPixelsPng = Buffer.from(badCrcPng); badPixelsPng.writeUInt32BE(crc32(badPixelsPng.subarray(37, 52)), 52);
+const invalidPngs = [png.subarray(0, 8), png.subarray(0, 45), png.subarray(0, -1), badCrcPng, badPixelsPng];
 const image = 'data:image/png;base64,' + png.toString('base64');
 const generateViews = async ({ onImage }) => { for (const view of requiredViews) await onImage({ view, side: view === 'side' ? 'left' : undefined, bytes: png, ext: 'png' }); };
 const inspectReferences = async () => ({ consistent: true, issues: [] });
@@ -45,6 +49,22 @@ async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
   return { ...instance, url, request, dataDir };
 }
 const input = { name: 'Robot', mode: 'text', prompt: 'A teal robot', checkpoints: { input: false, concept: false, multiView: false, preview: false } };
+
+test('image validation decodes PNG, JPEG and WebP and rejects damaged contents with valid signatures', () => {
+  const jpeg = new Transformer(png).jpegSync(), webp = new Transformer(png).webpSync();
+  const corruptJpeg = Buffer.from(jpeg); corruptJpeg[corruptJpeg.indexOf(Buffer.from([255, 219])) + 4] = 255;
+  const corruptWebp = Buffer.from(webp); corruptWebp.fill(255, 20);
+  for (const [ext, bytes, corrupt, header] of [['png', png, badPixelsPng, 8], ['jpeg', jpeg, corruptJpeg, 3], ['webp', webp, corruptWebp, 12]]) {
+    const dataUrl = bytes => `data:image/${ext};base64,${bytes.toString('base64')}`;
+    assert.deepEqual(imageData(dataUrl(bytes)).bytes, bytes);
+    for (const invalid of [bytes.subarray(0, header), bytes.subarray(0, Math.floor(bytes.length / 2)), bytes.subarray(0, -1), corrupt]) {
+      assert.throws(() => imageData(dataUrl(invalid)), /Invalid image/, ext);
+    }
+  }
+  const lossless = new Transformer(png).webpLosslessSync();
+  assert.deepEqual(imageData(`data:image/webp;base64,${lossless.toString('base64')}`).bytes, lossless);
+  for (const bytes of invalidPngs) assert.throws(() => imageData(`data:image/png;base64,${bytes.toString('base64')}`), /Invalid image/);
+});
 
 test('text and image inputs persist and invalid images leave no project', t => {
   const dir = temporary(t), store = new Store(dir);
@@ -1016,6 +1036,25 @@ test('all consistency modes require complete, valid generated images before insp
   }
 });
 
+test('signature-preserving image damage blocks inspection and Codex/Blender in every consistency mode', async t => {
+  for (const mode of consistencyModes) for (const bytes of invalidPngs) for (const stage of ['generated', 'saved']) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: mode.settings }, 'web');
+    let inspections = 0, codexCalls = 0, blenderCalls = 0;
+    const runner = new Runner(store, {
+      conceptGenerator: { ...conceptGenerator, generateViews: async ({ onImage }) => {
+        for (const view of requiredViews) await onImage({ view, side: view === 'side' ? 'left' : undefined, bytes: stage === 'generated' ? bytes : png, ext: 'png' });
+        if (stage === 'saved') fs.writeFileSync(store.artifact(p.id, p.referenceSets[0].images[0].file), bytes);
+      } },
+      inspectReferences: async () => { inspections++; return inconsistentReport; },
+      processRunner: async () => { codexCalls++; throw new Error('Must not call Codex'); },
+      blender: async () => { blenderCalls++; throw new Error('Must not call Blender'); },
+    });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.referenceSets[0].status, 'failed'); assert.match(p.referenceSets[0].error, /Invalid image/);
+    assert.equal(inspections, 0); assert.equal(codexCalls, 0); assert.equal(blenderCalls, 0); assert.equal(p.versions.length, 0);
+  }
+});
+
 test('continue and off still reject missing, corrupted, mismatched or incorrectly attached images at the Blender boundary', async t => {
   for (const mode of consistencyModes.slice(1)) {
     const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: mode.settings }, 'web');
@@ -1033,6 +1072,9 @@ test('continue and off still reject missing, corrupted, mismatched or incorrectl
       const file = store.artifact(p.id, relative), bytes = fs.readFileSync(file);
       fs.unlinkSync(file); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)));
       fs.writeFileSync(file, 'corrupted image'); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)), /Invalid/);
+      for (const bytes of invalidPngs) {
+        fs.writeFileSync(file, bytes); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)), /Invalid image/);
+      }
       fs.writeFileSync(file, bytes);
     }
     // Review remains mandatory, even when the consistency policy allows modeling.
