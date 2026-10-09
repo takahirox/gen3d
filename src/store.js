@@ -28,6 +28,19 @@ export function checkpoints(value = {}, previous = { input: false, concept: true
   return { ...previous, ...value };
 }
 
+export function currentConcept(p, c) {
+  return c.prompt === p.prompt && (!c.profile || c.profile === p.profile);
+}
+export function currentReferenceSet(p, set) {
+  return set.conceptId === p.selectedConceptId && set.prompt === p.prompt && set.profile === p.profile;
+}
+export function revisionReferenceSet(p, set) {
+  const source = set.request?.kind === 'revision' && p.versions.find(v => v.id === set.request.sourceVersionId && v.status === 'ready');
+  const concept = p.concepts.find(c => c.id === set.conceptId && c.status === 'ready' && c.review === 'approved');
+  return Boolean(source && concept && source.conceptId === concept.id && source.prompt === set.prompt
+    && set.prompt === concept.prompt && (!concept.profile || set.profile === concept.profile));
+}
+
 // Only the HTTP server owns this store. MCP clients always use that server's API.
 export class Store {
   constructor(root) {
@@ -158,7 +171,7 @@ export class Store {
     const p = this.get(id); this.idle(p);
     if (actor !== 'web') throw new AppError('Concept checkpoint requires the web UI', 403);
     const c = p.concepts.find(c => c.id === conceptId && c.status === 'ready');
-    if (!c || c.prompt !== p.prompt || (c.profile && c.profile !== p.profile)) throw new AppError('Choose a completed concept for the current input');
+    if (!c || !currentConcept(p, c)) throw new AppError('Choose a completed concept for the current input');
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
     c.review = decision;
     if (decision === 'approved') { if (p.selectedConceptId !== c.id) p.selectedReferenceSetId = null; p.selectedConceptId = c.id; }
@@ -169,12 +182,12 @@ export class Store {
     const p = this.get(id); this.idle(p);
     if (actor !== 'web') throw new AppError('Multi-view checkpoint requires the web UI', 403);
     const set = p.referenceSets.find(s => s.id === setId && s.status === 'ready');
-    if (!set || set.conceptId !== p.selectedConceptId || set.prompt !== p.prompt || set.profile !== p.profile) throw new AppError('Choose a completed reference set for the selected concept');
+    if (!set || (!currentReferenceSet(p, set) && !revisionReferenceSet(p, set))) throw new AppError('Choose a completed reference set for the selected concept or source revision');
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
     if (decision === 'approved') {
       validateViewSet(set);
       if (set.consistency?.status !== 'passed') throw new AppError('Resolve reference contradictions by regenerating the set before modeling', 409);
-      p.selectedReferenceSetId = set.id;
+      if (currentReferenceSet(p, set)) p.selectedReferenceSetId = set.id;
     } else if (p.selectedReferenceSetId === set.id) p.selectedReferenceSetId = null;
     set.review = decision;
     this.event(p, actor, 'reference_set_reviewed', { referenceSetId: set.id, conceptId: set.conceptId, decision }); this.save(p); return p;

@@ -6,9 +6,9 @@ import { runProcess, subscriptionEnv } from './codex.js';
 export { runProcess, subscriptionEnv } from './codex.js';
 import { CodexConceptGenerator } from './concept.js';
 import { gunzipSync, zstdDecompressSync } from 'node:zlib';
-import { AppError, text, imageData } from './store.js';
+import { AppError, text, imageData, currentConcept, currentReferenceSet, revisionReferenceSet } from './store.js';
 import { blenderCall } from './blender.js';
-import { CodexReferenceInspector, validateViewSet } from './reference-set.js';
+import { CodexReferenceInspector, validateViewSet, referenceProfile } from './reference-set.js';
 
 const base = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export function codexArgs(dir, images, env = process.env) {
@@ -147,7 +147,7 @@ export class Runner {
     if (((p.checkpoints.input || p.inputCheckpoint) && p.inputReview !== 'approved') || p.inputReview === 'rejected') throw new AppError('Review the input in the web UI before continuing', 409);
     if (p.references.some(r => r.review === 'pending')) throw new AppError('Review all pending reference images in the web UI before modeling', 409);
     if (p.versions.some(v => v.checkpoints?.preview && v.status === 'ready' && v.review === 'pending')) throw new AppError('Review the 3D preview in the web UI before continuing', 409);
-    if (!concepts && p.concepts.some(c => c.prompt === p.prompt && c.status === 'ready' && c.review === 'pending')) throw new AppError('Review the concept image in the web UI before modeling', 409);
+    if (!concepts && p.concepts.some(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'pending')) throw new AppError('Review the concept image in the web UI before modeling', 409);
     if (!referenceSets && p.referenceSets.some(s => s.conceptId === p.selectedConceptId && s.status === 'ready' && s.review === 'pending')) throw new AppError('Review the multi-view reference set in the web UI before modeling', 409);
     if (p.inputReview === 'pending') {
       p.inputReview = 'approved'; this.store.event(p, 'system', 'input_auto_accepted'); this.store.save(p);
@@ -163,14 +163,18 @@ export class Runner {
     const feedback = kind === 'revision' ? text(input.feedback, 'Revision feedback') : (input.feedback ? text(input.feedback, 'Instructions') : '');
     const concept = p.mode === 'text' ? p.concepts.find(c => c.id === (kind === 'revision' && source?.conceptId ? source.conceptId : p.selectedConceptId) && c.status === 'ready' && c.review === 'approved') : null;
     if (p.mode === 'text' && !concept) {
-      if (p.concepts.some(c => c.prompt === p.prompt && c.status === 'ready' && c.review === 'rejected')) throw new AppError('Regenerate or explicitly accept a concept before modeling', 409);
+      if (p.concepts.some(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'rejected')) throw new AppError('Regenerate or explicitly accept a concept before modeling', 409);
       return this.startConcept(p, { kind, sourceVersionId: source?.id, feedback }, actor);
     }
     const request = { kind, sourceVersionId: source?.id, feedback };
-    const setId = kind === 'revision' && source?.referenceSetId ? source.referenceSetId : p.selectedReferenceSetId;
+    // Legacy models have no referenceSetId. Resume the set saved for this exact
+    // revision request, even when the current project has a different design.
+    const revisionSet = kind === 'revision' && !source.referenceSetId ? p.referenceSets.findLast(s => revisionReferenceSet(p, s)
+      && s.request.sourceVersionId === source.id && s.request.feedback === feedback) : null;
+    const setId = kind === 'revision' && source.referenceSetId ? source.referenceSetId : revisionSet?.id || p.selectedReferenceSetId;
     const set = concept ? p.referenceSets.find(s => s.id === setId && s.conceptId === concept.id) : null;
     if (concept && !set) {
-      if (p.referenceSets.some(s => s.conceptId === concept.id)) throw new AppError('Regenerate or explicitly accept a reference set before modeling', 409);
+      if (p.referenceSets.some(s => s.conceptId === concept.id) && kind !== 'revision') throw new AppError('Regenerate or explicitly accept a reference set before modeling', 409);
       return this.startReferenceSet(p, concept, request, actor);
     }
     if (set) this.validateReferences(p, set, concept);
@@ -192,7 +196,7 @@ export class Runner {
   regenerateConcept(id, input, actor) {
     const p = this.store.get(id); this.guard(p, { concepts: true, referenceSets: true });
     if (p.mode !== 'text') throw new AppError('Image input does not need concept generation');
-    const pending = p.concepts.filter(c => c.prompt === p.prompt && c.status === 'ready' && c.review === 'pending');
+    const pending = p.concepts.filter(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'pending');
     if (pending.length && actor !== 'web') throw new AppError('Reject pending concepts in the web UI before regeneration', 403);
     const pendingSets = p.referenceSets.filter(s => s.conceptId === p.selectedConceptId && s.status === 'ready' && s.review === 'pending');
     if (pendingSets.length && actor !== 'web') throw new AppError('Reject pending reference sets in the web UI before regeneration', 403);
@@ -207,7 +211,7 @@ export class Runner {
     if (decision === 'approved') this.guard(p, { concepts: true });
     this.store.reviewConcept(id, conceptId, decision, actor);
     const c = p.concepts.find(c => c.id === conceptId);
-    if (decision === 'approved' && !p.concepts.some(c => c.prompt === p.prompt && c.status === 'ready' && c.review === 'pending')) return this.start(id, c.request, actor);
+    if (decision === 'approved' && !p.concepts.some(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'pending')) return this.start(id, c.request, actor);
     return p;
   }
   startConcept(p, request, actor, feedback = '') {
@@ -257,7 +261,7 @@ export class Runner {
   validateReferences(p, set, concept) {
     validateViewSet(set);
     if (set.status !== 'ready' || set.review !== 'approved' || set.consistency?.status !== 'passed'
-      || set.conceptId !== concept.id || set.prompt !== concept.prompt) throw new AppError('A reviewed, consistent reference set is required before Blender modeling', 409);
+      || set.conceptId !== concept.id || set.prompt !== concept.prompt || (concept.profile && set.profile !== concept.profile)) throw new AppError('A reviewed, consistent reference set is required before Blender modeling', 409);
     for (const image of set.images) this.store.artifact(p.id, image.file);
   }
   modelingInputs(p, v) {
@@ -279,15 +283,17 @@ export class Runner {
     if (decision === 'approved') this.guard(p, { referenceSets: true });
     this.store.reviewReferenceSet(id, setId, decision, actor);
     const set = p.referenceSets.find(s => s.id === setId);
-    if (decision === 'approved' && !p.referenceSets.some(s => s.conceptId === set.conceptId && s.status === 'ready' && s.review === 'pending')) return this.start(id, set.request, actor);
+    if (decision === 'approved' && !p.referenceSets.some(s => s.conceptId === set.conceptId && s.status === 'ready' && s.review === 'pending'
+      && (set.request.kind !== 'revision' || (s.request?.kind === 'revision' && s.request.sourceVersionId === set.request.sourceVersionId && s.request.feedback === set.request.feedback)))) return this.start(id, set.request, actor);
     return p;
   }
   startReferenceSet(p, concept, request, actor, feedback = '') {
     this.store.artifact(p.id, concept.artifacts.image);
-    const set = { id: randomUUID(), number: p.referenceSets.length + 1, conceptId: concept.id, prompt: concept.prompt, profile: concept.profile || p.profile, feedback, request,
+    const set = { id: randomUUID(), number: p.referenceSets.length + 1, conceptId: concept.id, prompt: concept.prompt, profile: concept.profile || referenceProfile(undefined, concept.prompt), feedback, request,
       provider: this.conceptGenerator.provider || 'custom', status: 'running', review: 'pending', checkpoints: { ...p.checkpoints }, images: [], artifacts: {}, consistency: { status: 'pending', issues: [] }, createdAt: new Date().toISOString(), error: null };
     const dir = path.join(this.store.dir(p.id), 'reference-sets', set.id); fs.mkdirSync(dir, { recursive: true });
-    p.selectedReferenceSetId = null; p.referenceSets.push(set);
+    if (currentReferenceSet(p, set)) p.selectedReferenceSetId = null;
+    p.referenceSets.push(set);
     this.store.event(p, actor, 'reference_set_generation_started', { referenceSetId: set.id, conceptId: concept.id }); this.store.save(p);
     this.active = true; this.pending = this.completeReferenceSet(p, concept, set, dir); return p;
   }
@@ -316,7 +322,9 @@ export class Runner {
       this.store.event(p, 'codex', 'reference_set_inspected', { referenceSetId: set.id, consistency: set.consistency.status });
       if (set.consistency.status === 'failed') set.error = 'Cross-view contradictions found. Inspect the report and regenerate views from the same base concept.';
       else if (!set.checkpoints.multiView) {
-        set.review = 'approved'; p.selectedReferenceSetId = set.id; continueModeling = true;
+        set.review = 'approved';
+        if (currentReferenceSet(p, set)) p.selectedReferenceSetId = set.id;
+        continueModeling = true;
         this.store.event(p, 'system', 'reference_set_auto_accepted', { referenceSetId: set.id });
       }
     } catch (e) {

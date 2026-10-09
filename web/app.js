@@ -14,6 +14,13 @@ async function api(route, method = 'GET', input) {
   return data;
 }
 function project() { return projects.find(p => p.id === projectId); }
+function currentConcept(p, c) { return c.prompt === p.prompt && (!c.profile || c.profile === p.profile); }
+function revisionReferenceSet(p, set) {
+  const source = set.request?.kind === 'revision' && p.versions.find(v => v.id === set.request.sourceVersionId && v.status === 'ready');
+  const concept = p.concepts.find(c => c.id === set.conceptId && c.status === 'ready' && c.review === 'approved');
+  return Boolean(source && concept && source.conceptId === concept.id && source.prompt === set.prompt
+    && set.prompt === concept.prompt && (!concept.profile || set.profile === concept.profile));
+}
 function artifact(file) { return `/api/projects/${projectId}/artifacts/${file}`; }
 function button(label, action, disabled = false) { const b = document.createElement('button'); b.textContent = label; b.disabled = disabled; b.onclick = () => safe(action); return b; }
 async function safe(action) { try { notify(''); await action(); await refresh(); } catch (e) { notify(e.message); } }
@@ -75,8 +82,8 @@ function render() {
   const signature = JSON.stringify([p, versionId, status.busy, status.usageLimited]);
   const sourceConcept = p.concepts.find(c => c.id === v?.conceptId);
   const projectBusy = p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running') || p.referenceSets.some(s => s.status === 'running');
-  const pendingConcept = p.concepts.some(c => c.prompt === p.prompt && c.status === 'ready' && c.review === 'pending');
-  const pendingViews = p.referenceSets.some(s => s.conceptId === p.selectedConceptId && s.status === 'ready' && s.review === 'pending');
+  const pendingConcept = p.concepts.some(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'pending');
+  const pendingViews = p.referenceSets.some(s => (s.conceptId === p.selectedConceptId || revisionReferenceSet(p, s)) && s.status === 'ready' && s.review === 'pending');
   const pendingPreview = p.versions.some(v => v.status === 'ready' && v.checkpoints?.preview && v.review === 'pending');
   if (followLatest && !projectBusy && !pendingConcept && !pendingViews && v?.status === 'ready') followLatest = false;
   const pendingInput = ((p.checkpoints.input || p.inputCheckpoint) && p.inputReview !== 'approved') || p.inputReview === 'rejected';
@@ -108,19 +115,20 @@ function render() {
       const node = c.artifacts.image ? figure(c.artifacts.image, `Concept ${c.number} · ${c.review}${c.feedback ? ' · ' + c.feedback : ''}${p.selectedConceptId === c.id ? ' · selected' : ''}${v?.conceptId === c.id ? ` · source of v${v.number}` : ''}`) : document.createElement('div');
       if (c.status !== 'ready') { const info = document.createElement('p'); info.textContent = `Concept ${c.number} · ${c.status}${c.error ? ' — ' + c.error : ''}`; node.append(info); }
       const actions = document.createElement('div'); actions.className = 'reference-actions';
-      if (c.status === 'ready') for (const decision of ['approved', 'rejected']) actions.append(button(decision === 'approved' ? 'Accept concept & generate views' : 'Reject concept', async () => { followLatest = decision === 'approved'; const current = await api(`/projects/${p.id}/concepts/${c.id}/review`, 'POST', { decision }); versionId = current.versions.at(-1)?.id || null; }, busy || pendingInput || (decision === 'approved' && pendingViews) || pendingPreview || c.prompt !== p.prompt || (c.profile && c.profile !== p.profile)));
+      if (c.status === 'ready') for (const decision of ['approved', 'rejected']) actions.append(button(decision === 'approved' ? 'Accept concept & generate views' : 'Reject concept', async () => { followLatest = decision === 'approved'; const current = await api(`/projects/${p.id}/concepts/${c.id}/review`, 'POST', { decision }); versionId = current.versions.at(-1)?.id || null; }, busy || pendingInput || (decision === 'approved' && pendingViews) || pendingPreview || !currentConcept(p, c)));
       node.append(actions); return node;
     }));
     $('reference-sets').replaceChildren(...p.referenceSets.slice().reverse().map(set => {
       const node = document.createElement('section'), info = document.createElement('p');
       const models = p.versions.filter(v => v.referenceSetId === set.id).map(v => `v${v.number}`).join(', ');
-      info.textContent = `View set ${set.number} · ${set.profile} · concept ${p.concepts.find(c => c.id === set.conceptId)?.number} · ${set.status} · ${set.review} · consistency ${set.consistency.status}${models ? ' · models ' + models : ''}${set.feedback ? ' · ' + set.feedback : ''}${set.error ? ' — ' + set.error : ''}`;
+      const revisionSource = revisionReferenceSet(p, set) ? p.versions.find(v => v.id === set.request.sourceVersionId) : null;
+      info.textContent = `View set ${set.number} · ${set.profile} · concept ${p.concepts.find(c => c.id === set.conceptId)?.number} · ${set.status} · ${set.review} · consistency ${set.consistency.status}${revisionSource ? ` · revision of v${revisionSource.number} · ${set.request.feedback}` : ''}${models ? ' · models ' + models : ''}${set.feedback ? ' · ' + set.feedback : ''}${set.error ? ' — ' + set.error : ''}`;
       node.append(info, ...set.images.map(image => figure(image.file, image.label)));
       for (const issue of set.consistency.issues) { const line = document.createElement('p'); line.textContent = issue; node.append(line); }
       if (set.artifacts['consistency.json']) { const link = document.createElement('a'); link.href = artifact(set.artifacts['consistency.json']); link.textContent = 'Consistency report'; link.target = '_blank'; node.append(link); }
       if (set.status === 'ready') for (const decision of ['approved', 'rejected']) node.append(button(decision === 'approved' ? 'Accept views & model' : 'Reject view set', async () => {
         followLatest = decision === 'approved'; await api(`/projects/${p.id}/reference-sets/${set.id}/review`, 'POST', { decision });
-      }, busy || pendingInput || pendingConcept || pendingPreview || set.conceptId !== p.selectedConceptId || (decision === 'approved' && set.consistency.status !== 'passed')));
+      }, busy || pendingInput || pendingConcept || pendingPreview || (set.conceptId !== p.selectedConceptId && !revisionSource) || (decision === 'approved' && set.consistency.status !== 'passed')));
       return node;
     }));
     $('input-image').replaceChildren(...(p.inputImage ? [figure(p.inputImage, 'Original image input')] : []));

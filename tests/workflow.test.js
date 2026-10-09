@@ -280,6 +280,98 @@ test('rejection and regeneration preserve concepts and never model a rejected de
   assert.equal(modeled, 1); assert.equal(p.versions[0].conceptId, p.concepts[2].id);
 });
 
+test('profile changes scope pending and rejected concepts to the current design without rewriting history', async t => {
+  for (const regenerate of [false, true]) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, profile: 'character', checkpoints: { ...input.checkpoints, concept: true } }, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const old = structuredClone(p.concepts[0]);
+    store.update(p.id, { profile: 'object' }, 'web');
+    assert.throws(() => runner.reviewConcept(p.id, old.id, 'rejected', 'web'), /current input/);
+    if (regenerate) runner.regenerateConcept(p.id, {}, 'mcp');
+    else runner.start(p.id, {}, 'web');
+    await runner.pending;
+    const current = p.concepts[1];
+    assert.deepEqual(p.concepts[0], old); assert.equal(current.profile, 'object'); assert.equal(current.review, 'pending');
+    assert.throws(() => runner.start(p.id, {}, 'web'), /Review the concept/);
+    assert.throws(() => runner.regenerateConcept(p.id, {}, 'mcp'), /Reject pending/);
+    runner.reviewConcept(p.id, current.id, 'approved', 'web'); await runner.pending;
+    assert.equal(p.versions[0].status, 'ready'); assert.equal(p.versions[0].conceptId, current.id);
+    assert.equal(p.referenceSets[0].profile, 'object');
+    assert.deepEqual(new Store(store.root).get(p.id).concepts[0], JSON.parse(JSON.stringify(old)));
+    // A rejected design from the other profile must not force regeneration.
+    store.update(p.id, { profile: 'character' }, 'web');
+    runner.reviewConcept(p.id, old.id, 'rejected', 'web');
+    const rejected = structuredClone(p.concepts[0]);
+    store.update(p.id, { profile: 'object' }, 'web');
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.concepts[2].profile, 'object'); assert.equal(p.concepts[2].review, 'pending');
+    assert.deepEqual(p.concepts[0], rejected);
+  }
+});
+
+test('legacy model revisions retain their own concept, review request and all images across project edits and restart', async t => {
+  for (const multiView of [true, false]) {
+    const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const source = p.versions[0];
+    const sourceBytes = fs.readFileSync(store.artifact(p.id, source.artifacts.blend));
+    // Persist a pre-multi-view project: completed concept/model, no typed views.
+    delete source.referenceSetId; delete source.modelingImages; delete source.imageInputs;
+    delete p.concepts[0].profile; delete p.profile; delete p.referenceSets; delete p.selectedReferenceSetId;
+    delete p.checkpoints.multiView; store.save(p);
+    const legacy = structuredClone(source);
+    const loaded = new Store(dir), current = loaded.get(p.id);
+    const resumed = new Runner(loaded, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+    loaded.update(p.id, { prompt: 'A brass teapot', profile: 'object', checkpoints: { multiView: false } }, 'web');
+    resumed.start(p.id, {}, 'web'); await resumed.pending;
+    const selectedConceptId = current.selectedConceptId, selectedReferenceSetId = current.selectedReferenceSetId;
+    loaded.update(p.id, { checkpoints: { multiView } }, 'web');
+    const request = { kind: 'revision', sourceVersionId: source.id, feedback: 'Lengthen the original robot arms' };
+    resumed.start(p.id, request, 'web'); await resumed.pending;
+    const set = current.referenceSets.at(-1);
+    assert.equal(set.prompt, input.prompt); assert.equal(set.profile, 'character'); assert.equal(set.conceptId, source.conceptId);
+    assert.deepEqual(set.request, request); assert.equal(set.images.length, 4);
+    assert.equal(current.selectedConceptId, selectedConceptId); assert.equal(current.selectedReferenceSetId, selectedReferenceSetId);
+    if (multiView) {
+      assert.equal(current.versions.length, 2); assert.equal(set.review, 'pending');
+      assert.throws(() => resumed.start(p.id, request, 'web'), /reviewed, consistent/);
+      assert.throws(() => resumed.reviewReferenceSet(p.id, set.id, 'approved', 'mcp'), /web UI/);
+      loaded.update(p.id, { prompt: 'A silver teapot', checkpoints: { multiView: false } }, 'web');
+      const reloaded = new Store(dir), restored = reloaded.get(p.id);
+      const pending = restored.referenceSets.at(-1);
+      const continued = new Runner(reloaded, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => {
+        assert.deepEqual(fs.readFileSync(path.join(dir, 'source.blend')), sourceBytes); artifacts(dir);
+      } });
+      assert.equal(pending.review, 'pending'); assert.equal(pending.checkpoints.multiView, true);
+      assert.throws(() => continued.start(p.id, request, 'web'), /reviewed, consistent/);
+      const savedSource = pending.request.sourceVersionId;
+      pending.request.sourceVersionId = 'missing-source';
+      assert.throws(() => continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'), /selected concept or source revision/);
+      pending.request.sourceVersionId = savedSource;
+      const back = pending.images.pop();
+      assert.throws(() => continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'), /complete reference set/);
+      pending.images.push(back);
+      continued.reviewReferenceSet(p.id, pending.id, 'rejected', 'web');
+      assert.equal(restored.versions.length, 2); assert.equal(pending.review, 'rejected');
+      continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'); await continued.pending;
+      assert.equal(restored.versions.length, 3); assert.equal(restored.versions[2].status, 'ready');
+      assert.equal(restored.selectedConceptId, null); assert.equal(restored.selectedReferenceSetId, null);
+      assert.deepEqual(restored.versions[0], legacy);
+      assert.ok(restored.activity.some(e => e.referenceSetId === set.id && e.decision === 'rejected'));
+    } else {
+      assert.equal(current.versions.length, 3); assert.equal(set.review, 'approved');
+    }
+    const saved = new Store(dir).get(p.id), revision = saved.versions[2], savedSet = saved.referenceSets.at(-1);
+    assert.deepEqual(saved.versions[0], legacy); assert.equal(revision.sourceVersionId, source.id);
+    assert.equal(revision.prompt, input.prompt); assert.equal(revision.feedback, request.feedback);
+    assert.equal(revision.referenceSetId, set.id); assert.deepEqual(revision.modelingImages, savedSet.images);
+    assert.deepEqual(revision.imageInputs, [saved.concepts[0].artifacts.image, ...savedSet.images.map(i => i.file)]);
+    for (const file of revision.imageInputs) assert.deepEqual(fs.readFileSync(new Store(dir).artifact(p.id, file)), png);
+  }
+});
+
 test('disabled checkpoints auto-continue and a replaceable generator needs no Blender-flow changes', async t => {
   const store = new Store(temporary(t)), p = store.create(input, 'web');
   let generated = 0;
