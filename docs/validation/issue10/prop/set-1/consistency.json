@@ -1,6 +1,0 @@
-{
-  "consistent": false,
-  "issues": [
-    "The requested left-side view shows the cabinet’s right side: the front edge and protruding orange handle appear on the left of the image. A left-side view should place the front edge and handle on the right."
-  ]
-}
