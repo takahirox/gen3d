@@ -162,6 +162,13 @@ export class Runner {
     if (input.sourceVersionId && !source) throw new AppError('Source version not found');
     const feedback = kind === 'revision' ? text(input.feedback, 'Revision feedback') : (input.feedback ? text(input.feedback, 'Instructions') : '');
     const concept = p.mode === 'text' ? p.concepts.find(c => c.id === (kind === 'revision' && source?.conceptId ? source.conceptId : p.selectedConceptId) && c.status === 'ready' && c.review === 'approved') : null;
+    const chosenSet = input.referenceSetId ? p.referenceSets.find(s => s.id === input.referenceSetId) : null;
+    if (input.referenceSetId) {
+      if (!chosenSet) throw new AppError('Reference set not found', 404);
+      if (!concept || chosenSet.conceptId !== concept.id || chosenSet.request?.kind !== kind
+        || chosenSet.request.sourceVersionId !== source?.id || (chosenSet.request.feedback || '') !== feedback
+        || (kind === 'revision' && !revisionReferenceSet(p, chosenSet))) throw new AppError('Reference set does not match the modeling request', 409);
+    }
     if (p.mode === 'text' && !concept) {
       if (p.concepts.some(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'rejected')) throw new AppError('Regenerate or explicitly accept a concept before modeling', 409);
       return this.startConcept(p, { kind, sourceVersionId: source?.id, feedback }, actor);
@@ -171,7 +178,9 @@ export class Runner {
     // revision request, even when the current project has a different design.
     const revisionSet = kind === 'revision' && !source.referenceSetId ? p.referenceSets.findLast(s => revisionReferenceSet(p, s)
       && s.request.sourceVersionId === source.id && s.request.feedback === feedback) : null;
-    const setId = kind === 'revision' && source.referenceSetId ? source.referenceSetId : revisionSet?.id || p.selectedReferenceSetId;
+    // Continuations must use the exact set accepted by the reviewer/provider,
+    // even if a newer set exists for the same revision request.
+    const setId = chosenSet?.id || (kind === 'revision' && source.referenceSetId ? source.referenceSetId : revisionSet?.id || p.selectedReferenceSetId);
     const set = concept ? p.referenceSets.find(s => s.id === setId && s.conceptId === concept.id) : null;
     if (concept && !set) {
       if (p.referenceSets.some(s => s.conceptId === concept.id) && kind !== 'revision') throw new AppError('Regenerate or explicitly accept a reference set before modeling', 409);
@@ -290,7 +299,7 @@ export class Runner {
     this.store.reviewReferenceSet(id, setId, decision, actor);
     const set = p.referenceSets.find(s => s.id === setId);
     if (decision === 'approved' && !p.referenceSets.some(s => s.conceptId === set.conceptId && s.status === 'ready' && s.review === 'pending'
-      && (set.request.kind !== 'revision' || (s.request?.kind === 'revision' && s.request.sourceVersionId === set.request.sourceVersionId && s.request.feedback === set.request.feedback)))) return this.start(id, set.request, actor);
+      && (set.request.kind !== 'revision' || (s.request?.kind === 'revision' && s.request.sourceVersionId === set.request.sourceVersionId && s.request.feedback === set.request.feedback)))) return this.start(id, { ...set.request, referenceSetId: set.id }, actor);
     return p;
   }
   startReferenceSet(p, concept, request, actor, feedback = '', parentReferenceSetId = null) {
@@ -347,7 +356,7 @@ export class Runner {
       set.finishedAt = new Date().toISOString(); this.store.save(p); this.active = false;
     }
     if (continueModeling) {
-      try { this.start(p.id, set.request, 'system'); await this.pending; }
+      try { this.start(p.id, { ...set.request, referenceSetId: set.id }, 'system'); await this.pending; }
       catch (e) { this.store.event(p, 'system', 'continuation_blocked', { referenceSetId: set.id, message: e.message }); this.store.save(p); }
     }
   }

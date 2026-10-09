@@ -462,6 +462,70 @@ test('regenerating legacy revision views retains the source, modeling feedback a
   }
 });
 
+test('approving older legacy revision views models their exact images after replacement decisions and restart', async t => {
+  for (const replacementDecision of ['rejected', 'approved']) for (const restart of [false, true]) for (const historical of [false, true]) {
+    await t.test(`replacement ${replacementDecision}, restart ${restart}, historical design ${historical}`, async t => {
+      const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
+      const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+      runner.start(p.id, {}, 'web'); await runner.pending;
+      const source = p.versions[0];
+      delete source.referenceSetId; delete source.modelingImages; delete source.imageInputs;
+      p.referenceSets = []; p.selectedReferenceSetId = null; store.save(p);
+      const legacy = structuredClone(source);
+      if (historical) {
+        store.update(p.id, { prompt: 'A brass teapot', profile: 'object' }, 'web');
+        runner.start(p.id, {}, 'web'); await runner.pending;
+      }
+      const selectedConceptId = p.selectedConceptId, selectedReferenceSetId = p.selectedReferenceSetId;
+      store.update(p.id, { checkpoints: { multiView: true } }, 'web');
+      const request = { kind: 'revision', sourceVersionId: source.id, feedback: 'Lengthen the original robot arms' };
+      runner.start(p.id, request, 'web'); await runner.pending;
+      const older = p.referenceSets.at(-1);
+      runner.regenerateReferenceSet(p.id, { referenceSetId: older.id, feedback: 'Restore rear arm colors' }, 'web'); await runner.pending;
+      const replacement = p.referenceSets.at(-1);
+      assert.equal(older.review, 'rejected'); assert.equal(older.consistency.status, 'passed');
+      assert.deepEqual(replacement.request, older.request);
+      runner.reviewReferenceSet(p.id, replacement.id, replacementDecision, 'web'); await runner.pending;
+      if (replacementDecision === 'approved') assert.equal(p.versions.at(-1).referenceSetId, replacement.id);
+      const continuedStore = restart ? new Store(dir) : store, continuedProject = continuedStore.get(p.id);
+      const replacementSnapshot = structuredClone(continuedProject.referenceSets.find(s => s.id === replacement.id));
+      const versionsSnapshot = structuredClone(continuedProject.versions);
+      let modelCalls = 0;
+      const continued = new Runner(continuedStore, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => {
+        modelCalls++;
+        assert.equal(v.referenceSetId, older.id); assert.equal(v.sourceVersionId, source.id);
+        assert.equal(v.prompt, input.prompt); assert.equal(v.feedback, request.feedback);
+        assert.deepEqual(v.modelingImages, p.referenceSets.find(s => s.id === older.id).images);
+        assert.deepEqual(v.imageInputs, [p.concepts[0].artifacts.image, ...older.images.map(i => i.file)]);
+        assert.ok(!v.imageInputs.some(file => replacement.images.some(i => i.file === file)));
+        assert.equal(fs.readFileSync(path.join(dir, 'source.blend'), 'utf8'), 'BLENDER-test-fixture');
+        artifacts(dir);
+      } });
+      // Explicit IDs cannot be used to bypass request association or approval.
+      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: 'missing' }, 'web'), /Reference set not found/);
+      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, feedback: 'Different revision' }, 'web'), /does not match the modeling request/);
+      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, kind: 'generate' }, 'web'), /does not match the modeling request/);
+      if (historical) assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, sourceVersionId: p.versions[1].id }, 'web'), /does not match the modeling request/);
+      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id }, 'web'), /reviewed, consistent/);
+      assert.equal(modelCalls, 0); assert.equal(continuedProject.versions.length, versionsSnapshot.length);
+      continued.reviewReferenceSet(p.id, older.id, 'approved', 'web'); await continued.pending;
+      assert.equal(modelCalls, 1); assert.equal(continuedProject.versions.at(-1).status, 'ready');
+      assert.equal(continuedProject.versions.length, versionsSnapshot.length + 1);
+      assert.deepEqual(continuedProject.versions.slice(0, -1), versionsSnapshot);
+      assert.deepEqual(continuedProject.versions[0], legacy);
+      assert.deepEqual(continuedProject.referenceSets.find(s => s.id === replacement.id), replacementSnapshot);
+      if (historical) {
+        assert.equal(continuedProject.selectedConceptId, selectedConceptId);
+        assert.equal(continuedProject.selectedReferenceSetId, selectedReferenceSetId);
+      }
+      const saved = new Store(dir).get(p.id), revision = saved.versions.at(-1);
+      assert.equal(revision.referenceSetId, older.id); assert.deepEqual(revision.modelingImages, saved.referenceSets.find(s => s.id === older.id).images);
+      assert.deepEqual(revision.imageInputs, [saved.concepts[0].artifacts.image, ...older.images.map(i => i.file)]);
+      assert.ok(saved.activity.some(e => e.referenceSetId === older.id && e.decision === 'approved'));
+    });
+  }
+});
+
 test('disabled checkpoints auto-continue and a replaceable generator needs no Blender-flow changes', async t => {
   const store = new Store(temporary(t)), p = store.create(input, 'web');
   let generated = 0;
