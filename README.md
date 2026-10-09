@@ -26,9 +26,13 @@ On macOS, use `/Applications/Blender.app/Contents/MacOS/Blender` if `blender` is
 npm start
 ```
 
-Open **http://127.0.0.1:3333**. Create a text or image project, choose **Pause for review** settings, then click **Start workflow**. Text input generates a base concept first; accept it (when concept review is enabled) to generate front, left-side, back and three-quarter images. Configure **Run consistency check** (On / Off) and **On consistency failure** (Stop / Warn and continue) before generating views. Defaults are On and Stop: Codex checks those views against the base design and blocks inconsistent sets before modeling. Accept the set when multi-view review is enabled, or reject/regenerate it while retaining the same concept. Orbit, pan and zoom the GLB in the viewer; inspect the rendered view; approve/reject; request a natural-language revision; choose earlier versions from the dropdown; download the GLB or Blender scene. Retry starts a new candidate from the input. Revision starts from a copy of the selected scene, retaining the original.
+Open **http://127.0.0.1:3333**. Click **New project** (+), enter text or upload an image, then click **Start workflow**. The studio has navigable **Input → Base concept → Multi-view → 3D model** stages; image projects use **Input → 3D model**. Each stage puts its artifact in the main workspace and its decisions alongside it. The stage indicators and **Next step** identify progress, pending human review, warnings and failures.
 
-See [local setup, MCP integration and troubleshooting](docs/local-setup.md), [Issue #12 validation](docs/validation-issue12.md), [Issue #10 validation](docs/validation-issue10.md), [historical Issue #8 validation](docs/validation-issue8.md), and [historical MVP validation](docs/validation.md).
+Use **Review & settings** for **Pause for review**, **Run consistency check** (On / Off), and **On consistency failure** (Stop / Warn and continue). New-project settings are also available under **Review checkpoints & advanced settings**. Text generates a base concept first; **Accept concept & generate views** explicitly continues an enabled checkpoint. Compare the base/front/side/back/three-quarter images, inspect consistency issues/report, then **Accept views & model**, reject or regenerate. All concept and view candidates remain available in their selectors and thumbnail strips, including uninterrupted automatic runs.
+
+In **3D model**, orbit, pan and zoom the GLB, **Fit model**, inspect the rendered preview, approve/reject, request a revision, switch model versions and download GLB or **Blender scene**. **Source concept** and **Source view set** open the exact images used by the selected model. Retry starts a new candidate from the input; revision copies the selected scene and retains its source artifacts. **History** opens shared activity and version history. Browser polling shows MCP updates without a manual refresh, while preserving unsaved edits and explicitly selected older candidates.
+
+See [local setup, MCP integration and troubleshooting](docs/local-setup.md), [UI redesign validation (Issue #14)](docs/validation-issue14.md), [Issue #12 validation](docs/validation-issue12.md), [Issue #10 validation](docs/validation-issue10.md), [historical Issue #8 validation](docs/validation-issue8.md), and [historical MVP validation](docs/validation.md).
 
 ## Workflow
 
@@ -79,6 +83,7 @@ The app server, project store and Blender run on your machine. Codex inference u
 ```sh
 npm test
 npm run check
+npm run test:browser # Chrome/Chromium; injected fixtures, no Codex allowance
 git diff --check
 ```
 
