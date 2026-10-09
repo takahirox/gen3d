@@ -1,0 +1,30 @@
+{
+  "provider": "native Codex image generation, then exact-byte local reuse",
+  "files": [
+    {
+      "file": "back.png",
+      "bytes": 1716349,
+      "sha256": "6420ed0081b5097287b61b035bbb5c78097e335e5755b3bc7104cd9920e8e59c"
+    },
+    {
+      "file": "concept.png",
+      "bytes": 1757705,
+      "sha256": "929cee1ead39be73b2fd6c19987ea1ffdc21d12bdc992b5df9234b3f1c527592"
+    },
+    {
+      "file": "front.png",
+      "bytes": 1754436,
+      "sha256": "8bac1e197953264abc8128dc9458205aa2b71c111f21f2650eb7e0fb85a4867e"
+    },
+    {
+      "file": "side.png",
+      "bytes": 1648697,
+      "sha256": "bf5e4052519aa8ded85677fd4c7b807ddba542674535b97512a0ca1307745afb"
+    },
+    {
+      "file": "three-quarter.png",
+      "bytes": 1721088,
+      "sha256": "a499e0550dd90b139880a3d75c2e41d426e8fc5b0151efe406ae634a05a378c5"
+    }
+  ]
+}

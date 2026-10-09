@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+import { matchingComparison, modelingLabel } from './modeling-state.js';
 import { stageNames, studioState, currentConcept, revisionReferenceSet, consistencyAllowsModeling } from './studio-state.js';
 
 const $ = id => document.getElementById(id);
@@ -141,9 +142,12 @@ function render() {
   $('revise').querySelector('button').disabled = !!blocked || v?.status !== 'ready';
   $('concept-retry').querySelector('button').disabled = !!(busy || pendingInput || pendingPreview || pendingRefs || status.usageLimited);
   $('views-retry').querySelector('button').disabled = !!(busy || pendingInput || pendingConcept || pendingPreview || pendingRefs || status.usageLimited || !p.selectedConceptId && !p.referenceSets.some(s => revisionReferenceSet(p, s)));
-  for (const id of ['edit', 'checkpoints', 'consistency', 'reference']) $(id).querySelector('button').disabled = projectBusy;
-  for (const key of ['name', 'prompt', 'profile']) { if (!$('edit').dataset.dirty) $('edit').elements[key].value = p[key]; }
-  $('edit').elements.prompt.required = p.mode === 'text'; $('edit').elements.profile.closest('label').hidden = p.mode !== 'text';
+  for (const id of ['edit', 'modeling', 'checkpoints', 'consistency', 'reference']) $(id).querySelector('button').disabled = projectBusy;
+  for (const key of ['name', 'prompt', 'profile', 'modelingMode']) { if (!$('edit').dataset.dirty) $('edit').elements[key].value = p[key]; }
+  $('edit').elements.prompt.required = p.mode === 'text'; $('edit').elements.profile.closest('label').hidden = false;
+  $('modeling').hidden = p.profile !== 'character';
+  if (!$('modeling').dataset.dirty) $('modeling').elements.modelingMode.value = p.modelingMode || 'scratch';
+  syncModeling($('edit')); syncModeling(create);
   $('input-kind').textContent = p.mode === 'text' ? 'Text → concept → views → model' : 'Image → model';
   for (const key of ['input', 'concept', 'multiView', 'preview']) if (!$('checkpoints').dataset.dirty) $('checkpoints').elements[key].checked = p.checkpoints[key];
   for (const cls of ['concept-setting', 'view-setting']) $('checkpoints').querySelector('.' + cls).hidden = p.mode !== 'text';
@@ -204,8 +208,8 @@ function render() {
   }));
   $('reference-state').textContent = pendingRefs ? 'Review each pending reference before modeling. Rejected images will not be used.' : 'Only approved supplementary references are used alongside required design images.';
   if (pendingRefs && stage === 'input') $('references').closest('details').open = true;
-  selectOptions('versions', p.versions, v?.id, v => `v${v.number} · ${v.kind} · ${v.status}`);
-  $('version-info').textContent = describe(v, 'Version') + (v ? ` · ${v.kind}${v.sourceVersionId ? ` · revision of v${p.versions.find(source => source.id === v.sourceVersionId)?.number ?? '?'}` : ''}` : '') + (v?.continuedDespiteInconsistency ? ' · WARNING: modeling continued despite failed consistency inspection' : v?.consistency?.status === 'skipped' ? ' · Consistency inspection skipped' : '');
+  selectOptions('versions', p.versions, v?.id, v => `v${v.number} · ${modelingLabel(v.modelingMode)} · ${v.kind} · ${v.status}`);
+  $('version-info').textContent = describe(v, 'Version') + (v ? ` · ${modelingLabel(v.modelingMode)} · ${v.kind}${v.sourceVersionId ? ` · revision of v${p.versions.find(source => source.id === v.sourceVersionId)?.number ?? '?'}` : ''}` : '') + (v?.continuedDespiteInconsistency ? ' · WARNING: modeling continued despite failed consistency inspection' : v?.consistency?.status === 'skipped' ? ' · Consistency inspection skipped' : '');
   $('version-info').classList.toggle('error', v?.status === 'failed');
   $('model-summary').textContent = v?.summary || 'No modeling summary yet.';
   const sourceConcept = p.concepts.find(c => c.id === v?.conceptId), sourceSet = p.referenceSets.find(s => s.id === v?.referenceSetId);
@@ -220,6 +224,10 @@ function render() {
   }
   const renderKey = v?.artifacts?.render || '', renderSignature = `${p.id}/${v?.id}/${renderKey}`;
   if ($('render-image').dataset.file !== renderSignature) { $('render-image').dataset.file = renderSignature; $('render-image').replaceChildren(renderKey ? figure(renderKey, `Rendered view · v${v.number}`) : placeholder('A completed model will include a rendered preview.')); }
+  const other = matchingComparison(p.versions, v);
+  $('comparison').hidden = !v || v.profile !== 'character' || v.status !== 'ready';
+  $('comparison-info').textContent = other ? `v${v.number} and v${other.number} use the exact same saved reference images, original text and modeling feedback. Compare silhouette, anatomy, joints, face and materials; summaries describe edits and limitations. Aesthetic quality remains subjective.` : 'These views use the same camera directions and framing rule. Choose the other modeling mode and Retry from input to create a comparison using the same approved images.';
+  $('comparison-images').replaceChildren(...['front', 'side', 'three-quarter'].flatMap(view => [v, other].filter(Boolean).filter(model => model.artifacts?.[view]).map(model => figure(model.artifacts[view], `${view} · v${model.number} · ${modelingLabel(model.modelingMode)}`))));
   $('history-count').textContent = `(${p.activity.length})`;
   $('history').replaceChildren(...p.activity.slice().reverse().map(e => {
     const li = document.createElement('li'), n = p.versions.find(v => v.id === e.versionId)?.number, c = p.concepts.find(c => c.id === e.conceptId)?.number, set = p.referenceSets.find(s => s.id === e.referenceSetId)?.number;
@@ -238,9 +246,9 @@ async function refresh() {
 }
 function form(id, action) { $(id).oninput = () => { $(id).dataset.dirty = 'true'; }; $(id).onsubmit = event => { event.preventDefault(); safe(async () => { await action(new FormData(event.target)); delete $(id).dataset.dirty; lastState = ''; }); }; }
 const create = $('create');
-create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; for (const cls of ['concept-setting', 'view-setting', 'profile-setting', 'consistency-settings']) create.querySelector('.' + cls).hidden = image; syncConsistency(create); };
+create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; for (const cls of ['concept-setting', 'view-setting', 'consistency-settings']) create.querySelector('.' + cls).hidden = image; syncConsistency(create); syncModeling(create); };
 form('create', async data => {
-  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), checkpoints: checkpointData(data), consistencySettings: consistencyData(data, create), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
+  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), modelingMode: data.get('modelingMode') || 'scratch', checkpoints: checkpointData(data), consistencySettings: consistencyData(data, create), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
   projectId = p.id; localStorage.setItem('gen3d-project', p.id); conceptId = viewId = versionId = null; stagePinned = false; lastState = ''; $('create-dialog').close(); create.reset();
   for (const f of document.querySelectorAll('#workspace form')) { f.reset(); delete f.dataset.dirty; } create.elements.mode.onchange();
 });
@@ -252,7 +260,15 @@ function checkpointData(data) { return Object.fromEntries(['input', 'concept', '
 form('checkpoints', data => api(`/projects/${projectId}`, 'PATCH', { checkpoints: checkpointData(data) }));
 form('concept-retry', async data => { await api(`/projects/${projectId}/concepts`, 'POST', { feedback: data.get('feedback') }); followWorkflow(); });
 form('views-retry', async data => { await api(`/projects/${projectId}/reference-sets`, 'POST', { ...(data.get('referenceSetId') ? { referenceSetId: data.get('referenceSetId') } : {}), feedback: data.get('feedback') }); followWorkflow(); });
-form('edit', data => api(`/projects/${projectId}`, 'PATCH', { name: data.get('name'), prompt: data.get('prompt'), profile: data.get('profile') }));
+form('edit', data => api(`/projects/${projectId}`, 'PATCH', { name: data.get('name'), prompt: data.get('prompt'), profile: data.get('profile'), modelingMode: data.get('modelingMode') || 'scratch' }));
+form('modeling', data => api(`/projects/${projectId}`, 'PATCH', { modelingMode: data.get('modelingMode') }));
+function syncModeling(form) {
+  const object = form.elements.profile.value === 'object';
+  const option = form.elements.modelingMode.querySelector('option[value=mpfb]');
+  option.disabled = object;
+  if (object) form.elements.modelingMode.value = 'scratch';
+}
+for (const form of [create, $('edit')]) form.elements.profile.onchange = () => syncModeling(form);
 form('reference', async data => { await api(`/projects/${projectId}/references`, 'POST', { label: data.get('label'), image: await fileImage(data.get('image')) }); $('reference').reset(); });
 async function generate(kind, feedback) {
   const sourceVersionId = versionId || project()?.versions.at(-1)?.id;

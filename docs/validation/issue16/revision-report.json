@@ -1,0 +1,97 @@
+{
+  "live": true,
+  "id": "47a6f001-82c3-41d0-b11a-faf904ce9450",
+  "kind": "revision",
+  "status": "ready",
+  "sourceVersionId": "24912daf-cca1-4066-a8c9-6826b4111e3e",
+  "modelingMode": "mpfb",
+  "profile": "character",
+  "prompt": "A realistic fictional adult human with a lean build, natural human proportions and a calm neutral face. Short dark hair, warm medium skin tone, plain fitted teal short-sleeved T-shirt, dark charcoal trousers and simple dark shoes. No accessories, no text. Standing upright in a neutral A-pose. Focus on anatomically plausible hands, face, elbows and knees.",
+  "feedback": "Repair the visible hand and wrist deformation while preserving the original MPFB body topology and all approved references. Keep natural connected palms and fingers, remove stray floating helper/detail pieces near the hands, and smooth the rough teal shirt neckline, sleeve and hem edges. Retain the base concept A-pose, natural proportions, teal shirt, charcoal trousers and shoes. Prefer restoring native MPFB anatomy in damaged hand regions over exaggerating local vertex transforms. Do not recreate or replace the MPFB body. Inspect these problem regions and honestly report remaining limitations.",
+  "imageInputs": [
+    "concepts/e3886297-d3a8-40a7-a38b-569f623fa132/concept.png",
+    "reference-sets/07033b19-b23e-4067-b366-965922c049cf/front.png",
+    "reference-sets/07033b19-b23e-4067-b366-965922c049cf/side.png",
+    "reference-sets/07033b19-b23e-4067-b366-965922c049cf/back.png",
+    "reference-sets/07033b19-b23e-4067-b366-965922c049cf/three-quarter.png"
+  ],
+  "referenceFingerprint": "e75ca5a086e491ad27a03554d6fb0ac65a12e70547f3a0a7fd468d1b38280738",
+  "sameReferences": true,
+  "sourceCopiedExactly": true,
+  "bodyTopologyPreserved": true,
+  "mpfb": {
+    "available": true,
+    "module": "bl_ext.gen3d_validation.mpfb",
+    "mpfbVersion": "2.0.17",
+    "blenderVersion": "5.1.2",
+    "api": "HumanService.create_human",
+    "body": "gen3d_mpfb_body",
+    "vertices": 19158,
+    "polygons": 18486,
+    "evaluatedVertices": 45561,
+    "topologyPreserved": true,
+    "topologyHash": "df191766244b0722cb766ad798f38e4ab3e03d3e8eb9a613cf00144fc41b120d"
+  },
+  "summary": "Repaired wrists, palms and fingers using native MPFB anatomy while preserving the original body topology. Removed floating trouser fragments near the hands and smoothed the teal shirt openings.\n\nInspected front, side, back and three-quarter renders. Retained the concept A-pose despite the conflicting side reference. Minor cuff irregularities remain; face, hair and fabric details are still approximations.",
+  "metrics": {
+    "meshes": 56
+  },
+  "files": [
+    {
+      "key": "glb",
+      "file": "revision/model.glb",
+      "bytes": 5242840,
+      "sha256": "34ff768acb16eb1addd0f20f6cc250354529072938ec23dbfcdcaa5a299da809"
+    },
+    {
+      "key": "blend",
+      "file": "revision/scene.blend",
+      "bytes": 7248012,
+      "sha256": "fe24198b7d6088e08dc19ece18925c4dd4b85153e8fb5fdeda077abc309532e0"
+    },
+    {
+      "key": "render",
+      "file": "revision/preview.png",
+      "bytes": 267095,
+      "sha256": "f3e19755a669b5415daba93bc8832ea454849c6f399b4635c3217e4354126812"
+    },
+    {
+      "key": "task",
+      "file": "revision/TASK.md",
+      "bytes": 4336,
+      "sha256": "82c4ad7a5e59f745bbc8f53473b4253043631ec8226cd6cf420a6fc35d2359c3"
+    },
+    {
+      "key": "audit",
+      "file": "revision/mcp-audit.jsonl",
+      "bytes": 2188,
+      "sha256": "f52e0cae47ca84b8a754f5d4a14c132ac04cb1966aba8be501552774cf93aa87"
+    },
+    {
+      "key": "front",
+      "file": "revision/front.png",
+      "bytes": 271758,
+      "sha256": "6a0ea779db66524d4cd9bbe62292c7f04cac65a2ba80654274a095642d5edba2"
+    },
+    {
+      "key": "side",
+      "file": "revision/side.png",
+      "bytes": 265310,
+      "sha256": "a6eb2ab0940c1fe6f39e6daceaaf300a53331680eb2b0c896ba66ecbc8ab1d2d"
+    },
+    {
+      "key": "three-quarter",
+      "file": "revision/three-quarter.png",
+      "bytes": 276489,
+      "sha256": "904d31ae321318970b47ae6c864fce249f7dbb973b5d79a327bbeb3b2c824c06"
+    },
+    {
+      "key": "mpfb",
+      "file": "revision/mpfb.json",
+      "bytes": 377,
+      "sha256": "e3c36787986dc911814a54024ade8622aba08c1debf781b24e1e2fb7b54f63ec"
+    }
+  ],
+  "originalArtifactsUnchanged": true,
+  "createdNewMpfbBody": false
+}

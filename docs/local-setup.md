@@ -14,6 +14,10 @@ Then run `npm start` in a second terminal and open http://127.0.0.1:3333. `npm s
 
 For interactive Blender instead, install `blender/gen3d_bridge.py` through **Edit → Preferences → Add-ons → Install from Disk** (in recent Blender, under the Add-ons menu). Enable the add-on, open the 3D View sidebar with **N**, and click **Start gen3d bridge** in the **gen3d** tab. Use a dedicated empty scene: new generation replaces its geometry. Revision opens the selected version's copied scene. The bridge runs Python on Blender's main thread; use it with trusted local clients and modeling instructions.
 
+## Optional MPFB humanoids
+
+For a locally generated continuous human base mesh, see [MPFB setup](mpfb.md). It documents compatible versions, enabling the add-on in this same Blender process, optional local assets, the availability check, explicit modeling selection and comparisons. Existing Blender modeling and props remain usable without MPFB.
+
 ## Model and review
 
 1. Click **New project** (+) and create a project using either a text description or a PNG/JPEG/WebP upload (maximum 10 MB). Image projects can optionally include modeling instructions. They do not require a preceding text/concept stage.
