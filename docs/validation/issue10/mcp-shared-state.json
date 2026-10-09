@@ -1,0 +1,242 @@
+{
+  "live": true,
+  "projects": [
+    {
+      "id": "33c470e8-5318-4925-a787-56aaccce00a0",
+      "name": "Reference prop",
+      "sameHttpAndMcp": true,
+      "sameResource": true,
+      "images": [
+        {
+          "id": "d9617514-4e51-42a9-a421-5e8c1b15bebe",
+          "file": "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+          "bytes": 1945048,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+        },
+        {
+          "id": "8e816c20-043b-44d4-889f-e668476693b3",
+          "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/front.png",
+          "bytes": 1949049,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "cc1370ae1c766bd56f9c3d061f11c37918f144f2818058d967afa0f0be8b6095"
+        },
+        {
+          "id": "d74c0f95-b567-4034-8e75-bad0ed5d47b1",
+          "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/side.png",
+          "bytes": 1769554,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "bb4af4a925ba00f3d7dcd4429d5ab61888af2fea1528f4b16cdfbd02f1e240f4"
+        },
+        {
+          "id": "7f755ff8-a90a-418f-8034-d24909769ab7",
+          "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/back.png",
+          "bytes": 1886830,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "93177039a3febbce589d2f814611e2bf0bbec2e153201067c1cb6d43301a2454"
+        },
+        {
+          "id": "299d6c30-4bb7-4f09-8415-0bbade7366ef",
+          "file": "reference-sets/b9dc3f0e-514c-4283-9da1-8f0077f706a7/three-quarter.png",
+          "bytes": 1873792,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "f38473b9c6c8a07d5ce6b48892598ca17d31713afc79113bec4e44b4f38ecb8e"
+        },
+        {
+          "id": "cada7b5a-146b-4b6f-999e-75d5c6a2bc13",
+          "file": "reference-sets/ce157e5c-c5d5-49a3-86b9-d7fc69eff532/front.png",
+          "bytes": 1823711,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "906f7c9c3792dccb978dabbcb0f9bb29894e696e0b15fc4b3b870a97c35ace09"
+        },
+        {
+          "id": "9e359b80-1e92-4328-98c1-5f61de393e14",
+          "file": "reference-sets/ce157e5c-c5d5-49a3-86b9-d7fc69eff532/side.png",
+          "bytes": 1861229,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "561eb24d09aad6efd958707368d8503afabfbbcdfad62747c2fa5940bdf4043d"
+        },
+        {
+          "id": "bc4b6364-7fba-497f-b272-4bb6e32fd30a",
+          "file": "reference-sets/ce157e5c-c5d5-49a3-86b9-d7fc69eff532/back.png",
+          "bytes": 1822617,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "9571254dfd678dd98aeb7f8f8804b853bcdeb8046d271eb0adca22dbd837aaa9"
+        },
+        {
+          "id": "9e55abaa-8da7-44cd-a784-a06fc2637625",
+          "file": "reference-sets/ce157e5c-c5d5-49a3-86b9-d7fc69eff532/three-quarter.png",
+          "bytes": 1863621,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "28ccb6323fffc40bb95bc0ae3703788e81e5faf5df85126ac8a50279636cb373"
+        },
+        {
+          "id": "5ffd9e95-2ba9-405c-ac0e-9b3cd446af1b",
+          "file": "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/front.png",
+          "bytes": 1879768,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "f1c32b22a4fc699afc97d30243ed991858e2324e24f798f16667d38afcca73c1"
+        },
+        {
+          "id": "e81e4f93-3f7f-4c2b-91e1-0a678dcda1d4",
+          "file": "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/side.png",
+          "bytes": 1815060,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "0df9d3c0524d7094dbd40f06d7ebab045855c51349d8a2609aadad696c747907"
+        },
+        {
+          "id": "fb941736-2eef-4113-948d-4af9c685968c",
+          "file": "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/back.png",
+          "bytes": 1915742,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "504a3bcd7933b640adbdfc4d2c3c75ca54008583c6dbadf2b57a15128c7735c8"
+        },
+        {
+          "id": "ea821ace-773c-49cd-840d-80273ad8cead",
+          "file": "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/three-quarter.png",
+          "bytes": 1849899,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "8e47a94b1fb8cb86d2b73bcd8af98152a69a46db8443d96cd6df5dcbde390d70"
+        }
+      ],
+      "exports": [
+        {
+          "versionId": "1c9ecf26-ceb2-4a21-b13d-ff383bcaf9af",
+          "referenceSetId": "299c95be-d1a3-4371-917e-063a82e54091",
+          "imageInputs": [
+            "concepts/d9617514-4e51-42a9-a421-5e8c1b15bebe/concept.png",
+            "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/front.png",
+            "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/side.png",
+            "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/back.png",
+            "reference-sets/299c95be-d1a3-4371-917e-063a82e54091/three-quarter.png"
+          ],
+          "bytes": 212100,
+          "glb": true,
+          "sha256": "b0d3c893438a6fc0513d7c398e0ec56634aaaae1d831d44c76e0ce94fb36db62"
+        }
+      ]
+    },
+    {
+      "id": "9ef4ab4c-0567-4b16-b939-4ba5c6a488af",
+      "name": "Uploaded cabinet",
+      "sameHttpAndMcp": true,
+      "sameResource": true,
+      "images": [],
+      "exports": [
+        {
+          "versionId": "9027f57c-7a8f-4b4f-88c7-3bacfc484b95",
+          "referenceSetId": null,
+          "imageInputs": [
+            "input.png"
+          ],
+          "bytes": 268612,
+          "glb": true,
+          "sha256": "05a0158bae30856bc1aff3f287aedb9f6f02334b21af93c55358defe9c6399ee"
+        }
+      ]
+    },
+    {
+      "id": "6d29bda9-3a1b-4ea9-aa3c-2531df2add2c",
+      "name": "Reference character",
+      "sameHttpAndMcp": true,
+      "sameResource": true,
+      "images": [
+        {
+          "id": "64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3",
+          "file": "concepts/64ffbf6d-f0a7-4a15-8648-4ebd9c5d15f3/concept.png",
+          "bytes": 1807199,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "48964e6dbf6fedde6c8112276a5cd9e5bf1b349399a0549c51762f84c8c220da"
+        },
+        {
+          "id": "9c20c3ca-dea1-4657-a291-993dce5a4d67",
+          "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/front.png",
+          "bytes": 1815404,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "df2fca29dcc9b99f6836815b3352bbd5c8a1f7d3506f8b0895e6ddb9d6e4cb4c"
+        },
+        {
+          "id": "8213f6ab-4078-4c65-b47c-ed9ea85f64b8",
+          "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/side.png",
+          "bytes": 1697565,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "864e7d9bc2a08590677fe786a70134ac6cf7133dc29323d2e7c9b84d0a3be692"
+        },
+        {
+          "id": "abee0568-8c14-4113-87ab-0d4ea30ef269",
+          "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/back.png",
+          "bytes": 1758570,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "0f2f0e57452b821aa58c08c7ec4cdecd0185d5536ae306ccfa7de269ec549a19"
+        },
+        {
+          "id": "f4961167-f858-42f4-b2f2-c19877210005",
+          "file": "reference-sets/d38fb49f-39e8-4a51-a97d-69ec568df35d/three-quarter.png",
+          "bytes": 1740390,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "1f6e8b443887c1716a96f29fbb2d030667ff5742e0c32c4b81662710f3d22ca1"
+        },
+        {
+          "id": "00754f50-dd4f-417e-ac74-99e8686a1988",
+          "file": "reference-sets/e9890f55-6dfc-440b-bfb6-2bdf6204e22d/front.png",
+          "bytes": 1820976,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "e0c427bdaee921c83aa9f5b8ea27e91fa42f6687bd426f3b76ed8e0bc5b090ed"
+        },
+        {
+          "id": "91fd0bc0-3740-4d06-adab-91afef8bad07",
+          "file": "reference-sets/e9890f55-6dfc-440b-bfb6-2bdf6204e22d/side.png",
+          "bytes": 1699029,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "69cf049b630ed6ee8de7f1b300b97dbacb9418ef89d84eff9c08eb784d6427c7"
+        },
+        {
+          "id": "3c3a34a7-b814-4d7d-85b9-1e8b69700632",
+          "file": "reference-sets/e9890f55-6dfc-440b-bfb6-2bdf6204e22d/back.png",
+          "bytes": 1796218,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "d5c4b865f8793181f71309201b35a9402a0ad8bd9e1dad1132721319cd43ea20"
+        },
+        {
+          "id": "15b732e1-a0c0-40e1-9025-64c759ac6085",
+          "file": "reference-sets/e9890f55-6dfc-440b-bfb6-2bdf6204e22d/three-quarter.png",
+          "bytes": 1781235,
+          "mimeType": "image/png",
+          "sameBytes": true,
+          "sha256": "6f60aaee5b14bc4dc585a0371b1e0b5237beaefabc070c2687f5d3d7d4e4166f"
+        }
+      ],
+      "exports": [],
+      "pendingModelRequest": {
+        "blocked": true,
+        "message": "Review the multi-view reference set in the web UI before modeling"
+      },
+      "pendingRegeneration": {
+        "blocked": true,
+        "message": "Reject pending reference sets in the web UI before regeneration"
+      }
+    }
+  ],
+  "checkedAt": "2026-10-09T00:32:59.945Z"
+}

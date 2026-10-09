@@ -2,7 +2,7 @@
 
 ## Prerequisites and startup
 
-Use Node.js 24+, an installed Codex CLI, a ChatGPT account with Codex access, and Blender 4+ with Cycles and its standard glTF exporter. For text input, the CLI/account must support native image generation (`image_generation` feature). The CLI must also support `exec --image`, `--ignore-user-config`, `forced_login_method` and `mcp_servers.<server>.tools.<tool>.approval_mode`; the live validation used Codex 0.161.0 and Blender 5.1.2. Install Codex following its [official CLI setup](https://developers.openai.com/codex/cli), then use `codex login` and confirm `codex login status` reports ChatGPT. gen3d will reject API-key-only login. [Official authentication documentation](https://developers.openai.com/codex/auth) explains the subscription path.
+Use Node.js 24+, an installed Codex CLI, a ChatGPT account with Codex access, and Blender 4+ with Cycles and its standard glTF exporter. For text input, the CLI/account must support native image generation (`image_generation` feature). The [official CLI reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli) describes image attachment and structured-output options; this implementation additionally verifies support against the installed CLI and real outputs. The CLI must also support `exec --image`, `--ignore-user-config`, `forced_login_method` and `mcp_servers.<server>.tools.<tool>.approval_mode`; the live validation used Codex 0.161.0 and Blender 5.1.2. Install Codex following its [official CLI setup](https://developers.openai.com/codex/cli), then use `codex login` and confirm `codex login status` reports ChatGPT. gen3d will reject API-key-only login. [Official authentication documentation](https://developers.openai.com/codex/auth) explains the subscription path.
 
 From the repository, run `npm ci`. Start a dedicated Blender process:
 
@@ -17,17 +17,24 @@ For interactive Blender instead, install `blender/gen3d_bridge.py` through **Edi
 ## Model and review
 
 1. Create a project using either a text description or a PNG/JPEG/WebP upload (maximum 10 MB). Image projects can optionally include modeling instructions. They do not require a preceding text/concept stage.
-2. Configure **Pause for review** for input, concept image (text only), and 3D preview. Defaults: input disabled, concept and preview enabled. Accept input if that checkpoint is enabled, then click **Start workflow**.
-3. Text projects run a separate subscription-authenticated Codex image session without Blender MCP. The resulting concept appears in the UI. If review is enabled, **Accept concept & model** starts modeling; **Reject concept** stops it. **Regenerate concept** can include design feedback and creates a new image version before any modeling. Image projects proceed directly using the uploaded image.
-4. Codex receives the concept/upload through `exec --image` and builds mesh geometry through Blender MCP. The app renders a PNG, saves a Blender scene and exports a self-contained GLB. Orbit, pan and zoom the preview; inspect the render. If preview review is enabled, approve before exporting or requesting more modeling. Rejection permits a deliberate retry/revision.
-5. **Revise selected version** copies that version's scene and reuses its source concept/upload, with natural-language feedback. Earlier artifacts/reviews remain intact. **Retry from input** creates a fresh model using the current selected concept. Changing the prompt invalidates the current input approval and concept selection, retaining history; the next text workflow generates a new concept.
-6. **Download GLB** and **Blender scene** become available after preview approval (or automatic acceptance when that checkpoint is disabled).
+2. Configure **Pause for review** for input, concept image (text only), multi-view set (text only), and 3D preview. Defaults: input disabled; concept, multi-view and preview enabled. Accept input if that checkpoint is enabled, then click **Start workflow**.
+3. Text projects run a separate subscription-authenticated Codex image session without Blender MCP. The resulting concept appears in the UI. If review is enabled, **Accept concept & generate views** starts reference generation; **Reject concept** stops it. **Regenerate concept** can include design feedback and creates a new image version before any modeling. Image projects proceed directly using the uploaded image.
+4. Choose the **Humanoid / character** or **Object / prop** reference profile (or infer it from the description on creation). Text generates separate front, **left side**, back and three-quarter images from the selected concept, passing that concept and earlier views as actual image inputs to native image generation. Character views use a consistent neutral A-pose; object views show the whole object. Both use simple backgrounds, near-orthographic projection and consistent materials/proportions/framing/lighting. The original user description remains supplementary guidance, including dimensions, asymmetry and hidden parts. Providers may also supply additional detail views when useful; four distinct whole-subject views are always required.
+5. A separate Codex session receives the base and all views and checks obvious contradictions. An inconsistent or unavailable set blocks modeling; inspect its report and **Regenerate view set** with feedback. This preserves the base design. With multi-view review enabled, **Accept views & model** explicitly approves the set and resumes; **Reject view set** or regeneration retains the previous set and decision history. Changing settings or restarting never dismisses pending review. When disabled, consistent sets continue automatically. All images stay visible in the UI, including historical and partial failed sets.
+6. Codex receives the base **and every generated view**, or the uploaded input for image projects, through `exec --image` and builds mesh geometry through Blender MCP. The app renders a PNG, saves a Blender scene and exports a self-contained GLB. Orbit, pan and zoom the preview; inspect the render. If preview review is enabled, approve before exporting or requesting more modeling. Rejection permits a deliberate retry/revision.
+7. **Revise selected version** copies that version's scene and reuses its source concept and view set/upload, with natural-language feedback. Earlier artifacts/reviews remain intact. **Retry from input** creates a fresh model using the current selected concept and reference set. Changing the prompt invalidates the current input approval and concept/reference-set selection, retaining history; the next text workflow generates a new concept.
+8. **Download GLB** and **Blender scene** become available after preview approval (or automatic acceptance when that checkpoint is disabled).
 
-Disabled checkpoints continue automatically and record automatic acceptance. Changing checkpoint settings does not approve a pending concept/model/input. Explicit rejection remains effective until input/concept acceptance or deliberate regeneration. Existing text projects also require a concept for new modeling; their historical artifacts remain viewable.
+The shared HTTP/MCP setting names are `input`, `concept`, `multiView` and `preview`, each a boolean under `checkpoints`. Disabled checkpoints continue automatically and record automatic acceptance. Changing checkpoint settings does not approve a pending concept/view-set/model/input. Explicit rejection remains effective until input/concept acceptance or deliberate regeneration. Existing text projects also require a concept and complete checked reference set for new modeling; their historical artifacts remain viewable.
 
-Supplementary references can be added through the UI or `add_reference` through MCP. Every pending reference requires human review; only approved references are attached alongside the required design image. A supplied reference does not satisfy the generated-concept stage for text.
+Supplementary references can be added through the UI or `add_reference` through MCP. Every pending reference requires human review; only approved references are attached alongside the required design images. A supplied reference does not satisfy the generated-concept stage for text.
 
-The generator interface is `generate({ prompt, feedback, dir }) → { bytes, ext }`, with `ext` equal to `png`, `jpg` or `webp`. Persistence, review and modeling belong to the runner. Inject a replacement object through `createApp({ conceptGenerator })` or `new Runner(store, { conceptGenerator })`; no provider framework or separately billed service is required.
+The small image-provider interface has two methods:
+
+- `generate({ prompt, profile, feedback, dir }) → { bytes, ext }` for the base concept.
+- `generateViews({ prompt, profile, conceptFile, conceptId, feedback, dir, onImage })` for that specific design. Call and await `onImage({ view, side, bytes, ext })` as each image becomes available. Required `view` values: `front`, `side`, `back`, `three-quarter`; use `side: 'left'` or `side: 'right'` for the side view (the native provider generates a labeled left-side view). Additional detail views may use distinct lowercase names. `ext` is `png`, `jpg` or `webp`. Immediate publication preserves already generated views if a later call fails.
+
+Persistence, typed provenance, human review and modeling belong to the runner. Inject a replacement object through `createApp({ conceptGenerator })` or `new Runner(store, { conceptGenerator })`; it must implement both stages or text modeling blocks. The independent default inspector always uses subscription-authenticated Codex. Tests can inject `inspectReferences` separately; replacing the image generator does not skip inspection or change the Blender flow. No generic provider framework, paid API or third-party 3D SaaS is required.
 
 ## AI-facing MCP
 
@@ -55,11 +62,13 @@ The project MCP server exposes:
 
 | Tool | Operation |
 | --- | --- |
-| `list_projects`, `get_project` | Read checkpoint settings, input review, concepts/selection, versions, artifact paths and history |
+| `list_projects`, `get_project` | Read checkpoint settings, input review, concepts/selection, reference sets/views/selection, consistency reports, reviews, linked model versions, artifact paths and history |
 | `create_project`, `update_project` | Create a text/image project or change its name/prompt |
 | `add_reference` | Stage an image data URL for human review |
-| `generate_model` | Start text→concept→model or image→model, retry or revision; poll `get_project` |
+| `generate_model` | Start text→concept→views→inspection→model or image→model, retry or revision; poll `get_project` |
 | `regenerate_concept` | Generate another text concept; pending concepts must first be rejected in the Web UI |
+| `regenerate_reference_set` | Generate new views from the selected base; pending sets must first be rejected in the Web UI |
+| `get_reference_image` | Read actual base/view image content by image ID, including prior and partial sets |
 | `review_model` | Record review when human preview checkpoint is disabled; enabled reviews require the Web UI |
 | `export_model` | Obtain GLB, Blender-scene and rendered-view download URLs |
 
@@ -71,7 +80,7 @@ The **project MCP** interface manages workflow state. The separate **Blender MCP
 
 ## Persistence and configuration
 
-The default store is `~/.gen3d/`. A project contains `project.json`, its input/reference images, `concepts/<uuid>/` directories with generated PNG/task/output metadata, and `versions/<uuid>/` directories holding its task snapshot, model, scene, render and MCP audit. The audit records successful Blender MCP operation names, timestamps and code hashes. Raw Codex streams and credentials are not stored or served. A bounded final modeling summary is kept with the version. Back up this directory to preserve projects. The repository's `.gen3d/` is ignored for development data.
+The default store is `~/.gen3d/`. A project contains `project.json`, its input/reference images, `concepts/<uuid>/` directories with generated PNG/task/output metadata, `reference-sets/<uuid>/` directories with separate images, provider tasks/audits and consistency reports, and `versions/<uuid>/` directories holding its task snapshot, model, scene, render and MCP audit. The audit records successful Blender MCP operation names, timestamps and code hashes. Raw Codex streams and credentials are not stored or served. A bounded final modeling summary is kept with the version. Back up this directory to preserve projects. The repository's `.gen3d/` is ignored for development data.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -81,15 +90,15 @@ The default store is `~/.gen3d/`. A project contains `project.json`, its input/r
 | `GEN3D_CODEX_BIN` | `codex` | Path to the installed CLI executable |
 | `GEN3D_URL` | `http://127.0.0.1:3333` | App URL used by project MCP/browser check |
 
-Only one server may own a data directory. Modeling is serialized globally across projects because Blender has one current scene. Each modeling job uses a fresh Codex session with the prompt, required concept/upload image, optional references and selected scene as its context. gen3d uses the CLI default subscription model, does not load unrelated global user MCP integrations/hooks, and does not alter credentials. Shell execution remains sandboxed; Blender Python executes inside the dedicated Blender process.
+Only one server may own a data directory. Modeling is serialized globally across projects because Blender has one current scene. Each modeling job uses a fresh Codex session with the prompt, required base and all views/upload image, optional references and selected scene as its context. gen3d uses the CLI default subscription model, does not load unrelated global user MCP integrations/hooks, and does not alter credentials. Shell execution remains sandboxed; Blender Python executes inside the dedicated Blender process.
 
 ## Failures and checks
 
-- **Concept generation unavailable:** the failed concept records a specific blocker and zero modeling jobs are launched. Verify `codex features list` and a real `codex exec` image task with ChatGPT login; feature announcements or an enabled flag alone do not establish account capability. There is no direct-text, paid-API or synthetic-image fallback. See [Issue #8 live validation](validation-issue8.md).
+- **Image generation unavailable:** the failed concept or reference set records a specific blocker and zero modeling jobs are launched. Verify `codex features list` and a real `codex exec` image task with ChatGPT login; feature announcements or an enabled flag alone do not establish account capability. There is no direct-text, paid-API or synthetic-image fallback. See [Issue #10 validation](validation-issue10.md).
 - **Bridge unavailable:** start Blender with the bridge, check that both processes use the same port, and retry manually.
 - **Codex login/CLI incompatibility:** run `codex login status` and `codex exec --help`; install a CLI with the options above. Failed versions show the final Codex summary when available.
 - **Usage limit:** gen3d stops the job and blocks further generation in that server session. It never redeems reset tickets, buys allowance, changes providers/models, or retries. Continue only after allowance is available through your normal account process.
-- **Interrupted server:** unfinished versions recover as failed on restart. Useful completed versions remain intact. A graceful shutdown waits for the current job before releasing the store lock. If the server was forcibly killed, stop its leftover Codex process and wait for Blender to finish any pending command before restarting.
+- **Interrupted server:** unfinished concepts, reference sets and versions recover as failed on restart. Useful completed versions remain intact. A graceful shutdown waits for the current job before releasing the store lock. If the server was forcibly killed, stop its leftover Codex process and wait for Blender to finish any pending command before restarting.
 - **WebGL unavailable:** the rendered preview and GLB/scene downloads remain available. Use a browser with WebGL enabled for orbit/pan/zoom.
 - **Quality:** this MVP produces agent-authored mesh models with basic materials. Subject likeness and topology depend on the prompt and Codex output. Use review/revision; advanced topology, animation and rigging are outside the MVP.
 
@@ -101,4 +110,4 @@ For an optional live browser check, start an isolated Chrome with remote debuggi
 GEN3D_PROJECT_ID=<project-uuid> node scripts/browser-check.js
 ```
 
-Set `GEN3D_CHROME_URL` for a different debugging port, `GEN3D_VERSION_ID` for an earlier completed version, and `GEN3D_BROWSER_OUTPUT` for the screenshot/report directory. The check verifies actual GLB loading/download and changed screenshots after orbit, pan and zoom; it does not launch generation or spend Codex allowance. Live generation itself requires an authenticated subscription and running Blender. See [Issue #8 validation actually performed](validation-issue8.md) and [historical MVP evidence](validation.md).
+Set `GEN3D_CHROME_URL` for a different debugging port, `GEN3D_VERSION_ID` for an earlier completed version, and `GEN3D_BROWSER_OUTPUT` for the screenshot/report directory. The check verifies actual GLB loading/download and changed screenshots after orbit, pan and zoom; it does not launch generation or spend Codex allowance. Live generation itself requires an authenticated subscription and running Blender. See [Issue #10 validation actually performed](validation-issue10.md) and [historical MVP evidence](validation.md).

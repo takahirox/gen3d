@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { referenceProfile, validateViewSet } from './reference-set.js';
 
 export class AppError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -21,10 +22,23 @@ export function imageData(value) {
   return { bytes, ext: match[1] === 'jpeg' ? 'jpg' : match[1] };
 }
 
-export function checkpoints(value = {}, previous = { input: false, concept: true, preview: true }) {
+export function checkpoints(value = {}, previous = { input: false, concept: true, multiView: true, preview: true }) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
-    || Object.entries(value).some(([key, v]) => !['input', 'concept', 'preview'].includes(key) || typeof v !== 'boolean')) throw new AppError('Checkpoint settings must be input, concept and preview booleans');
+    || Object.entries(value).some(([key, v]) => !['input', 'concept', 'multiView', 'preview'].includes(key) || typeof v !== 'boolean')) throw new AppError('Checkpoint settings must be input, concept, multiView and preview booleans');
   return { ...previous, ...value };
+}
+
+export function currentConcept(p, c) {
+  return c.prompt === p.prompt && (!c.profile || c.profile === p.profile);
+}
+export function currentReferenceSet(p, set) {
+  return set.conceptId === p.selectedConceptId && set.prompt === p.prompt && set.profile === p.profile;
+}
+export function revisionReferenceSet(p, set) {
+  const source = set.request?.kind === 'revision' && p.versions.find(v => v.id === set.request.sourceVersionId && v.status === 'ready');
+  const concept = p.concepts.find(c => c.id === set.conceptId && c.status === 'ready' && c.review === 'approved');
+  return Boolean(source && concept && source.conceptId === concept.id && source.prompt === set.prompt
+    && set.prompt === concept.prompt && (!concept.profile || set.profile === concept.profile));
 }
 
 // Only the HTTP server owns this store. MCP clients always use that server's API.
@@ -39,12 +53,23 @@ export class Store {
       if (!fs.existsSync(file)) continue;
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
       project.checkpoints ??= checkpoints();
+      project.checkpoints.multiView ??= true;
+      project.profile ??= referenceProfile(undefined, project.prompt);
+      project.referenceSets ??= [];
+      project.selectedReferenceSetId ??= null;
       project.inputReview ??= 'pending';
       project.inputCheckpoint ??= project.checkpoints.input;
       project.concepts ??= [];
       project.selectedConceptId ??= null;
       this.projects.set(project.id, project);
+      for (const set of project.referenceSets) {
+        if (set.status === 'running') {
+          set.status = 'failed'; set.error = 'Server stopped during reference generation/inspection. Regenerate manually.';
+          this.event(project, 'server', 'reference_set_interrupted', { referenceSetId: set.id });
+        }
+      }
       for (const concept of project.concepts) {
+        concept.role ??= 'base-concept'; concept.view ??= 'three-quarter'; concept.parentConceptId ??= null;
         if (concept.status === 'running') {
           concept.status = 'failed'; concept.error = 'Server stopped during concept generation. Regenerate manually.';
           this.event(project, 'server', 'concept_interrupted', { conceptId: concept.id });
@@ -82,7 +107,8 @@ export class Store {
     const prompt = input.mode === 'text' ? text(input.prompt, 'Prompt') : (input.prompt ? text(input.prompt, 'Prompt') : 'Create a 3D model of the subject in the input image.');
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
-    const p = { id: randomUUID(), name, mode: input.mode, prompt, inputImage: null, checkpoints: settings, inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const profile = referenceProfile(input.profile, prompt);
+    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -92,19 +118,20 @@ export class Store {
     this.event(p, actor, 'project_created'); this.save(p); return p;
   }
   idle(p) {
-    if (p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running')) throw new AppError('Wait for the current generation to finish', 409);
+    if (p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running') || p.referenceSets.some(s => s.status === 'running')) throw new AppError('Wait for the current generation to finish', 409);
   }
   update(id, input, actor) {
     const p = this.get(id); this.idle(p);
     const name = input.name === undefined ? p.name : text(input.name, 'Name', 160);
     const prompt = input.prompt === undefined ? p.prompt : text(input.prompt, 'Prompt');
+    const profile = referenceProfile(input.profile ?? (prompt === p.prompt ? p.profile : undefined), prompt);
     if (input.checkpoints !== undefined && actor !== 'web') throw new AppError('Change checkpoint settings in the web UI', 403);
     const settings = checkpoints(input.checkpoints, p.checkpoints);
-    if (prompt !== p.prompt) { p.inputReview = 'pending'; p.inputCheckpoint = settings.input; p.selectedConceptId = null; }
+    if (prompt !== p.prompt || profile !== p.profile) { p.inputReview = 'pending'; p.inputCheckpoint = settings.input; p.selectedConceptId = null; p.selectedReferenceSetId = null; }
     // Changing settings never silently approves an already waiting checkpoint.
     if (settings.input && !p.checkpoints.input) { p.inputReview = 'pending'; p.inputCheckpoint = true; }
     p.checkpoints = settings;
-    p.name = name; p.prompt = prompt;
+    p.name = name; p.prompt = prompt; p.profile = profile;
     this.event(p, actor, 'project_updated'); this.save(p); return p;
   }
   addReference(id, input, actor) {
@@ -144,12 +171,26 @@ export class Store {
     const p = this.get(id); this.idle(p);
     if (actor !== 'web') throw new AppError('Concept checkpoint requires the web UI', 403);
     const c = p.concepts.find(c => c.id === conceptId && c.status === 'ready');
-    if (!c || c.prompt !== p.prompt) throw new AppError('Choose a completed concept for the current input');
+    if (!c || !currentConcept(p, c)) throw new AppError('Choose a completed concept for the current input');
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
     c.review = decision;
-    if (decision === 'approved') p.selectedConceptId = c.id;
-    else if (p.selectedConceptId === c.id) p.selectedConceptId = null;
+    if (decision === 'approved') { if (p.selectedConceptId !== c.id) p.selectedReferenceSetId = null; p.selectedConceptId = c.id; }
+    else if (p.selectedConceptId === c.id) { p.selectedConceptId = null; p.selectedReferenceSetId = null; }
     this.event(p, actor, 'concept_reviewed', { conceptId, decision }); this.save(p); return p;
+  }
+  reviewReferenceSet(id, setId, decision, actor) {
+    const p = this.get(id); this.idle(p);
+    if (actor !== 'web') throw new AppError('Multi-view checkpoint requires the web UI', 403);
+    const set = p.referenceSets.find(s => s.id === setId && s.status === 'ready');
+    if (!set || (!currentReferenceSet(p, set) && !revisionReferenceSet(p, set))) throw new AppError('Choose a completed reference set for the selected concept or source revision');
+    if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
+    if (decision === 'approved') {
+      validateViewSet(set);
+      if (set.consistency?.status !== 'passed') throw new AppError('Resolve reference contradictions by regenerating the set before modeling', 409);
+      if (currentReferenceSet(p, set)) p.selectedReferenceSetId = set.id;
+    } else if (p.selectedReferenceSetId === set.id) p.selectedReferenceSetId = null;
+    set.review = decision;
+    this.event(p, actor, 'reference_set_reviewed', { referenceSetId: set.id, conceptId: set.conceptId, decision }); this.save(p); return p;
   }
   canExport(id, versionId) {
     const p = this.get(id), v = p.versions.find(v => v.id === versionId && v.status === 'ready');
@@ -159,7 +200,7 @@ export class Store {
   }
   artifact(id, relative) {
     const p = this.get(id);
-    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.versions.flatMap(v => Object.values(v.artifacts || {}))].filter(Boolean);
+    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => Object.values(v.artifacts || {}))].filter(Boolean);
     if (!files.includes(relative)) throw new AppError('Artifact not found', 404);
     const file = path.resolve(this.dir(id), relative);
     if (!file.startsWith(this.dir(id) + path.sep) || fs.lstatSync(file).isSymbolicLink()
