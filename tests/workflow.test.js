@@ -5,16 +5,20 @@ import path from 'node:path';
 import os from 'node:os';
 import { once } from 'node:events';
 import http from 'node:http';
-import { zstdCompressSync, gzipSync } from 'node:zlib';
+import { zstdCompressSync, gzipSync, crc32 } from 'node:zlib';
+import { Transformer } from '@napi-rs/image';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createApp } from '../src/server.js';
-import { Store } from '../src/store.js';
+import { Store, imageData } from '../src/store.js';
 import { CodexReferenceInspector, requiredViews } from '../src/reference-set.js';
 import { CodexConceptGenerator } from '../src/concept.js';
 import { Runner, subscriptionEnv, codexArgs, validateArtifacts, runProcess } from '../src/runner.js';
 
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
+const badCrcPng = Buffer.from(png); badCrcPng[45] ^= 255;
+const badPixelsPng = Buffer.from(badCrcPng); badPixelsPng.writeUInt32BE(crc32(badPixelsPng.subarray(37, 52)), 52);
+const invalidPngs = [png.subarray(0, 8), png.subarray(0, 45), png.subarray(0, -1), badCrcPng, badPixelsPng];
 const image = 'data:image/png;base64,' + png.toString('base64');
 const generateViews = async ({ onImage }) => { for (const view of requiredViews) await onImage({ view, side: view === 'side' ? 'left' : undefined, bytes: png, ext: 'png' }); };
 const inspectReferences = async () => ({ consistent: true, issues: [] });
@@ -45,6 +49,22 @@ async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
   return { ...instance, url, request, dataDir };
 }
 const input = { name: 'Robot', mode: 'text', prompt: 'A teal robot', checkpoints: { input: false, concept: false, multiView: false, preview: false } };
+
+test('image validation decodes PNG, JPEG and WebP and rejects damaged contents with valid signatures', () => {
+  const jpeg = new Transformer(png).jpegSync(), webp = new Transformer(png).webpSync();
+  const corruptJpeg = Buffer.from(jpeg); corruptJpeg[corruptJpeg.indexOf(Buffer.from([255, 219])) + 4] = 255;
+  const corruptWebp = Buffer.from(webp); corruptWebp.fill(255, 20);
+  for (const [ext, bytes, corrupt, header] of [['png', png, badPixelsPng, 8], ['jpeg', jpeg, corruptJpeg, 3], ['webp', webp, corruptWebp, 12]]) {
+    const dataUrl = bytes => `data:image/${ext};base64,${bytes.toString('base64')}`;
+    assert.deepEqual(imageData(dataUrl(bytes)).bytes, bytes);
+    for (const invalid of [bytes.subarray(0, header), bytes.subarray(0, Math.floor(bytes.length / 2)), bytes.subarray(0, -1), corrupt]) {
+      assert.throws(() => imageData(dataUrl(invalid)), /Invalid image/, ext);
+    }
+  }
+  const lossless = new Transformer(png).webpLosslessSync();
+  assert.deepEqual(imageData(`data:image/webp;base64,${lossless.toString('base64')}`).bytes, lossless);
+  for (const bytes of invalidPngs) assert.throws(() => imageData(`data:image/png;base64,${bytes.toString('base64')}`), /Invalid image/);
+});
 
 test('text and image inputs persist and invalid images leave no project', t => {
   const dir = temporary(t), store = new Store(dir);
@@ -336,7 +356,7 @@ test('legacy model revisions retain their own concept, review request and all im
     assert.equal(current.selectedConceptId, selectedConceptId); assert.equal(current.selectedReferenceSetId, selectedReferenceSetId);
     if (multiView) {
       assert.equal(current.versions.length, 2); assert.equal(set.review, 'pending');
-      assert.throws(() => resumed.start(p.id, request, 'web'), /reviewed, consistent/);
+      assert.throws(() => resumed.start(p.id, request, 'web'), /reviewed reference set/);
       assert.throws(() => resumed.reviewReferenceSet(p.id, set.id, 'approved', 'mcp'), /web UI/);
       loaded.update(p.id, { prompt: 'A silver teapot', checkpoints: { multiView: false } }, 'web');
       const reloaded = new Store(dir), restored = reloaded.get(p.id);
@@ -345,7 +365,7 @@ test('legacy model revisions retain their own concept, review request and all im
         assert.deepEqual(fs.readFileSync(path.join(dir, 'source.blend')), sourceBytes); artifacts(dir);
       } });
       assert.equal(pending.review, 'pending'); assert.equal(pending.checkpoints.multiView, true);
-      assert.throws(() => continued.start(p.id, request, 'web'), /reviewed, consistent/);
+      assert.throws(() => continued.start(p.id, request, 'web'), /reviewed reference set/);
       const savedSource = pending.request.sourceVersionId;
       pending.request.sourceVersionId = 'missing-source';
       assert.throws(() => continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'), /selected concept or source revision/);
@@ -445,7 +465,7 @@ test('regenerating legacy revision views retains the source, modeling feedback a
       const continued = new Runner(finalStore, { conceptGenerator, inspectReferences, generate: model });
       if (multiView) {
         assert.equal(finalProject.versions.length, modelCount); assert.equal(finalProject.referenceSets.at(-1).review, 'pending');
-        assert.throws(() => continued.start(p.id, request, 'web'), /Review the multi-view|reviewed, consistent/);
+        assert.throws(() => continued.start(p.id, request, 'web'), /Review the multi-view|reviewed reference set/);
         assert.throws(() => continued.reviewReferenceSet(p.id, replacement.id, 'approved', 'mcp'), /web UI/);
         continued.reviewReferenceSet(p.id, replacement.id, 'approved', 'web'); await continued.pending;
       }
@@ -506,7 +526,7 @@ test('approving older legacy revision views models their exact images after repl
       assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, feedback: 'Different revision' }, 'web'), /does not match the modeling request/);
       assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, kind: 'generate' }, 'web'), /does not match the modeling request/);
       if (historical) assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, sourceVersionId: p.versions[1].id }, 'web'), /does not match the modeling request/);
-      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id }, 'web'), /reviewed, consistent/);
+      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id }, 'web'), /reviewed reference set/);
       assert.equal(modelCalls, 0); assert.equal(continuedProject.versions.length, versionsSnapshot.length);
       continued.reviewReferenceSet(p.id, older.id, 'approved', 'web'); await continued.pending;
       assert.equal(modelCalls, 1); assert.equal(continuedProject.versions.at(-1).status, 'ready');
@@ -922,4 +942,244 @@ test('replacement providers can supply a clearly labeled right-side reference', 
   } }, inspectReferences: async ({ images }) => { assert.equal(images[2].label, 'right side'); return inspectReferences(); }, generate: async (p, v, dir) => artifacts(dir) });
   runner.start(p.id, {}, 'web'); await runner.pending;
   assert.equal(p.referenceSets[0].images[1].side, 'right'); assert.equal(p.versions[0].status, 'ready');
+});
+
+const consistencyModes = [
+  { name: 'On + Stop', settings: { enabled: true, onFailure: 'stop' }, status: 'failed', models: 0 },
+  { name: 'On + Warn and continue', settings: { enabled: true, onFailure: 'continue' }, status: 'failed', models: 1 },
+  { name: 'Off', settings: { enabled: false, onFailure: 'stop' }, status: 'skipped', models: 1 },
+];
+const inconsistentReport = { consistent: false, issues: ['Rear arm changes color'] };
+
+test('consistency modes control inspection and modeling while attaching the exact valid image set', async t => {
+  for (const mode of consistencyModes) await t.test(mode.name, async t => {
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: mode.settings }, 'web');
+    let inspections = 0; const calls = [];
+    const runner = new Runner(store, { conceptGenerator,
+      inspectReferences: async ({ images }) => { inspections++; assert.equal(images.length, 5); return inconsistentReport; },
+      processRunner: async (command, args) => { calls.push(args); return args[0] === 'login' ? 'Logged in using ChatGPT' : 'done'; },
+      blender: async (type, { code }) => { if (code?.includes('export_scene.gltf')) artifacts(path.join(store.dir(p.id), 'versions', p.versions.at(-1).id)); } });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const set = p.referenceSets[0];
+    assert.equal(inspections, mode.settings.enabled ? 1 : 0);
+    assert.equal(set.consistency.status, mode.status); assert.deepEqual(set.consistencySettings, mode.settings);
+    assert.equal(p.versions.length, mode.models); assert.equal(set.consistency.outcome, mode.models ? 'allowed' : 'blocked');
+    if (mode.settings.enabled) {
+      assert.deepEqual(set.consistency.report, inconsistentReport);
+      assert.deepEqual(JSON.parse(fs.readFileSync(store.artifact(p.id, set.artifacts['consistency.json']))), inconsistentReport);
+    } else {
+      assert.equal(set.artifacts['consistency.json'], undefined);
+      assert.ok(p.activity.some(e => e.type === 'reference_set_inspection_skipped'));
+    }
+    if (!mode.models) {
+      assert.equal(calls.length, 0);
+      assert.throws(() => runner.reviewReferenceSet(p.id, set.id, 'approved', 'web'), /contradictions/);
+      return;
+    }
+    const v = p.versions[0], cli = calls.find(args => args[0] === 'exec');
+    assert.equal(v.status, 'ready'); assert.deepEqual(v.consistencySettings, mode.settings); assert.deepEqual(v.consistency, set.consistency);
+    assert.deepEqual(v.modelingImages, set.images);
+    assert.deepEqual(cli.flatMap((arg, n) => arg === '--image' ? [cli[n + 1]] : []), [p.concepts[0].artifacts.image, ...set.images.map(i => i.file)].map(file => store.artifact(p.id, file)));
+    const task = fs.readFileSync(store.artifact(p.id, v.artifacts.task), 'utf8');
+    assert.doesNotMatch(task, /set passed/);
+    if (mode.settings.enabled) {
+      assert.match(set.warning, /failed/); assert.equal(v.continuedDespiteInconsistency, true);
+      assert.match(task, /inspection FAILED/); assert.match(task, /Rear arm changes color/);
+      assert.ok(p.activity.some(e => e.type === 'modeling_continued_despite_inconsistency' && e.versionId === v.id));
+    } else { assert.match(task, /intentionally skipped/); assert.equal(v.continuedDespiteInconsistency, false); }
+    assert.equal(store.canExport(p.id, v.id).id, v.id);
+  });
+});
+
+test('inspection crashes, unavailable tools and malformed reports remain errors even in continue mode', async t => {
+  for (const onFailure of ['stop', 'continue']) for (const inspect of [
+    async () => { throw new Error('Inspector crashed'); },
+    async () => { const e = new Error('Tool unavailable'); e.code = 'ENOENT'; throw e; },
+    async () => null, async () => ({ consistent: 'yes', issues: [] }),
+    async () => ({ consistent: true, issues: [42] }), async () => ({ consistent: false }),
+  ]) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: { onFailure } }, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences: inspect, generate: () => assert.fail('Inspection errors must block') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const set = p.referenceSets[0];
+    assert.equal(set.status, 'failed'); assert.equal(set.consistency.status, 'error'); assert.equal(set.consistency.outcome, 'blocked');
+    assert.ok(set.consistency.error); assert.equal(set.warning, undefined); assert.equal(p.versions.length, 0);
+    assert.throws(() => runner.reviewReferenceSet(p.id, set.id, 'approved', 'web'), /completed reference set/);
+    // Turning inspection off cannot approve an error from a previous attempt.
+    store.update(p.id, { consistencySettings: { enabled: false } }, 'web');
+    assert.throws(() => runner.start(p.id, {}, 'web'), /Regenerate/);
+  }
+});
+
+test('contradictory successful reports and failed reports without issue text remain failed, never passed', async t => {
+  for (const report of [{ consistent: true, issues: ['Different shape'] }, { consistent: false, issues: [] }]) {
+    const store = new Store(temporary(t)), p = store.create(input, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => report, generate: () => assert.fail('Stop mode blocks') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.referenceSets[0].consistency.status, 'failed'); assert.equal(p.versions.length, 0);
+  }
+});
+
+test('all consistency modes require complete, valid generated images before inspection or modeling', async t => {
+  for (const mode of consistencyModes) for (const generateViews of [
+    async () => {},
+    async ({ onImage }) => onImage({ view: 'front', bytes: png, ext: 'png' }),
+    async ({ onImage }) => onImage({ view: 'front', bytes: Buffer.from('invalid'), ext: 'png' }),
+    async ({ onImage }) => { for (const view of requiredViews) await onImage({ view, bytes: png, ext: 'png' }); }, // Unlabeled side.
+  ]) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: mode.settings }, 'web');
+    let inspections = 0;
+    const runner = new Runner(store, { conceptGenerator: { ...conceptGenerator, generateViews }, inspectReferences: async () => { inspections++; return inconsistentReport; }, generate: () => assert.fail('Invalid images block all modes') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.referenceSets[0].status, 'failed'); assert.ok(p.referenceSets[0].error);
+    assert.equal(inspections, 0); assert.equal(p.versions.length, 0);
+  }
+});
+
+test('signature-preserving image damage blocks inspection and Codex/Blender in every consistency mode', async t => {
+  for (const mode of consistencyModes) for (const bytes of invalidPngs) for (const stage of ['generated', 'saved']) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: mode.settings }, 'web');
+    let inspections = 0, codexCalls = 0, blenderCalls = 0;
+    const runner = new Runner(store, {
+      conceptGenerator: { ...conceptGenerator, generateViews: async ({ onImage }) => {
+        for (const view of requiredViews) await onImage({ view, side: view === 'side' ? 'left' : undefined, bytes: stage === 'generated' ? bytes : png, ext: 'png' });
+        if (stage === 'saved') fs.writeFileSync(store.artifact(p.id, p.referenceSets[0].images[0].file), bytes);
+      } },
+      inspectReferences: async () => { inspections++; return inconsistentReport; },
+      processRunner: async () => { codexCalls++; throw new Error('Must not call Codex'); },
+      blender: async () => { blenderCalls++; throw new Error('Must not call Blender'); },
+    });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    assert.equal(p.referenceSets[0].status, 'failed'); assert.match(p.referenceSets[0].error, /Invalid image/);
+    assert.equal(inspections, 0); assert.equal(codexCalls, 0); assert.equal(blenderCalls, 0); assert.equal(p.versions.length, 0);
+  }
+});
+
+test('continue and off still reject missing, corrupted, mismatched or incorrectly attached images at the Blender boundary', async t => {
+  for (const mode of consistencyModes.slice(1)) {
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: mode.settings }, 'web');
+    const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => inconsistentReport, generate: async (p, v, dir) => artifacts(dir), processRunner: () => assert.fail('Invalid boundary must not call Codex'), blender: () => assert.fail('Invalid boundary must not call Blender') });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const v = p.versions[0], set = p.referenceSets[0], original = structuredClone(set);
+    for (const change of [
+      s => s.images.pop(), s => s.images[0].parentConceptId = 'wrong', s => s.images[0].referenceSetId = 'wrong',
+      s => s.images[0].parentImage = 'wrong.png', s => s.prompt = 'wrong', s => s.profile = 'object',
+    ]) {
+      change(set); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id))); Object.assign(set, structuredClone(original));
+    }
+    for (const patch of [{ modelingImages: v.modelingImages.slice(1) }, { imageInputs: v.imageInputs.slice(1) }, { visualInput: set.images[0].file }, { consistencySettings: { enabled: true, onFailure: 'stop' } }]) await assert.rejects(runner.realGenerate(p, { ...v, ...patch }, store.dir(p.id)));
+    for (const relative of [v.visualInput, ...set.images.map(i => i.file)]) {
+      const file = store.artifact(p.id, relative), bytes = fs.readFileSync(file);
+      fs.unlinkSync(file); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)));
+      fs.writeFileSync(file, 'corrupted image'); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)), /Invalid/);
+      for (const bytes of invalidPngs) {
+        fs.writeFileSync(file, bytes); await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)), /Invalid image/);
+      }
+      fs.writeFileSync(file, bytes);
+    }
+    // Review remains mandatory, even when the consistency policy allows modeling.
+    set.review = 'pending'; await assert.rejects(runner.realGenerate(p, v, store.dir(p.id)), /reviewed/);
+  }
+});
+
+test('human multi-view approval gates every policy across restart and settings changes', async t => {
+  for (const mode of consistencyModes) await t.test(mode.name, async t => {
+    const dir = temporary(t), store = new Store(dir), p = store.create({ ...input, consistencySettings: mode.settings, checkpoints: { ...input.checkpoints, multiView: true } }, 'web');
+    let models = 0;
+    const generate = async (p, v, dir) => { models++; artifacts(dir); };
+    const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => mode.name === 'On + Stop' ? { consistent: true, issues: [] } : inconsistentReport, generate });
+    runner.start(p.id, {}, 'web'); await runner.pending;
+    const set = p.referenceSets[0]; assert.equal(set.review, 'pending'); assert.equal(models, 0);
+    store.update(p.id, { consistencySettings: { enabled: false }, checkpoints: { multiView: false } }, 'web');
+    const nextStore = new Store(dir), current = nextStore.get(p.id), next = new Runner(nextStore, { conceptGenerator, inspectReferences, generate });
+    assert.deepEqual(current.referenceSets[0].consistencySettings, mode.settings);
+    assert.equal(current.referenceSets[0].checkpoints.multiView, true);
+    assert.throws(() => next.start(p.id, {}, 'mcp'), /multi-view/);
+    assert.throws(() => next.reviewReferenceSet(p.id, set.id, 'approved', 'mcp'), /web UI/);
+    assert.equal(models, 0);
+    next.reviewReferenceSet(p.id, set.id, 'approved', 'web'); await next.pending;
+    assert.equal(models, 1); assert.equal(current.versions[0].status, 'ready'); assert.equal(current.versions[0].referenceSetId, set.id);
+  });
+});
+
+test('consistency defaults migrate old projects conservatively and reject invalid settings without mutation', t => {
+  const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
+  assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'stop' });
+  for (const bad of [null, [], false, { enabled: 'off' }, { onFailure: 'ignore' }, { other: true }]) {
+    assert.throws(() => store.create({ ...input, consistencySettings: bad }, 'web'), /Consistency settings/);
+    assert.throws(() => store.update(p.id, { consistencySettings: bad }, 'web'), /Consistency settings/);
+    assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'stop' });
+  }
+  assert.equal(store.list().length, 1);
+  delete p.consistencySettings; store.save(p);
+  assert.deepEqual(new Store(dir).get(p.id).consistencySettings, { enabled: true, onFailure: 'stop' });
+});
+
+test('HTTP and MCP share consistency settings, reports, outcomes, warnings and history in every mode', async t => {
+  const a = await app(t); a.runner.inspectReferences = async () => inconsistentReport;
+  const client = new Client({ name: 'consistency-test', version: '1' });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/mcp.js')], env: { ...process.env, GEN3D_URL: a.url }, stderr: 'pipe' })); t.after(() => client.close());
+  for (const mode of consistencyModes) {
+    const created = await client.callTool({ name: 'create_project', arguments: { ...input, consistencySettings: mode.settings } });
+    const p = JSON.parse(created.content[0].text);
+    await client.callTool({ name: 'generate_model', arguments: { projectId: p.id } }); await a.runner.pending;
+    const http = (await a.request(`/api/projects/${p.id}`)).data;
+    const mcp = JSON.parse((await client.callTool({ name: 'get_project', arguments: { projectId: p.id } })).content[0].text);
+    const resource = JSON.parse((await client.readResource({ uri: `gen3d://projects/${p.id}` })).contents[0].text);
+    assert.deepEqual(mcp, http); assert.deepEqual(resource, http); assert.equal(mcp.referenceSets[0].consistency.status, mode.status);
+    assert.deepEqual(mcp.consistencySettings, mode.settings);
+    if (mode.settings.enabled) {
+      const report = (await a.request(`/api/projects/${p.id}/artifacts/${mcp.referenceSets[0].artifacts['consistency.json']}`)).data;
+      assert.deepEqual(report, inconsistentReport);
+    }
+    if (mode.models) assert.ok(!(await client.callTool({ name: 'export_model', arguments: { projectId: p.id, versionId: mcp.versions[0].id } })).isError);
+    const changed = await client.callTool({ name: 'update_project', arguments: { projectId: p.id, consistencySettings: { enabled: false, onFailure: 'continue' } } });
+    assert.ok(!changed.isError);
+    assert.deepEqual((await a.request(`/api/projects/${p.id}`)).data, JSON.parse(changed.content[0].text));
+    assert.ok(JSON.parse(changed.content[0].text).activity.some(e => e.type === 'consistency_settings_updated' && e.actor === 'mcp'));
+  }
+});
+
+test('server restart persists edited consistency settings and completed warning reports', async t => {
+  const dataDir = temporary(t); let a = createApp({ dataDir, conceptGenerator, inspectReferences: async () => inconsistentReport, generate: async (p, v, dir) => artifacts(dir) });
+  a.server.listen(0, '127.0.0.1'); await once(a.server, 'listening');
+  const p = a.store.create(input, 'web');
+  const response = await fetch(`http://127.0.0.1:${a.server.address().port}/api/projects/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consistencySettings: { onFailure: 'continue' } }) });
+  assert.equal(response.status, 200);
+  a.runner.start(p.id, {}, 'web'); await a.runner.pending;
+  const saved = JSON.parse(JSON.stringify(a.store.get(p.id)));
+  await new Promise(resolve => a.server.close(resolve)); await a.closed;
+  a = createApp({ dataDir, conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
+  a.server.listen(0, '127.0.0.1'); await once(a.server, 'listening');
+  t.after(async () => { await new Promise(resolve => a.server.close(resolve)); await a.closed; });
+  const recovered = await (await fetch(`http://127.0.0.1:${a.server.address().port}/api/projects/${p.id}`)).json();
+  assert.deepEqual(recovered, saved); assert.match(recovered.referenceSets[0].warning, /failed/);
+});
+
+test('retry/revision retain source consistency policies; regeneration snapshots changed settings', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: { onFailure: 'continue' } }, 'web');
+  let inspections = 0;
+  const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => { inspections++; return inconsistentReport; }, generate: async (p, v, dir) => artifacts(dir) });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  const source = p.versions[0], firstSet = structuredClone(p.referenceSets[0]);
+  store.update(p.id, { consistencySettings: { enabled: false, onFailure: 'stop' } }, 'web');
+  runner.start(p.id, { kind: 'retry' }, 'web'); await runner.pending;
+  runner.start(p.id, { kind: 'revision', sourceVersionId: source.id, feedback: 'Longer arms' }, 'web'); await runner.pending;
+  assert.equal(inspections, 1); assert.deepEqual(p.referenceSets[0], firstSet);
+  for (const v of p.versions) { assert.deepEqual(v.consistencySettings, firstSet.consistencySettings); assert.equal(v.referenceSetId, firstSet.id); assert.equal(v.continuedDespiteInconsistency, true); }
+  runner.regenerateReferenceSet(p.id, {}, 'web'); await runner.pending;
+  assert.equal(inspections, 1); assert.equal(p.referenceSets[1].consistency.status, 'skipped');
+  assert.deepEqual(p.referenceSets[1].consistencySettings, p.consistencySettings); assert.equal(p.versions.at(-1).continuedDespiteInconsistency, false);
+});
+
+test('continue mode stops on inspection usage limits without retry and preserves interrupted inspection errors', async t => {
+  const dir = temporary(t), store = new Store(dir), p = store.create({ ...input, consistencySettings: { onFailure: 'continue' } }, 'web');
+  let inspections = 0;
+  const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => { inspections++; const e = new Error('Usage limit reached'); e.usageLimited = true; throw e; }, generate: () => assert.fail('Usage limit blocks modeling') });
+  runner.start(p.id, {}, 'web'); await runner.pending;
+  assert.equal(inspections, 1); assert.equal(runner.usageLimited, true); assert.equal(p.referenceSets[0].consistency.status, 'error'); assert.equal(p.versions.length, 0);
+  assert.throws(() => runner.regenerateReferenceSet(p.id, {}, 'web'), /usage limit/);
+  p.referenceSets[0].status = 'running'; p.referenceSets[0].consistency.status = 'running'; store.save(p);
+  const recovered = new Store(dir).get(p.id).referenceSets[0];
+  assert.equal(recovered.status, 'failed'); assert.equal(recovered.consistency.status, 'error'); assert.equal(recovered.consistency.outcome, 'blocked');
 });

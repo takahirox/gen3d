@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { referenceProfile, validateViewSet } from './reference-set.js';
+import { crc32 } from 'node:zlib';
+import { Transformer } from '@napi-rs/image';
+import { referenceProfile, validateViewSet, consistencySettings, consistencyAllowsModeling } from './reference-set.js';
 
 export class AppError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -19,6 +21,26 @@ export function imageData(value) {
     : match[1] === 'jpeg' ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
       : bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP';
   if (!valid || bytes.length > 10_000_000) throw new AppError('Invalid or oversized image');
+  try {
+    // Decoders can tolerate missing trailers. Require a complete container too.
+    if (match[1] === 'png') {
+      let offset = 8, ended = false;
+      while (offset + 12 <= bytes.length) {
+        const start = offset, size = bytes.readUInt32BE(offset), type = bytes.toString('ascii', offset + 4, offset + 8);
+        offset += 12 + size;
+        if (offset > bytes.length) throw new Error('Truncated PNG chunk');
+        if (crc32(bytes.subarray(start + 4, offset - 4)) !== bytes.readUInt32BE(offset - 4)) throw new Error('Corrupted PNG chunk');
+        if (type === 'IEND') { ended = size === 0 && offset === bytes.length; break; }
+      }
+      if (!ended) throw new Error('Missing PNG end');
+    } else if (match[1] === 'jpeg') {
+      if (bytes.at(-2) !== 255 || bytes.at(-1) !== 217) throw new Error('Missing JPEG end');
+    } else if (bytes.length < 12 || bytes.readUInt32LE(4) + 8 !== bytes.length) throw new Error('Truncated WebP container');
+    // Read every pixel, not just metadata/signatures. Preserve the original bytes.
+    if (!new Transformer(bytes).rawPixelsSync().length) throw new Error('Empty image');
+  } catch {
+    throw new AppError('Invalid image contents');
+  }
   return { bytes, ext: match[1] === 'jpeg' ? 'jpg' : match[1] };
 }
 
@@ -54,6 +76,7 @@ export class Store {
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
       project.checkpoints ??= checkpoints();
       project.checkpoints.multiView ??= true;
+      project.consistencySettings = consistencySettings(project.consistencySettings);
       project.profile ??= referenceProfile(undefined, project.prompt);
       project.referenceSets ??= [];
       project.selectedReferenceSetId ??= null;
@@ -63,8 +86,10 @@ export class Store {
       project.selectedConceptId ??= null;
       this.projects.set(project.id, project);
       for (const set of project.referenceSets) {
+        set.consistencySettings = consistencySettings(set.consistencySettings);
         if (set.status === 'running') {
           set.status = 'failed'; set.error = 'Server stopped during reference generation/inspection. Regenerate manually.';
+          if (set.consistency?.status === 'running') set.consistency = { ...set.consistency, status: 'error', outcome: 'blocked', error: set.error };
           this.event(project, 'server', 'reference_set_interrupted', { referenceSetId: set.id });
         }
       }
@@ -108,7 +133,7 @@ export class Store {
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
     const profile = referenceProfile(input.profile, prompt);
-    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -127,12 +152,17 @@ export class Store {
     const profile = referenceProfile(input.profile ?? (prompt === p.prompt ? p.profile : undefined), prompt);
     if (input.checkpoints !== undefined && actor !== 'web') throw new AppError('Change checkpoint settings in the web UI', 403);
     const settings = checkpoints(input.checkpoints, p.checkpoints);
+    const consistency = consistencySettings(input.consistencySettings, p.consistencySettings);
     if (prompt !== p.prompt || profile !== p.profile) { p.inputReview = 'pending'; p.inputCheckpoint = settings.input; p.selectedConceptId = null; p.selectedReferenceSetId = null; }
     // Changing settings never silently approves an already waiting checkpoint.
     if (settings.input && !p.checkpoints.input) { p.inputReview = 'pending'; p.inputCheckpoint = true; }
     p.checkpoints = settings;
+    const consistencyChanged = JSON.stringify(consistency) !== JSON.stringify(p.consistencySettings);
+    p.consistencySettings = consistency;
     p.name = name; p.prompt = prompt; p.profile = profile;
-    this.event(p, actor, 'project_updated'); this.save(p); return p;
+    this.event(p, actor, 'project_updated');
+    if (consistencyChanged) this.event(p, actor, 'consistency_settings_updated', { consistencySettings: { ...consistency } });
+    this.save(p); return p;
   }
   addReference(id, input, actor) {
     const p = this.get(id); this.idle(p);
@@ -186,7 +216,7 @@ export class Store {
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
     if (decision === 'approved') {
       validateViewSet(set);
-      if (set.consistency?.status !== 'passed') throw new AppError('Resolve reference contradictions by regenerating the set before modeling', 409);
+      if (!consistencyAllowsModeling(set)) throw new AppError('Resolve reference contradictions or inspection errors by regenerating the set before modeling', 409);
       if (currentReferenceSet(p, set)) p.selectedReferenceSetId = set.id;
     } else if (p.selectedReferenceSetId === set.id) p.selectedReferenceSetId = null;
     set.review = decision;
@@ -203,8 +233,14 @@ export class Store {
     const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => Object.values(v.artifacts || {}))].filter(Boolean);
     if (!files.includes(relative)) throw new AppError('Artifact not found', 404);
     const file = path.resolve(this.dir(id), relative);
-    if (!file.startsWith(this.dir(id) + path.sep) || fs.lstatSync(file).isSymbolicLink()
+    if (!file.startsWith(this.dir(id) + path.sep) || !fs.lstatSync(file).isFile()
       || !fs.realpathSync(file).startsWith(fs.realpathSync(this.dir(id)) + path.sep)) throw new AppError('Invalid artifact');
+    return file;
+  }
+  imageArtifact(id, relative) {
+    const file = this.artifact(id, relative), ext = path.extname(file).slice(1);
+    if (!['png', 'jpg', 'webp'].includes(ext) || fs.statSync(file).size > 10_000_000) throw new AppError('Invalid or oversized image artifact', 409);
+    imageData(`data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${fs.readFileSync(file).toString('base64')}`);
     return file;
   }
 }

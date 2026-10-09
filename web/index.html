@@ -29,6 +29,10 @@
           <label class="view-setting"><input type="checkbox" name="multiView" checked> After multi-view references (text)</label>
           <label><input type="checkbox" name="preview" checked> After 3D preview</label>
           </fieldset>
+          <fieldset class="consistency-settings"><legend>Multi-view consistency (text)</legend>
+          <label>Run consistency check<select name="enabled"><option value="true">On</option><option value="false">Off</option></select></label>
+          <label>On consistency failure<select name="onFailure"><option value="stop">Stop</option><option value="continue">Warn and continue</option></select></label>
+          </fieldset>
           <button type="submit">Create project</button>
         </form>
       </details>
@@ -57,6 +61,10 @@
           <label class="view-setting"><input type="checkbox" name="multiView" checked> After multi-view references (text)</label>
           <label><input type="checkbox" name="preview" checked> After 3D preview</label>
           </fieldset><button type="submit" class="secondary">Save checkpoints</button></form>
+            <form id="consistency"><fieldset class="consistency-settings"><legend>Multi-view consistency (text)</legend>
+          <label>Run consistency check<select name="enabled"><option value="true">On</option><option value="false">Off</option></select></label>
+          <label>On consistency failure<select name="onFailure"><option value="stop">Stop</option><option value="continue">Warn and continue</option></select></label>
+          </fieldset><p class="muted">Applies to new view sets. Regenerate views to use changed settings; retries and revisions keep their source set’s policy. Human review still requires approval.</p><button type="submit" class="secondary">Save consistency settings</button></form>
             <p id="input-review-state" class="muted"></p><div id="input-review" class="actions"></div>
             <div id="input-image"></div>
             <h2 id="concept-heading">Concept images</h2><div id="concepts"></div>

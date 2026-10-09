@@ -21,6 +21,11 @@ function revisionReferenceSet(p, set) {
   return Boolean(source && concept && source.conceptId === concept.id && source.prompt === set.prompt
     && set.prompt === concept.prompt && (!concept.profile || set.profile === concept.profile));
 }
+function consistencyAllowsModeling(set) {
+  return set.consistency.status === 'passed'
+    || (set.consistency.status === 'failed' && set.consistencySettings?.enabled && set.consistencySettings.onFailure === 'continue')
+    || (set.consistency.status === 'skipped' && set.consistencySettings?.enabled === false);
+}
 function artifact(file) { return `/api/projects/${projectId}/artifacts/${file}`; }
 function button(label, action, disabled = false) { const b = document.createElement('button'); b.textContent = label; b.disabled = disabled; b.onclick = () => safe(action); return b; }
 async function safe(action) { try { notify(''); await action(); await refresh(); } catch (e) { notify(e.message); } }
@@ -99,8 +104,10 @@ function render() {
   $('views-retry').hidden = p.mode !== 'text'; $('views-heading').hidden = p.mode !== 'text';
   $('views-retry').querySelector('button').disabled = busy || pendingInput || pendingConcept || pendingPreview || pendingRefs || (!p.selectedConceptId && !regenerableSets.length) || status.usageLimited;
   $('checkpoints').querySelector('button').disabled = projectBusy;
+  $('consistency').hidden = p.mode !== 'text';
+  $('consistency').querySelector('button').disabled = projectBusy;
   $('edit').querySelector('button').disabled = projectBusy; $('reference').querySelector('button').disabled = projectBusy;
-  $('version-info').textContent = v ? `Version ${v.number} · ${v.kind} · ${v.status} · ${v.review}${sourceConcept ? ` · concept ${sourceConcept.number}` : ''}${v.referenceSetId ? ` · view set ${p.referenceSets.find(s => s.id === v.referenceSetId)?.number}` : ''}${v.feedback ? ` · ${v.feedback}` : ''}${v.error ? ` — ${v.error}` : ''}` : 'No versions yet. Generate your first model.';
+  $('version-info').textContent = v ? `Version ${v.number} · ${v.kind} · ${v.status} · ${v.review}${sourceConcept ? ` · concept ${sourceConcept.number}` : ''}${v.referenceSetId ? ` · view set ${p.referenceSets.find(s => s.id === v.referenceSetId)?.number}` : ''}${v.feedback ? ` · ${v.feedback}` : ''}${v.continuedDespiteInconsistency ? ' · WARNING: modeling continued despite failed consistency inspection' : v.consistency?.status === 'skipped' ? ' · consistency inspection skipped' : ''}${v.error ? ` — ${v.error}` : ''}` : 'No versions yet. Generate your first model.';
   $('model-summary').textContent = v?.summary || '';
   for (const [id, key] of [['download', 'glb'], ['blend-download', 'blend']]) { $(id).hidden = v?.status !== 'ready' || (v.checkpoints?.preview && v.review !== 'approved'); if (v?.status === 'ready') { $(id).href = artifact(v.artifacts[key]) + '?download=1'; $(id).download = key === 'glb' ? 'model.glb' : 'scene.blend'; } }
   const options = p.versions.map(v => { const option = document.createElement('option'); option.value = v.id; option.textContent = `v${v.number} · ${v.kind} · ${v.status}`; return option; });
@@ -118,6 +125,8 @@ function render() {
     for (const key of ['name', 'prompt', 'profile']) { const field = $('edit').elements[key]; if (document.activeElement !== field) field.value = p[key]; }
     for (const key of ['input', 'concept', 'multiView', 'preview']) { const field = $('checkpoints').elements[key]; if (document.activeElement !== field) field.checked = p.checkpoints[key]; }
     for (const cls of ['concept-setting', 'view-setting']) $('checkpoints').querySelector('.' + cls).hidden = p.mode !== 'text';
+    for (const key of ['enabled', 'onFailure']) { const field = $('consistency').elements[key]; if (document.activeElement !== field) field.value = String(p.consistencySettings[key]); }
+    syncConsistency($('consistency'));
     $('input-review-state').textContent = `Input review: ${p.inputReview}`;
     $('input-review').replaceChildren(...(p.checkpoints.input || p.inputCheckpoint || p.inputReview === 'rejected' ? ['approved', 'rejected'].map(decision => button(decision === 'approved' ? 'Accept input' : 'Reject input', () => api(`/projects/${p.id}/input/review`, 'POST', { decision }), projectBusy)) : []));
     $('concepts').replaceChildren(...p.concepts.slice().reverse().map(c => {
@@ -132,12 +141,15 @@ function render() {
       const models = p.versions.filter(v => v.referenceSetId === set.id).map(v => `v${v.number}`).join(', ');
       const revisionSource = revisionReferenceSet(p, set) ? p.versions.find(v => v.id === set.request.sourceVersionId) : null;
       info.textContent = `View set ${set.number} · ${set.profile} · concept ${p.concepts.find(c => c.id === set.conceptId)?.number} · ${set.status} · ${set.review} · consistency ${set.consistency.status}${revisionSource ? ` · revision of v${revisionSource.number} · ${set.request.feedback}` : ''}${models ? ' · models ' + models : ''}${set.feedback ? ' · ' + set.feedback : ''}${set.error ? ' — ' + set.error : ''}`;
+      const settings = set.consistencySettings || { enabled: true, onFailure: 'stop' };
+      info.textContent += ` · check ${settings.enabled ? 'On' : 'Off'}${settings.enabled ? ` · on failure ${settings.onFailure === 'continue' ? 'Warn and continue' : 'Stop'}` : ''} · inspection outcome ${set.consistency.outcome || (set.consistency.status === 'passed' ? 'allowed' : 'blocked')}`;
+      if (set.warning) { const warning = document.createElement('p'); warning.className = 'warning'; warning.setAttribute('role', 'alert'); warning.textContent = set.warning + (models ? ` Modeling continued: ${models}.` : set.review === 'pending' ? ' Awaiting explicit human approval.' : ''); node.append(warning); }
       node.append(info, ...set.images.map(image => figure(image.file, image.label)));
       for (const issue of set.consistency.issues) { const line = document.createElement('p'); line.textContent = issue; node.append(line); }
       if (set.artifacts['consistency.json']) { const link = document.createElement('a'); link.href = artifact(set.artifacts['consistency.json']); link.textContent = 'Consistency report'; link.target = '_blank'; node.append(link); }
       if (set.status === 'ready') for (const decision of ['approved', 'rejected']) node.append(button(decision === 'approved' ? 'Accept views & model' : 'Reject view set', async () => {
         followLatest = decision === 'approved'; await api(`/projects/${p.id}/reference-sets/${set.id}/review`, 'POST', { decision });
-      }, busy || pendingInput || pendingConcept || pendingPreview || (set.conceptId !== p.selectedConceptId && !revisionSource) || (decision === 'approved' && set.consistency.status !== 'passed')));
+      }, busy || pendingInput || pendingConcept || pendingPreview || (set.conceptId !== p.selectedConceptId && !revisionSource) || (decision === 'approved' && !consistencyAllowsModeling(set))));
       return node;
     }));
     $('input-image').replaceChildren(...(p.inputImage ? [figure(p.inputImage, 'Original image input')] : []));
@@ -164,11 +176,15 @@ async function refresh() {
 }
 function form(id, action) { $(id).onsubmit = event => { event.preventDefault(); safe(() => action(new FormData(event.target))); }; }
 const create = $('create');
-create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; for (const cls of ['concept-setting', 'view-setting', 'profile-setting']) create.querySelector('.' + cls).hidden = image; };
+create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; for (const cls of ['concept-setting', 'view-setting', 'profile-setting', 'consistency-settings']) create.querySelector('.' + cls).hidden = image; syncConsistency(create); };
 form('create', async data => {
-  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), checkpoints: checkpointData(data), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
+  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), checkpoints: checkpointData(data), consistencySettings: consistencyData(data, create), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
   projectId = p.id; localStorage.setItem('gen3d-project', p.id); versionId = null; followLatest = false; lastState = ''; create.reset(); create.elements.mode.onchange();
 });
+function syncConsistency(form) { form.elements.onFailure.disabled = form.elements.enabled.value === 'false'; }
+function consistencyData(data, form) { return { enabled: data.get('enabled') === 'true', onFailure: form.elements.onFailure.value }; }
+for (const form of [create, $('consistency')]) form.elements.enabled.onchange = () => syncConsistency(form);
+form('consistency', data => api(`/projects/${projectId}`, 'PATCH', { consistencySettings: consistencyData(data, $('consistency')) }));
 function checkpointData(data) { return Object.fromEntries(['input', 'concept', 'multiView', 'preview'].map(key => [key, data.has(key)])); }
 form('checkpoints', data => api(`/projects/${projectId}`, 'PATCH', { checkpoints: checkpointData(data) }));
 form('concept-retry', async data => { await api(`/projects/${projectId}/concepts`, 'POST', { feedback: data.get('feedback') }); followLatest = true; });

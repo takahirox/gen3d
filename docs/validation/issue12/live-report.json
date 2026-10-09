@@ -1,0 +1,223 @@
+{
+  "checkedAt": "2026-10-09T06:15:40.691Z",
+  "imageSource": "Existing real Codex images from docs/validation/issue10/prop/concept-1 and set-3; no fresh image generation",
+  "inspection": "Injected deterministic failed report; no live consistency inspection",
+  "modeling": "Live subscription Codex and dedicated Blender bridge",
+  "modes": [
+    {
+      "name": "warn",
+      "settings": {
+        "enabled": true,
+        "onFailure": "continue"
+      },
+      "projectId": "137af039-1803-41eb-aec0-9cacf927a3b4",
+      "versionId": "4919dc00-ec1a-4b3e-879a-38b9e5df9d4f",
+      "referenceSetId": "b97b6e90-d44a-4ce7-b253-7b6710068e7e",
+      "inspectionStatus": "failed",
+      "modelingStatus": "ready",
+      "imageInputCount": 5,
+      "continuedDespiteInconsistency": true,
+      "inspectionCalls": 1,
+      "usageLimited": false,
+      "error": null,
+      "meshes": 20,
+      "glbBytes": 352652,
+      "glbSha256": "69fa157a9b1b17ec98258c171220da504b5c19f013674a79f41ce9395fd7294c",
+      "export": true,
+      "blenderOperationCount": 7,
+      "totalInspectionCalls": 1,
+      "inspection": {
+        "status": "failed",
+        "issues": [
+          "Injected validation warning: rear panel color differs from base concept."
+        ],
+        "report": {
+          "consistent": false,
+          "issues": [
+            "Injected validation warning: rear panel color differs from base concept."
+          ]
+        },
+        "provider": "codex",
+        "checkedAt": "2026-10-09T06:15:41.329Z",
+        "outcome": "allowed"
+      },
+      "warning": "Consistency inspection failed. Warn and continue allows modeling despite the reported contradictions.",
+      "imageInputs": [
+        {
+          "role": "base concept",
+          "source": "docs/validation/issue10/prop/concept-1/concept.png",
+          "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+        },
+        {
+          "role": "front",
+          "source": "docs/validation/issue10/prop/set-3/front.png",
+          "sha256": "f1c32b22a4fc699afc97d30243ed991858e2324e24f798f16667d38afcca73c1"
+        },
+        {
+          "role": "left side",
+          "source": "docs/validation/issue10/prop/set-3/side.png",
+          "sha256": "0df9d3c0524d7094dbd40f06d7ebab045855c51349d8a2609aadad696c747907"
+        },
+        {
+          "role": "back",
+          "source": "docs/validation/issue10/prop/set-3/back.png",
+          "sha256": "504a3bcd7933b640adbdfc4d2c3c75ca54008583c6dbadf2b57a15128c7735c8"
+        },
+        {
+          "role": "three-quarter",
+          "source": "docs/validation/issue10/prop/set-3/three-quarter.png",
+          "sha256": "8e47a94b1fb8cb86d2b73bcd8af98152a69a46db8443d96cd6df5dcbde390d70"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-10-09T06:15:41.221Z",
+          "actor": "system",
+          "type": "reference_set_generation_started",
+          "consistencySettings": {
+            "enabled": true,
+            "onFailure": "continue"
+          }
+        },
+        {
+          "at": "2026-10-09T06:15:41.329Z",
+          "actor": "codex",
+          "type": "reference_set_inspected",
+          "consistencySettings": {
+            "enabled": true,
+            "onFailure": "continue"
+          },
+          "consistency": "failed",
+          "outcome": "allowed",
+          "issues": [
+            "Injected validation warning: rear panel color differs from base concept."
+          ]
+        },
+        {
+          "at": "2026-10-09T06:15:41.329Z",
+          "actor": "system",
+          "type": "reference_set_auto_accepted"
+        },
+        {
+          "at": "2026-10-09T06:15:41.374Z",
+          "actor": "system",
+          "type": "generation_started",
+          "consistencySettings": {
+            "enabled": true,
+            "onFailure": "continue"
+          }
+        },
+        {
+          "at": "2026-10-09T06:15:41.374Z",
+          "actor": "system",
+          "type": "modeling_continued_despite_inconsistency",
+          "issues": [
+            "Injected validation warning: rear panel color differs from base concept."
+          ]
+        },
+        {
+          "at": "2026-10-09T06:17:51.740Z",
+          "actor": "codex",
+          "type": "generation_completed"
+        }
+      ]
+    },
+    {
+      "name": "off",
+      "settings": {
+        "enabled": false,
+        "onFailure": "stop"
+      },
+      "projectId": "2c3759c4-be3b-418b-9a79-c05084f70720",
+      "versionId": "51849112-48b4-404e-bd00-74f8b9a820fd",
+      "referenceSetId": "c4a1cd54-7a68-4e5a-9706-f4ca1666e35b",
+      "inspectionStatus": "skipped",
+      "modelingStatus": "ready",
+      "imageInputCount": 5,
+      "continuedDespiteInconsistency": false,
+      "inspectionCalls": 0,
+      "usageLimited": false,
+      "error": null,
+      "meshes": 19,
+      "glbBytes": 202780,
+      "glbSha256": "072b22b210b3339fb65981935ddf539869b93f7ebd300d8174f40827c18417d2",
+      "export": true,
+      "blenderOperationCount": 4,
+      "totalInspectionCalls": 1,
+      "inspection": {
+        "status": "skipped",
+        "issues": [],
+        "outcome": "allowed",
+        "reason": "Consistency check disabled for this reference set."
+      },
+      "warning": null,
+      "imageInputs": [
+        {
+          "role": "base concept",
+          "source": "docs/validation/issue10/prop/concept-1/concept.png",
+          "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+        },
+        {
+          "role": "front",
+          "source": "docs/validation/issue10/prop/set-3/front.png",
+          "sha256": "f1c32b22a4fc699afc97d30243ed991858e2324e24f798f16667d38afcca73c1"
+        },
+        {
+          "role": "left side",
+          "source": "docs/validation/issue10/prop/set-3/side.png",
+          "sha256": "0df9d3c0524d7094dbd40f06d7ebab045855c51349d8a2609aadad696c747907"
+        },
+        {
+          "role": "back",
+          "source": "docs/validation/issue10/prop/set-3/back.png",
+          "sha256": "504a3bcd7933b640adbdfc4d2c3c75ca54008583c6dbadf2b57a15128c7735c8"
+        },
+        {
+          "role": "three-quarter",
+          "source": "docs/validation/issue10/prop/set-3/three-quarter.png",
+          "sha256": "8e47a94b1fb8cb86d2b73bcd8af98152a69a46db8443d96cd6df5dcbde390d70"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-10-09T06:17:51.758Z",
+          "actor": "system",
+          "type": "reference_set_generation_started",
+          "consistencySettings": {
+            "enabled": false,
+            "onFailure": "stop"
+          }
+        },
+        {
+          "at": "2026-10-09T06:17:51.825Z",
+          "actor": "system",
+          "type": "reference_set_inspection_skipped",
+          "consistencySettings": {
+            "enabled": false,
+            "onFailure": "stop"
+          }
+        },
+        {
+          "at": "2026-10-09T06:17:51.825Z",
+          "actor": "system",
+          "type": "reference_set_auto_accepted"
+        },
+        {
+          "at": "2026-10-09T06:17:51.871Z",
+          "actor": "system",
+          "type": "generation_started",
+          "consistencySettings": {
+            "enabled": false,
+            "onFailure": "stop"
+          }
+        },
+        {
+          "at": "2026-10-09T06:19:01.938Z",
+          "actor": "codex",
+          "type": "generation_completed"
+        }
+      ]
+    }
+  ],
+  "completedAt": "2026-10-09T06:21:00.159Z"
+}
