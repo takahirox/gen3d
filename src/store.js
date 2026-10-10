@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { refinementSettings } from './refinement.js';
-import { modelingMode } from './modeling-mode.js';
 import { crc32 } from 'node:zlib';
 import { Transformer } from '@napi-rs/image';
 import { referenceProfile, validateViewSet, consistencySettings, consistencyAllowsModeling } from './reference-set.js';
@@ -53,16 +52,10 @@ export function checkpoints(value = {}, previous = { input: false, concept: true
 }
 
 export function currentConcept(p, c) {
-  return c.prompt === p.prompt && (!c.profile || c.profile === p.profile);
+  return c.prompt === p.prompt && c.profile === p.profile;
 }
 export function currentReferenceSet(p, set) {
   return set.conceptId === p.selectedConceptId && set.prompt === p.prompt && set.profile === p.profile;
-}
-export function revisionReferenceSet(p, set) {
-  const source = set.request?.kind === 'revision' && p.versions.find(v => v.id === set.request.sourceVersionId && v.status === 'ready');
-  const concept = p.concepts.find(c => c.id === set.conceptId && c.status === 'ready' && c.review === 'approved');
-  return Boolean(source && concept && source.conceptId === concept.id && source.prompt === set.prompt
-    && set.prompt === concept.prompt && (!concept.profile || set.profile === concept.profile));
 }
 
 // Only the HTTP server owns this store. MCP clients always use that server's API.
@@ -76,21 +69,9 @@ export class Store {
       const file = path.join(this.root, entry.name, 'project.json');
       if (!fs.existsSync(file)) continue;
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
-      project.checkpoints ??= checkpoints();
-      project.checkpoints.multiView ??= true;
-      project.consistencySettings = consistencySettings(project.consistencySettings);
-      project.profile ??= referenceProfile(undefined, project.prompt);
-      project.refinementSettings = refinementSettings(project.refinementSettings);
-      project.modelingMode = modelingMode(project.modelingMode, project.profile);
-      project.referenceSets ??= [];
-      project.selectedReferenceSetId ??= null;
-      project.inputReview ??= 'pending';
-      project.inputCheckpoint ??= project.checkpoints.input;
-      project.concepts ??= [];
-      project.selectedConceptId ??= null;
+      if (project.schemaVersion !== 1) throw new AppError('Unsupported project schema. Start fresh by clearing only the gen3d-managed data store; see docs/local-setup.md#start-fresh.');
       this.projects.set(project.id, project);
       for (const set of project.referenceSets) {
-        set.consistencySettings = consistencySettings(set.consistencySettings);
         if (set.status === 'running') {
           set.status = 'failed'; set.error = 'Server stopped during reference generation/inspection. Regenerate manually.';
           if (set.consistency?.status === 'running') set.consistency = { ...set.consistency, status: 'error', outcome: 'blocked', error: set.error };
@@ -98,14 +79,12 @@ export class Store {
         }
       }
       for (const concept of project.concepts) {
-        concept.role ??= 'base-concept'; concept.view ??= 'three-quarter'; concept.parentConceptId ??= null;
         if (concept.status === 'running') {
           concept.status = 'failed'; concept.error = 'Server stopped during concept generation. Regenerate manually.';
           this.event(project, 'server', 'concept_interrupted', { conceptId: concept.id });
         }
       }
       for (const version of project.versions) {
-        version.modelingMode ??= 'scratch';
         if (version.status === 'running') {
           if (version.refinement?.status === 'running') {
             version.refinement.status = 'interrupted'; version.refinement.error = 'Server stopped; no automatic resume.';
@@ -142,7 +121,7 @@ export class Store {
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
     const profile = referenceProfile(input.profile, prompt);
-    const p = { id: randomUUID(), name, mode: input.mode, prompt, profile, modelingMode: modelingMode(input.modelingMode, profile), inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const p = { schemaVersion: 1, id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -160,7 +139,6 @@ export class Store {
     const prompt = input.prompt === undefined ? p.prompt : text(input.prompt, 'Prompt');
     const profile = referenceProfile(input.profile ?? (prompt === p.prompt ? p.profile : undefined), prompt);
     if (input.checkpoints !== undefined && actor !== 'web') throw new AppError('Change checkpoint settings in the web UI', 403);
-    const method = modelingMode(input.modelingMode ?? p.modelingMode, profile);
     const settings = checkpoints(input.checkpoints, p.checkpoints);
     const consistency = consistencySettings(input.consistencySettings, p.consistencySettings);
     const refinement = refinementSettings(input.refinementSettings, p.refinementSettings);
@@ -172,7 +150,7 @@ export class Store {
     p.consistencySettings = consistency;
     if (JSON.stringify(refinement) !== JSON.stringify(p.refinementSettings)) this.event(p, actor, 'refinement_settings_updated', { refinementSettings: refinement });
     p.refinementSettings = refinement;
-    p.name = name; p.prompt = prompt; p.profile = profile; p.modelingMode = method;
+    p.name = name; p.prompt = prompt; p.profile = profile;
     this.event(p, actor, 'project_updated');
     if (consistencyChanged) this.event(p, actor, 'consistency_settings_updated', { consistencySettings: { ...consistency } });
     this.save(p); return p;
@@ -225,7 +203,7 @@ export class Store {
     const p = this.get(id); this.idle(p);
     if (actor !== 'web') throw new AppError('Multi-view checkpoint requires the web UI', 403);
     const set = p.referenceSets.find(s => s.id === setId && s.status === 'ready');
-    if (!set || (!currentReferenceSet(p, set) && !revisionReferenceSet(p, set))) throw new AppError('Choose a completed reference set for the selected concept or source revision');
+    if (!set || !currentReferenceSet(p, set)) throw new AppError('Choose a completed reference set for the selected concept');
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
     if (decision === 'approved') {
       validateViewSet(set);

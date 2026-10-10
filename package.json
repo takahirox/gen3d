@@ -9,7 +9,7 @@
     "mcp": "node src/mcp.js",
     "test": "node --test",
     "test:browser": "node scripts/studio-browser-check.js",
-    "check": "node --check src/server.js && node --check src/store.js && node --check src/runner.js && node --check src/refinement.js && node --check src/codex.js && node --check src/concept.js && node --check src/reference-set.js && node --check src/mcp.js && node --check src/blender-mcp.js && node --check src/blender.js && node --check src/mpfb.js && node --check src/modeling-mode.js && node --check web/modeling-state.js && node --check web/app.js && node --check web/studio-state.js && node --check scripts/mpfb-check.js && node --check scripts/mpfb-validation.js && node --check scripts/refinement-validation.js && node --check scripts/refinement-export-check.js && node --check scripts/browser-check.js && node --check scripts/studio-browser-check.js"
+    "check": "node --check src/server.js && node --check src/store.js && node --check src/runner.js && node --check src/refinement.js && node --check src/codex.js && node --check src/concept.js && node --check src/reference-set.js && node --check src/mcp.js && node --check src/blender-mcp.js && node --check src/blender.js && node --check web/app.js && node --check web/studio-state.js && node --check scripts/refinement-validation.js && node --check scripts/refinement-export-check.js && node --check scripts/browser-check.js && node --check scripts/studio-browser-check.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

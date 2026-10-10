@@ -1,3 +1,0 @@
-Created and inspected the MPFB model with teal shirt, charcoal trousers, dark shoes and short hair. Preserved connected body topology and helper masking; adjusted male proportions, leg length, arm pose and hand position.
-
-Used the concept’s A-pose to reconcile the conflicting side view. No local garment or hair assets were found. Facial likeness, hair, garment edges and hand anatomy remain visibly approximate.

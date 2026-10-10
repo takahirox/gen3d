@@ -5,14 +5,13 @@ import path from 'node:path';
 import os from 'node:os';
 import { once } from 'node:events';
 import http from 'node:http';
+import net from 'node:net';
 import { zstdCompressSync, gzipSync, crc32 } from 'node:zlib';
 import { Transformer } from '@napi-rs/image';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createApp } from '../src/server.js';
 import { Store, imageData } from '../src/store.js';
-import { mpfbCode, mpfbResult } from '../src/mpfb.js';
-import { matchingComparison } from '../web/modeling-state.js';
 import { CodexReferenceInspector, requiredViews } from '../src/reference-set.js';
 import { CodexConceptGenerator } from '../src/concept.js';
 import { Runner, subscriptionEnv, codexArgs, validateArtifacts, runProcess } from '../src/runner.js';
@@ -36,7 +35,6 @@ function artifacts(dir) {
   fs.writeFileSync(path.join(dir, 'model.glb'), glb);
   fs.writeFileSync(path.join(dir, 'scene.blend'), 'BLENDER-test-fixture');
   fs.writeFileSync(path.join(dir, 'preview.png'), png);
-  for (const view of ['front', 'side', 'three-quarter']) fs.writeFileSync(path.join(dir, view + '.png'), png);
   fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"execute_blender_code"}\n');
 }
 async function app(t, generate = async (p, v, dir) => artifacts(dir)) {
@@ -75,7 +73,20 @@ test('text and image inputs persist and invalid images leave no project', t => {
   assert.equal(b.mode, 'image'); assert.deepEqual(fs.readFileSync(store.artifact(b.id, b.inputImage)), png);
   assert.throws(() => store.create({ name: 'bad', mode: 'image', image: 'data:image/png;base64,YmFk' }, 'web'), /Invalid/);
   assert.equal(store.list().length, 2);
-  const reloaded = new Store(dir); assert.equal(reloaded.get(a.id).prompt, input.prompt); assert.equal(reloaded.get(b.id).activity[0].actor, 'mcp');
+  const reloaded = new Store(dir);
+  assert.equal(a.schemaVersion, 1); assert.equal(b.schemaVersion, 1);
+  assert.deepEqual(reloaded.get(a.id), a); assert.deepEqual(reloaded.get(b.id), b);
+});
+
+test('unsupported schema stops startup without rewriting projects or deleting unrelated data', t => {
+  const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
+  p.schemaVersion = 999; store.save(p);
+  const manifest = path.join(store.dir(p.id), 'project.json'), saved = fs.readFileSync(manifest);
+  const unrelated = path.join(dir, 'unrelated.txt'); fs.writeFileSync(unrelated, 'Leave this file alone');
+  assert.throws(() => createApp({ dataDir: dir }), /Unsupported project schema.*Start fresh/);
+  assert.deepEqual(fs.readFileSync(manifest), saved);
+  assert.equal(fs.readFileSync(unrelated, 'utf8'), 'Leave this file alone');
+  assert.equal(fs.existsSync(path.join(dir, 'server.lock')), false);
 });
 
 test('pending concepts gate generation and only human-reviewed references enter snapshots', async t => {
@@ -97,11 +108,19 @@ test('revision copies source scene, preserves artifacts, snapshots prompt and br
   runner.start(p.id, {}, 'web'); await runner.pending;
   const first = p.versions[0], old = fs.readFileSync(store.artifact(p.id, first.artifacts.glb));
   store.reviewVersion(p.id, first.id, 'approved', 'web');
-  store.update(p.id, { prompt: 'A larger robot' }, 'mcp');
+  store.update(p.id, { prompt: 'A brass kettle', profile: 'object' }, 'mcp');
   runner.start(p.id, { kind: 'revision', sourceVersionId: first.id, feedback: 'Longer arms' }, 'web'); await runner.pending;
   runner.start(p.id, { kind: 'revision', sourceVersionId: first.id, feedback: 'Orange eyes' }, 'mcp'); await runner.pending;
   assert.equal(p.versions.length, 3); assert.equal(first.prompt, input.prompt); assert.equal(first.review, 'approved');
   assert.equal(p.versions[1].feedback, 'Longer arms'); assert.equal(p.versions[2].sourceVersionId, first.id);
+  for (const revision of p.versions.slice(1)) {
+    assert.equal(revision.profile, first.profile);
+    assert.equal(revision.conceptId, first.conceptId);
+    assert.equal(revision.referenceSetId, first.referenceSetId);
+    assert.deepEqual(revision.modelingImages, first.modelingImages);
+    assert.deepEqual(revision.imageInputs, first.imageInputs);
+    assert.equal(revision.referenceFingerprint, first.referenceFingerprint);
+  }
   assert.deepEqual(fs.readFileSync(store.artifact(p.id, first.artifacts.glb)), old);
   assert.equal(new Store(store.root).get(p.id).versions.length, 3);
 });
@@ -231,7 +250,37 @@ test('CLI invocation uses image attachments, ChatGPT auth, workspace sandbox and
   assert.ok(args.includes('workspace-write')); assert.ok(args.includes('--ignore-user-config')); assert.ok(args.includes('forced_login_method="chatgpt"'));
   assert.equal(args.filter(a => a === '--image').length, 2); assert.ok(!args.includes('--model')); assert.ok(!args.includes('--dangerously-bypass-approvals-and-sandbox'));
   assert.ok(args.includes('mcp_servers.gen3d_blender.tools.execute_blender_code.approval_mode="approve"'));
+  assert.ok(args.includes('mcp_servers.gen3d_blender.enabled_tools=["get_scene_info","execute_blender_code"]'));
   assert.equal(args.at(-2), '--');
+});
+
+test('Blender MCP exposes the two ordinary tools, dispatches to the bridge and audits only successful calls', async t => {
+  const dir = temporary(t), requests = []; let fail = false;
+  const bridge = net.createServer(socket => {
+    let data = '';
+    socket.on('data', chunk => {
+      data += chunk;
+      if (!data.includes('\n')) return;
+      requests.push(JSON.parse(data.split('\n')[0]));
+      socket.end(JSON.stringify(fail ? { status: 'error', message: 'Fixture Blender error' }
+        : { status: 'success', result: { meshes: 1 } }) + '\n');
+    });
+  });
+  bridge.listen(0, '127.0.0.1'); await once(bridge, 'listening');
+  const client = new Client({ name: 'blender-bridge-test', version: '1' });
+  t.after(async () => { await client.close(); await new Promise(resolve => bridge.close(resolve)); });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/blender-mcp.js')],
+    env: { ...process.env, GEN3D_BLENDER_PORT: String(bridge.address().port), GEN3D_AUDIT_DIR: dir }, stderr: 'pipe' }));
+  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['get_scene_info', 'execute_blender_code']);
+  assert.equal((await client.callTool({ name: 'get_scene_info', arguments: {} })).isError, undefined);
+  assert.equal((await client.callTool({ name: 'execute_blender_code', arguments: { code: 'import bpy' } })).isError, undefined);
+  assert.deepEqual(requests.map(r => r.type), ['get_scene_info', 'execute_code']);
+  assert.deepEqual(requests[1].params, { code: 'import bpy' });
+  fail = true;
+  assert.equal((await client.callTool({ name: 'execute_blender_code', arguments: { code: 'raise RuntimeError()' } })).isError, true);
+  const audit = fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(audit.map(e => e.tool), ['get_scene_info', 'execute_blender_code']);
+  assert.match(audit[1].codeHash, /^[a-f0-9]{64}$/);
 });
 
 test('Codex usage errors terminate the child and block completion', async () => {
@@ -333,222 +382,6 @@ test('profile changes scope pending and rejected concepts to the current design 
   }
 });
 
-test('legacy model revisions retain their own concept, review request and all images across project edits and restart', async t => {
-  for (const multiView of [true, false]) {
-    const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
-    const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
-    runner.start(p.id, {}, 'web'); await runner.pending;
-    const source = p.versions[0];
-    const sourceBytes = fs.readFileSync(store.artifact(p.id, source.artifacts.blend));
-    // Persist a pre-multi-view project: completed concept/model, no typed views.
-    delete source.referenceSetId; delete source.modelingImages; delete source.imageInputs;
-    delete p.concepts[0].profile; delete p.profile; delete p.referenceSets; delete p.selectedReferenceSetId;
-    delete p.checkpoints.multiView; store.save(p);
-    const legacy = structuredClone(source);
-    const loaded = new Store(dir), current = loaded.get(p.id);
-    const resumed = new Runner(loaded, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
-    loaded.update(p.id, { prompt: 'A brass teapot', profile: 'object', checkpoints: { multiView: false } }, 'web');
-    resumed.start(p.id, {}, 'web'); await resumed.pending;
-    const selectedConceptId = current.selectedConceptId, selectedReferenceSetId = current.selectedReferenceSetId;
-    loaded.update(p.id, { checkpoints: { multiView } }, 'web');
-    const request = { kind: 'revision', sourceVersionId: source.id, feedback: 'Lengthen the original robot arms' };
-    resumed.start(p.id, request, 'web'); await resumed.pending;
-    const set = current.referenceSets.at(-1);
-    assert.equal(set.prompt, input.prompt); assert.equal(set.profile, 'character'); assert.equal(set.conceptId, source.conceptId);
-    assert.deepEqual(set.request, request); assert.equal(set.images.length, 4);
-    assert.equal(current.selectedConceptId, selectedConceptId); assert.equal(current.selectedReferenceSetId, selectedReferenceSetId);
-    if (multiView) {
-      assert.equal(current.versions.length, 2); assert.equal(set.review, 'pending');
-      assert.throws(() => resumed.start(p.id, request, 'web'), /reviewed reference set/);
-      assert.throws(() => resumed.reviewReferenceSet(p.id, set.id, 'approved', 'mcp'), /web UI/);
-      loaded.update(p.id, { prompt: 'A silver teapot', checkpoints: { multiView: false } }, 'web');
-      const reloaded = new Store(dir), restored = reloaded.get(p.id);
-      const pending = restored.referenceSets.at(-1);
-      const continued = new Runner(reloaded, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => {
-        assert.deepEqual(fs.readFileSync(path.join(dir, 'source.blend')), sourceBytes); artifacts(dir);
-      } });
-      assert.equal(pending.review, 'pending'); assert.equal(pending.checkpoints.multiView, true);
-      assert.throws(() => continued.start(p.id, request, 'web'), /reviewed reference set/);
-      const savedSource = pending.request.sourceVersionId;
-      pending.request.sourceVersionId = 'missing-source';
-      assert.throws(() => continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'), /selected concept or source revision/);
-      pending.request.sourceVersionId = savedSource;
-      const back = pending.images.pop();
-      assert.throws(() => continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'), /complete reference set/);
-      pending.images.push(back);
-      continued.reviewReferenceSet(p.id, pending.id, 'rejected', 'web');
-      assert.equal(restored.versions.length, 2); assert.equal(pending.review, 'rejected');
-      continued.reviewReferenceSet(p.id, pending.id, 'approved', 'web'); await continued.pending;
-      assert.equal(restored.versions.length, 3); assert.equal(restored.versions[2].status, 'ready');
-      assert.equal(restored.selectedConceptId, null); assert.equal(restored.selectedReferenceSetId, null);
-      assert.deepEqual(restored.versions[0], legacy);
-      assert.ok(restored.activity.some(e => e.referenceSetId === set.id && e.decision === 'rejected'));
-    } else {
-      assert.equal(current.versions.length, 3); assert.equal(set.review, 'approved');
-    }
-    const saved = new Store(dir).get(p.id), revision = saved.versions[2], savedSet = saved.referenceSets.at(-1);
-    assert.deepEqual(saved.versions[0], legacy); assert.equal(revision.sourceVersionId, source.id);
-    assert.equal(revision.prompt, input.prompt); assert.equal(revision.feedback, request.feedback);
-    assert.equal(revision.referenceSetId, set.id); assert.deepEqual(revision.modelingImages, savedSet.images);
-    assert.deepEqual(revision.imageInputs, [saved.concepts[0].artifacts.image, ...savedSet.images.map(i => i.file)]);
-    for (const file of revision.imageInputs) assert.deepEqual(fs.readFileSync(new Store(dir).artifact(p.id, file)), png);
-  }
-});
-
-test('regenerating legacy revision views retains the source, modeling feedback and history across edits and restart', async t => {
-  for (const edit of ['none', 'before revision', 'after views']) for (const outcome of ['pending', 'inconsistent', 'failed']) for (const multiView of [true, false]) {
-    await t.test(`${edit}, ${outcome}, replacement review ${multiView}`, async t => {
-      const dir = temporary(t), initialStore = new Store(dir), p = initialStore.create(input, 'web');
-      const initialRunner = new Runner(initialStore, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
-      initialRunner.start(p.id, {}, 'web'); await initialRunner.pending;
-      const source = p.versions[0], conceptId = source.conceptId;
-      const sourceBytes = fs.readFileSync(initialStore.artifact(p.id, source.artifacts.blend));
-      delete source.referenceSetId; delete source.modelingImages; delete source.imageInputs;
-      delete p.concepts[0].profile; p.referenceSets = []; p.selectedReferenceSetId = null; initialStore.save(p);
-      const legacy = structuredClone(source), store = new Store(dir), current = store.get(p.id);
-      const viewCalls = [], runner = new Runner(store, {
-        conceptGenerator: { ...conceptGenerator, generateViews: async task => {
-          viewCalls.push({ conceptId: task.conceptId, conceptFile: task.conceptFile, prompt: task.prompt, profile: task.profile, feedback: task.feedback });
-          if (outcome === 'failed') {
-            await task.onImage({ view: 'front', bytes: png, ext: 'png' });
-            throw new Error('View provider unavailable');
-          }
-          await generateViews(task);
-        } },
-        inspectReferences: outcome === 'inconsistent' ? async () => ({ consistent: false, issues: ['Rear arms changed color'] }) : inspectReferences,
-        generate: async (p, v, dir) => artifacts(dir)
-      });
-      if (edit === 'before revision') {
-        store.update(p.id, { prompt: 'A brass teapot', profile: 'object' }, 'web');
-        const currentDesignRunner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
-        currentDesignRunner.start(p.id, {}, 'web'); await currentDesignRunner.pending;
-      }
-      store.update(p.id, { checkpoints: { multiView: true } }, 'web');
-      const request = { kind: 'revision', sourceVersionId: source.id, feedback: 'Lengthen the original robot arms' };
-      runner.start(p.id, request, 'web'); await runner.pending;
-      const oldSet = current.referenceSets.at(-1), modelCount = current.versions.length;
-      assert.equal(oldSet.status, outcome === 'failed' ? 'failed' : 'ready');
-      assert.equal(oldSet.consistency.status, outcome === 'inconsistent' ? 'failed' : outcome === 'failed' ? 'pending' : 'passed');
-      assert.equal(modelCount, edit === 'before revision' ? 2 : 1);
-      if (edit === 'after views') store.update(p.id, { prompt: 'A silver teapot', profile: 'object' }, 'web');
-      const selectedConceptId = current.selectedConceptId, selectedReferenceSetId = current.selectedReferenceSetId;
-      store.update(p.id, { checkpoints: { multiView } }, 'web');
-      // Reload both before regeneration and while the replacement awaits review.
-      const resumedStore = new Store(dir), resumedProject = resumedStore.get(p.id), replacementCalls = [];
-      const model = async (p, v, dir) => {
-        assert.equal(v.kind, 'revision'); assert.equal(v.sourceVersionId, source.id);
-        assert.equal(v.prompt, input.prompt); assert.equal(v.feedback, request.feedback);
-        assert.equal(v.conceptId, conceptId);
-        assert.deepEqual(fs.readFileSync(path.join(dir, 'source.blend')), sourceBytes);
-        const task = fs.readFileSync(path.join(dir, 'TASK.md'), 'utf8');
-        assert.match(task, /Revise the existing geometry/); assert.ok(task.includes(request.feedback));
-        assert.ok(!task.includes('Restore teal rear arms')); artifacts(dir);
-      };
-      const resumed = new Runner(resumedStore, { conceptGenerator: { ...conceptGenerator, generateViews: async task => {
-        replacementCalls.push({ conceptId: task.conceptId, conceptFile: task.conceptFile, prompt: task.prompt, profile: task.profile, feedback: task.feedback });
-        await generateViews(task);
-      } }, inspectReferences, generate: model });
-      assert.throws(() => resumed.regenerateReferenceSet(p.id, { referenceSetId: 'missing' }, 'web'), /Reference set not found/);
-      if (outcome !== 'failed') assert.throws(() => resumed.regenerateReferenceSet(p.id, { referenceSetId: oldSet.id }, 'mcp'), /Reject pending/);
-      resumed.regenerateReferenceSet(p.id, { ...(edit === 'none' ? {} : { referenceSetId: oldSet.id }), feedback: 'Restore teal rear arms' }, 'web'); await resumed.pending;
-      const replacement = resumedProject.referenceSets.at(-1), savedOldSet = structuredClone(resumedProject.referenceSets.find(s => s.id === oldSet.id));
-      assert.equal(replacement.parentReferenceSetId, oldSet.id);
-      assert.deepEqual(replacement.request, request); assert.equal(replacement.feedback, 'Restore teal rear arms');
-      assert.notEqual(replacement.request, resumedProject.referenceSets.find(s => s.id === oldSet.id).request);
-      assert.equal(replacement.conceptId, conceptId); assert.equal(replacement.images.length, 4);
-      assert.equal(resumedProject.selectedConceptId, selectedConceptId);
-      // A replacement for the current design may become selected; a historical
-      // revision must leave the new project's selection unchanged.
-      if (edit !== 'none') assert.equal(resumedProject.selectedReferenceSetId, selectedReferenceSetId);
-      assert.deepEqual(viewCalls, [{ conceptId, conceptFile: store.artifact(p.id, current.concepts[0].artifacts.image), prompt: input.prompt, profile: 'character', feedback: '' }]);
-      assert.deepEqual(replacementCalls, [{ ...viewCalls[0], feedback: 'Restore teal rear arms' }]);
-      assert.equal(savedOldSet.review, outcome === 'failed' ? 'pending' : 'rejected');
-      assert.deepEqual(resumedProject.versions[0], legacy);
-      const finalStore = new Store(dir), finalProject = finalStore.get(p.id);
-      const continued = new Runner(finalStore, { conceptGenerator, inspectReferences, generate: model });
-      if (multiView) {
-        assert.equal(finalProject.versions.length, modelCount); assert.equal(finalProject.referenceSets.at(-1).review, 'pending');
-        assert.throws(() => continued.start(p.id, request, 'web'), /Review the multi-view|reviewed reference set/);
-        assert.throws(() => continued.reviewReferenceSet(p.id, replacement.id, 'approved', 'mcp'), /web UI/);
-        continued.reviewReferenceSet(p.id, replacement.id, 'approved', 'web'); await continued.pending;
-      }
-      assert.equal(finalProject.versions.length, modelCount + 1);
-      const revision = finalProject.versions.at(-1);
-      assert.equal(revision.status, 'ready'); assert.equal(revision.referenceSetId, replacement.id);
-      assert.deepEqual(revision.modelingImages, JSON.parse(JSON.stringify(replacement.images)));
-      assert.deepEqual(revision.imageInputs, [finalProject.concepts[0].artifacts.image, ...replacement.images.map(i => i.file)]);
-      assert.deepEqual(finalProject.referenceSets.find(s => s.id === oldSet.id), savedOldSet);
-      assert.deepEqual(finalProject.versions[0], legacy);
-      for (const img of oldSet.images) assert.deepEqual(fs.readFileSync(finalStore.artifact(p.id, img.file)), png);
-      assert.deepEqual(new Store(dir).get(p.id).versions.at(-1), JSON.parse(JSON.stringify(revision)));
-    });
-  }
-});
-
-test('approving older legacy revision views models their exact images after replacement decisions and restart', async t => {
-  for (const replacementDecision of ['rejected', 'approved']) for (const restart of [false, true]) for (const historical of [false, true]) {
-    await t.test(`replacement ${replacementDecision}, restart ${restart}, historical design ${historical}`, async t => {
-      const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
-      const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => artifacts(dir) });
-      runner.start(p.id, {}, 'web'); await runner.pending;
-      const source = p.versions[0];
-      delete source.referenceSetId; delete source.modelingImages; delete source.imageInputs;
-      p.referenceSets = []; p.selectedReferenceSetId = null; store.save(p);
-      const legacy = structuredClone(source);
-      if (historical) {
-        store.update(p.id, { prompt: 'A brass teapot', profile: 'object' }, 'web');
-        runner.start(p.id, {}, 'web'); await runner.pending;
-      }
-      const selectedConceptId = p.selectedConceptId, selectedReferenceSetId = p.selectedReferenceSetId;
-      store.update(p.id, { checkpoints: { multiView: true } }, 'web');
-      const request = { kind: 'revision', sourceVersionId: source.id, feedback: 'Lengthen the original robot arms' };
-      runner.start(p.id, request, 'web'); await runner.pending;
-      const older = p.referenceSets.at(-1);
-      runner.regenerateReferenceSet(p.id, { referenceSetId: older.id, feedback: 'Restore rear arm colors' }, 'web'); await runner.pending;
-      const replacement = p.referenceSets.at(-1);
-      assert.equal(older.review, 'rejected'); assert.equal(older.consistency.status, 'passed');
-      assert.deepEqual(replacement.request, older.request);
-      runner.reviewReferenceSet(p.id, replacement.id, replacementDecision, 'web'); await runner.pending;
-      if (replacementDecision === 'approved') assert.equal(p.versions.at(-1).referenceSetId, replacement.id);
-      const continuedStore = restart ? new Store(dir) : store, continuedProject = continuedStore.get(p.id);
-      const replacementSnapshot = structuredClone(continuedProject.referenceSets.find(s => s.id === replacement.id));
-      const versionsSnapshot = structuredClone(continuedProject.versions);
-      let modelCalls = 0;
-      const continued = new Runner(continuedStore, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => {
-        modelCalls++;
-        assert.equal(v.referenceSetId, older.id); assert.equal(v.sourceVersionId, source.id);
-        assert.equal(v.prompt, input.prompt); assert.equal(v.feedback, request.feedback);
-        assert.deepEqual(v.modelingImages, p.referenceSets.find(s => s.id === older.id).images);
-        assert.deepEqual(v.imageInputs, [p.concepts[0].artifacts.image, ...older.images.map(i => i.file)]);
-        assert.ok(!v.imageInputs.some(file => replacement.images.some(i => i.file === file)));
-        assert.equal(fs.readFileSync(path.join(dir, 'source.blend'), 'utf8'), 'BLENDER-test-fixture');
-        artifacts(dir);
-      } });
-      // Explicit IDs cannot be used to bypass request association or approval.
-      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: 'missing' }, 'web'), /Reference set not found/);
-      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, feedback: 'Different revision' }, 'web'), /does not match the modeling request/);
-      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, kind: 'generate' }, 'web'), /does not match the modeling request/);
-      if (historical) assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id, sourceVersionId: p.versions[1].id }, 'web'), /does not match the modeling request/);
-      assert.throws(() => continued.start(p.id, { ...request, referenceSetId: older.id }, 'web'), /reviewed reference set/);
-      assert.equal(modelCalls, 0); assert.equal(continuedProject.versions.length, versionsSnapshot.length);
-      continued.reviewReferenceSet(p.id, older.id, 'approved', 'web'); await continued.pending;
-      assert.equal(modelCalls, 1); assert.equal(continuedProject.versions.at(-1).status, 'ready');
-      assert.equal(continuedProject.versions.length, versionsSnapshot.length + 1);
-      assert.deepEqual(continuedProject.versions.slice(0, -1), versionsSnapshot);
-      assert.deepEqual(continuedProject.versions[0], legacy);
-      assert.deepEqual(continuedProject.referenceSets.find(s => s.id === replacement.id), replacementSnapshot);
-      if (historical) {
-        assert.equal(continuedProject.selectedConceptId, selectedConceptId);
-        assert.equal(continuedProject.selectedReferenceSetId, selectedReferenceSetId);
-      }
-      const saved = new Store(dir).get(p.id), revision = saved.versions.at(-1);
-      assert.equal(revision.referenceSetId, older.id); assert.deepEqual(revision.modelingImages, saved.referenceSets.find(s => s.id === older.id).images);
-      assert.deepEqual(revision.imageInputs, [saved.concepts[0].artifacts.image, ...older.images.map(i => i.file)]);
-      assert.ok(saved.activity.some(e => e.referenceSetId === older.id && e.decision === 'approved'));
-    });
-  }
-});
-
 test('disabled checkpoints auto-continue and a replaceable generator needs no Blender-flow changes', async t => {
   const store = new Store(temporary(t)), p = store.create(input, 'web');
   let generated = 0;
@@ -586,19 +419,6 @@ test('unavailable, invalid and usage-limited concept providers never invoke mode
     assert.equal(p.versions.length, 0); assert.equal(p.concepts[0].status, 'failed'); assert.ok(p.concepts[0].error);
     if (runner.usageLimited) assert.throws(() => runner.regenerateConcept(p.id, {}, 'web'), /usage limit/);
   }
-});
-
-test('legacy text projects cannot bypass mandatory concepts and interrupted concepts recover', async t => {
-  const store = new Store(temporary(t)), p = store.create(input, 'web');
-  p.versions.push({ id: 'legacy', status: 'ready', artifacts: {}, review: 'approved' });
-  delete p.concepts; delete p.checkpoints; delete p.inputReview; store.save(p);
-  const loaded = new Store(store.root), current = loaded.get(p.id);
-  const runner = new Runner(loaded, { conceptGenerator, generate: () => assert.fail('Must wait for concept review') });
-  runner.start(p.id, {}, 'web'); await runner.pending;
-  assert.equal(current.concepts.length, 1); assert.equal(current.versions.length, 1);
-  current.concepts.push({ id: 'interrupted', status: 'running' }); loaded.save(current);
-  const recovered = new Store(store.root).get(p.id);
-  assert.equal(recovered.concepts[1].status, 'failed'); assert.equal(recovered.activity.at(-1).type, 'concept_interrupted');
 });
 
 test('HTTP and MCP expose the same concept state and cannot approve enabled human checkpoints', async t => {
@@ -806,45 +626,6 @@ test('HTTP/MCP share view artifacts, pending reviews, regeneration, consistency 
   await a.request(`/api/projects/${p.id}/reference-sets/${next.id}/review`, 'POST', { decision: 'approved' }); await a.runner.pending;
   const shared = JSON.parse((await client.callTool({ name: 'get_project', arguments: { projectId: p.id } })).content[0].text);
   assert.equal(shared.referenceSets[0].review, 'rejected'); assert.equal(shared.versions[0].referenceSetId, next.id);
-});
-
-test('HTTP and MCP target historical revision sets without changing another revision request or the selected design', async t => {
-  const a = await app(t), p = a.store.create(input, 'web');
-  a.runner.start(p.id, {}, 'web'); await a.runner.pending;
-  const source = p.versions[0]; delete source.referenceSetId; delete source.modelingImages; delete source.imageInputs;
-  p.referenceSets = []; p.selectedReferenceSetId = null; a.store.save(p);
-  a.store.update(p.id, { prompt: 'A brass teapot', profile: 'object' }, 'web');
-  a.runner.start(p.id, {}, 'web'); await a.runner.pending;
-  const selectedConceptId = p.selectedConceptId, selectedReferenceSetId = p.selectedReferenceSetId;
-  a.store.update(p.id, { checkpoints: { multiView: true } }, 'web');
-  const request = { kind: 'revision', sourceVersionId: source.id, feedback: 'Longer robot arms' };
-  a.runner.start(p.id, request, 'web'); await a.runner.pending;
-  const target = p.referenceSets.at(-1);
-  a.runner.start(p.id, { ...request, feedback: 'Wider robot shoulders' }, 'web'); await a.runner.pending;
-  const other = p.referenceSets.at(-1), otherSnapshot = structuredClone(other);
-  const client = new Client({ name: 'revision-views-test', version: '1' });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/mcp.js')], env: { ...process.env, GEN3D_URL: a.url }, stderr: 'pipe' })); t.after(() => client.close());
-  const denied = await client.callTool({ name: 'regenerate_reference_set', arguments: { projectId: p.id, referenceSetId: target.id } });
-  assert.equal(denied.isError, true); assert.match(denied.content[0].text, /Reject pending/);
-  await a.request(`/api/projects/${p.id}/reference-sets/${target.id}/review`, 'POST', { decision: 'rejected' });
-  const result = await client.callTool({ name: 'regenerate_reference_set', arguments: { projectId: p.id, referenceSetId: target.id, feedback: 'Restore the rear panel' } });
-  assert.ok(!result.isError); await a.runner.pending;
-  const replacement = p.referenceSets.at(-1);
-  assert.equal(replacement.parentReferenceSetId, target.id); assert.equal(replacement.conceptId, source.conceptId);
-  assert.deepEqual(replacement.request, request); assert.equal(replacement.feedback, 'Restore the rear panel');
-  assert.deepEqual(other, otherSnapshot); assert.equal(other.review, 'pending');
-  assert.equal(p.selectedConceptId, selectedConceptId); assert.equal(p.selectedReferenceSetId, selectedReferenceSetId);
-  assert.equal((await a.request(`/api/projects/${p.id}/reference-sets/${replacement.id}/review`, 'POST', { decision: 'approved' })).status, 200); await a.runner.pending;
-  assert.equal(p.versions.at(-1).kind, 'revision'); assert.equal(p.versions.at(-1).sourceVersionId, source.id);
-  assert.equal(p.versions.at(-1).feedback, request.feedback); assert.equal(p.versions.at(-1).referenceSetId, replacement.id);
-  const shared = JSON.parse((await client.callTool({ name: 'get_project', arguments: { projectId: p.id } })).content[0].text);
-  assert.deepEqual(shared, (await a.request(`/api/projects/${p.id}`)).data);
-  // The web endpoint accepts the same explicit target and records its request.
-  const webReplacement = await a.request(`/api/projects/${p.id}/reference-sets`, 'POST', { referenceSetId: other.id, feedback: 'Keep shoulder proportions' });
-  assert.equal(webReplacement.status, 202); await a.runner.pending;
-  assert.equal(p.referenceSets.at(-1).request.feedback, other.request.feedback);
-  assert.equal(p.referenceSets.at(-1).parentReferenceSetId, other.id);
-  assert.equal(other.review, 'rejected'); assert.equal(p.versions.length, 3);
 });
 
 test('real modeling boundary attaches all required images in order, rejects missing/tampered sets and retains image input', async t => {
@@ -1105,7 +886,7 @@ test('human multi-view approval gates every policy across restart and settings c
   });
 });
 
-test('consistency defaults migrate old projects conservatively and reject invalid settings without mutation', t => {
+test('consistency defaults persist and reject invalid settings without mutation', t => {
   const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
   assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'stop' });
   for (const bad of [null, [], false, { enabled: 'off' }, { onFailure: 'ignore' }, { other: true }]) {
@@ -1114,7 +895,6 @@ test('consistency defaults migrate old projects conservatively and reject invali
     assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'stop' });
   }
   assert.equal(store.list().length, 1);
-  delete p.consistencySettings; store.save(p);
   assert.deepEqual(new Store(dir).get(p.id).consistencySettings, { enabled: true, onFailure: 'stop' });
 });
 
@@ -1189,131 +969,3 @@ test('continue mode stops on inspection usage limits without retry and preserves
 
 
 // Issue #16: mocked workflows exercise policy/state; live Blender evidence is separate.
-const mpfbEvidence = { available: true, module: 'bl_ext.user_default.mpfb', mpfbVersion: '2.0.17', blenderVersion: '5.1.2', api: 'HumanService.create_human', vertices: 19158, polygons: 18486, topologyPreserved: true };
-function humanoidArtifacts(dir, mode) {
-  artifacts(dir);
-  if (mode === 'mpfb') {
-    fs.appendFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"create_mpfb_human"}\n');
-    fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify(mpfbEvidence));
-  }
-}
-
-test('modeling selection validates humanoids, preserves references, persists and defaults legacy scenes to scratch', async t => {
-  const root = temporary(t), store = new Store(root), p = store.create({ ...input, profile: 'character' }, 'web');
-  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => humanoidArtifacts(dir, v.modelingMode) });
-  runner.start(p.id, {}, 'web'); await runner.pending;
-  const baseline = structuredClone(p.versions[0]), concepts = structuredClone(p.concepts), sets = structuredClone(p.referenceSets);
-  store.update(p.id, { modelingMode: 'mpfb' }, 'mcp');
-  assert.deepEqual(p.concepts, concepts); assert.deepEqual(p.referenceSets, sets); assert.deepEqual(p.versions[0], baseline);
-  runner.start(p.id, { kind: 'retry' }, 'web'); await runner.pending;
-  const assisted = p.versions[1]; assert.equal(assisted.status, 'ready'); assert.equal(assisted.modelingMode, 'mpfb');
-  assert.equal(assisted.referenceFingerprint, baseline.referenceFingerprint); assert.deepEqual(assisted.imageInputs, baseline.imageInputs);
-  assert.equal(assisted.referenceSetId, baseline.referenceSetId); assert.equal(assisted.conceptId, baseline.conceptId);
-  assert.equal(matchingComparison(p.versions, assisted).id, baseline.id);
-  assert.ok(assisted.artifacts.front && assisted.artifacts.side && assisted.artifacts['three-quarter'] && assisted.artifacts.mpfb);
-  assert.match(fs.readFileSync(store.artifact(p.id, assisted.artifacts.task), 'utf8'), /create_mpfb_human/);
-  runner.start(p.id, { kind: 'revision', sourceVersionId: baseline.id, feedback: 'Widen shoulders' }, 'web'); await runner.pending;
-  assert.equal(p.versions[2].modelingMode, 'scratch');
-  store.update(p.id, { modelingMode: 'scratch', profile: 'object', prompt: 'A kettle' }, 'web');
-  runner.start(p.id, { kind: 'revision', sourceVersionId: assisted.id, feedback: 'Widen shoulders' }, 'web'); await runner.pending;
-  assert.equal(p.versions[3].modelingMode, 'mpfb'); assert.equal(p.versions[3].profile, 'character');
-  assert.deepEqual(p.versions[3].imageInputs, assisted.imageInputs);
-  assert.match(fs.readFileSync(store.artifact(p.id, p.versions[3].artifacts.task), 'utf8'), /do not call create_mpfb_human again/);
-  assert.equal(new Store(root).get(p.id).versions[1].modelingMode, 'mpfb');
-  assert.throws(() => store.update(p.id, { modelingMode: 'mpfb' }, 'web'), /Humanoid/);
-  assert.throws(() => store.create({ ...input, modelingMode: 'automatic' }, 'web'), /Modeling mode/);
-  assert.throws(() => store.create({ ...input, profile: 'object', modelingMode: 'mpfb' }, 'web'), /Humanoid/);
-  delete p.modelingMode; delete p.versions[0].modelingMode; store.save(p);
-  const legacy = new Store(root).get(p.id); assert.equal(legacy.modelingMode, 'scratch'); assert.equal(legacy.versions[0].modelingMode, 'scratch');
-});
-
-test('MPFB selection cannot dismiss pending review or bypass consistency policy', async t => {
-  const store = new Store(temporary(t)), p = store.create({ ...input, profile: 'character', checkpoints: { ...input.checkpoints, multiView: true } }, 'web');
-  let generations = 0;
-  const runner = new Runner(store, { conceptGenerator, inspectReferences, generate: async (p, v, dir) => { generations++; humanoidArtifacts(dir, v.modelingMode); } });
-  runner.start(p.id, {}, 'web'); await runner.pending;
-  const set = p.referenceSets[0]; store.update(p.id, { modelingMode: 'mpfb', consistencySettings: { enabled: false } }, 'web');
-  assert.equal(set.review, 'pending'); assert.equal(set.consistency.status, 'passed');
-  assert.throws(() => runner.start(p.id, {}, 'mcp'), /Review the multi-view/); assert.equal(generations, 0);
-  runner.reviewReferenceSet(p.id, set.id, 'approved', 'web'); await runner.pending;
-  assert.equal(p.versions[0].modelingMode, 'mpfb'); assert.deepEqual(p.versions[0].consistencySettings, set.consistencySettings);
-});
-
-test('MPFB preflight failures stop before scene clearing and modeling; explicit scratch retry works without MPFB', async t => {
-  for (const error of ['MPFB is missing or disabled. Install and enable MPFB; see docs/mpfb.md.', 'MPFB API is incompatible. See docs/mpfb.md.']) {
-    const store = new Store(temporary(t)), p = store.create({ ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' }, 'web');
-    const calls = [], operations = [];
-    const runner = new Runner(store, { processRunner: async (cmd, args) => { calls.push(args); return args[0] === 'login' ? 'Logged in using ChatGPT' : 'done'; },
-      blender: async (type, { code }) => {
-        operations.push({ type, code });
-        if (code?.includes("gen3d_mpfb_status()))")) throw new Error(error);
-        if (code?.includes('export_scene.gltf')) artifacts(path.join(store.dir(p.id), 'versions', p.versions.at(-1).id));
-      } });
-    runner.start(p.id, {}, 'web'); await runner.pending;
-    assert.equal(p.versions[0].status, 'failed'); assert.equal(p.versions[0].error, error);
-    assert.equal(calls.length, 1); assert.equal(operations.length, 2);
-    assert.ok(!operations.some(o => o.code?.includes('bpy.data.objects.remove')));
-    assert.ok(p.versions[0].artifacts.task); assert.equal(runner.usageLimited, false);
-    store.update(p.id, { modelingMode: 'scratch' }, 'web');
-    runner.start(p.id, { kind: 'retry' }, 'web'); await runner.pending;
-    assert.equal(p.versions[1].status, 'ready'); assert.equal(p.versions[0].modelingMode, 'mpfb');
-  }
-});
-
-test('MPFB production boundary records validation, attaches uploaded image and exposes local creation only in MPFB jobs', async t => {
-  const store = new Store(temporary(t)), p = store.create({ ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' }, 'web');
-  const calls = [], operations = [];
-  const runner = new Runner(store, { processRunner: async (cmd, args) => { calls.push(args); return args[0] === 'login' ? 'Logged in using ChatGPT' : 'done'; },
-    blender: async (type, { code }) => {
-      operations.push(code);
-      if (code?.includes('GEN3D_MPFB_RESULT=')) return { output: 'local diagnostic\nGEN3D_MPFB_RESULT=' + JSON.stringify(mpfbEvidence) + '\n' };
-      if (code?.includes('export_scene.gltf')) humanoidArtifacts(path.join(store.dir(p.id), 'versions', p.versions.at(-1).id), 'mpfb');
-    } });
-  runner.start(p.id, {}, 'web'); await runner.pending;
-  const v = p.versions[0]; assert.equal(v.status, 'ready'); assert.deepEqual(v.mpfb, mpfbEvidence); assert.deepEqual(v.imageInputs, [p.inputImage]);
-  const args = calls.find(a => a[0] === 'exec');
-  assert.ok(args.some(a => a.includes('enabled_tools=') && a.includes('create_mpfb_human')));
-  assert.ok(args.some(a => a.includes('GEN3D_MODELING_MODE = "mpfb"')));
-  assert.equal(operations.filter(c => c?.includes('GEN3D_MPFB_RESULT=')).length, 2);
-  assert.ok(codexArgs('/tmp/job', []).some(a => a.includes('enabled_tools=') && !a.includes('mpfb')));
-  assert.throws(() => mpfbResult({ output: 'no result' }), /no result/);
-  assert.equal(mpfbResult({ output: 'GEN3D_MPFB_RESULT={"available":true}\n' }).available, true);
-  assert.match(mpfbCode('create'), /service.create_human/);
-});
-
-test('MPFB cannot finish with a primitive fallback, omitted creation or unverified topology', async t => {
-  for (const failure of ['no creation', 'no body', 'damaged topology', 'missing render']) {
-    const store = new Store(temporary(t)), p = store.create({ ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' }, 'web');
-    const runner = new Runner(store, { generate: async (p, v, dir) => {
-      humanoidArtifacts(dir, 'mpfb');
-      if (failure === 'no creation') fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), '{"tool":"execute_blender_code"}\n');
-      if (failure === 'no body') fs.unlinkSync(path.join(dir, 'mpfb.json'));
-      if (failure === 'damaged topology') fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ ...mpfbEvidence, topologyPreserved: false }));
-      if (failure === 'missing render') fs.unlinkSync(path.join(dir, 'side.png'));
-    } });
-    runner.start(p.id, {}, 'web'); await runner.pending;
-    assert.equal(p.versions[0].status, 'failed'); assert.throws(() => store.canExport(p.id, p.versions[0].id), /completed/);
-  }
-});
-
-test('comparison only pairs completed opposite modes with exactly matching reference fingerprints', () => {
-  const v = { id: 'a', profile: 'character', referenceFingerprint: 'same', modelingMode: 'mpfb', status: 'ready' };
-  const baseline = { ...v, id: 'b', modelingMode: 'scratch' };
-  assert.equal(matchingComparison([v, baseline], v), baseline);
-  for (const patch of [{ referenceFingerprint: 'different' }, { feedback: 'Change the pose' }, { modelingMode: 'mpfb' }, { status: 'failed' }, { profile: 'object' }]) assert.equal(matchingComparison([v, { ...baseline, ...patch }], v), null);
-  assert.equal(matchingComparison([baseline], { ...v, referenceFingerprint: undefined }), null);
-});
-
-test('HTTP and MCP share explicit modeling selection for image and text inputs and validate object exclusion', async t => {
-  const a = await app(t), client = new Client({ name: 'mpfb-test', version: '1' });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/mcp.js')], env: { ...process.env, GEN3D_URL: a.url }, stderr: 'pipe' })); t.after(() => client.close());
-  const created = await client.callTool({ name: 'create_project', arguments: { ...input, mode: 'image', image, profile: 'character', modelingMode: 'mpfb' } });
-  const p = JSON.parse(created.content[0].text); assert.equal(p.modelingMode, 'mpfb');
-  assert.equal((await a.request(`/api/projects/${p.id}`)).data.modelingMode, 'mpfb');
-  await a.request(`/api/projects/${p.id}`, 'PATCH', { modelingMode: 'scratch' });
-  const shared = JSON.parse((await client.callTool({ name: 'get_project', arguments: { projectId: p.id } })).content[0].text); assert.equal(shared.modelingMode, 'scratch');
-  await client.callTool({ name: 'update_project', arguments: { projectId: p.id, modelingMode: 'mpfb' } });
-  assert.equal(a.store.get(p.id).modelingMode, 'mpfb');
-  const denied = await client.callTool({ name: 'update_project', arguments: { projectId: p.id, profile: 'object' } }); assert.equal(denied.isError, true);
-  assert.equal((await a.request(`/api/projects/${p.id}`, 'PATCH', { modelingMode: 'anything' })).status, 400);
-});

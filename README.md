@@ -30,7 +30,7 @@ Open **http://127.0.0.1:3333**. Click **New project** (+), enter text or upload 
 
 Projects can optionally enable bounded render–compare–revise refinement in **Review & settings** (default Off, 1–5 revision cycles). Each cycle consumes Codex time/usage. Original references, comparison reports, renders and intermediate scenes stay inspectable; AI visual passes do not prove geometric accuracy or quality improvement. See [visual refinement](docs/refinement.md).
 
-Humanoid projects can optionally select **MPFB-assisted humanoid** with a user-installed local MPFB add-on. The default **Existing Blender modeling** remains available without MPFB. Both modes share approved images, review/consistency policy, saved-scene revisions and exports; new humanoid versions include front/side/three-quarter comparisons. See [MPFB setup and experiment](docs/mpfb.md) and [issue #16 validation](docs/validation-issue16.md).
+All projects use the same Codex + Blender modeling flow. This release requires a fresh local store; follow the [scoped clean-start procedure](docs/local-setup.md#start-fresh) before using it with an earlier installation.
 
 Use **Review & settings** for **Pause for review**, **Run consistency check** (On / Off), and **On consistency failure** (Stop / Warn and continue). New-project settings are also available under **Review checkpoints & advanced settings**. Text generates a base concept first; **Accept concept & generate views** explicitly continues an enabled checkpoint. Compare the base/front/side/back/three-quarter images, inspect consistency issues/report, then **Accept views & model**, reject or regenerate. All concept and view candidates remain available in their selectors and thumbnail strips, including uninterrupted automatic runs.
 
