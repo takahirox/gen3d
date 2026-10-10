@@ -83,8 +83,14 @@ without overriding requested stylized/anime proportions.
 
 Decisions are audited and checked against surviving copied objects after export.
 Evidence records `assetId`, source `objectName`, `targetObject`, reuse `method`,
-role and SHA-256. Reuse without permitted surviving geometry, or visual-only
-decisions with copied geometry, fail validation.
+role and SHA-256. Ordinary Blender mesh joins preserve every contributing
+asset and source object, including multiple parts from one asset: the combined
+target has one provenance entry per surviving origin. Point-domain
+`gen3d_reused_origin_*` masks and the scene's `gen3d_reused_origins` registry
+carry these origins through joins and into the saved `.blend`; preserve both
+when editing. Validation checks the evaluated mesh, so removed pieces do not
+count as surviving reuse. Reuse without permitted surviving geometry, or
+visual-only decisions with copied geometry, fail validation.
 
 Guidance favors shape keys, proportional editing, controlled transforms and
 topology-preserving changes. Mirror, Subdivision Surface and Displacement are
@@ -140,9 +146,9 @@ design authority, including stylized/anime proportions where requested.
 
 Before render, GLB export and `.blend` save, the app removes all tagged reference
 objects (even accidentally linked ones), their inspection scenes and unused
-data. Approved independent copies retain `gen3d_reused_from` provenance, checked
-against the job's reuse permission. Original library paths are only read. Job
-`model-references.json` records the loaded-scene evidence and original snapshot;
+data. Approved independent copies retain geometry provenance, checked against
+the job's reuse permission for every contributing origin. Original library paths
+are only read. Job `model-references.json` records the loaded-scene evidence and original snapshot;
 MCP audits record inspections and successful reuse operations without raw code.
 
 Use trusted local files and local modeling instructions. Blender's Python MCP

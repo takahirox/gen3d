@@ -12,6 +12,29 @@ from mathutils import Vector
 
 MAX_OBJECTS = 2000
 MAX_VERTICES = 2000000
+ORIGIN_PREFIX = 'gen3d_reused_origin_'
+ORIGIN_REGISTRY = 'gen3d_reused_origins'
+
+
+def tag_reused_geometry(obj, asset_id, object_name):
+    """Point masks survive Blender joins, unlike the active object's ID properties.
+
+    Each origin has a separate mask so joining, splitting and editing parts can
+    retain multiple sources. The scene registry persists the full object names
+    without exceeding Blender's attribute-name limit.
+    """
+    origin = {'assetId': asset_id, 'objectName': object_name, 'method': 'reuse_reference_mesh'}
+    token = ORIGIN_PREFIX + hashlib.sha256(json.dumps(origin, sort_keys=True).encode()).hexdigest()[:32]
+    registry = json.loads(bpy.context.scene.get(ORIGIN_REGISTRY, '{}'))
+    registry[token] = origin
+    bpy.context.scene[ORIGIN_REGISTRY] = json.dumps(registry)
+    # A library asset may itself have been exported from a previous job. Its
+    # copied geometry belongs to this selected source, not that job's origins.
+    for attribute in list(obj.data.attributes):
+        if attribute.name.startswith(ORIGIN_PREFIX):
+            obj.data.attributes.remove(attribute)
+    mask = obj.data.attributes.new(token, 'BOOLEAN', 'POINT')
+    mask.data.foreach_set('value', [True] * len(obj.data.vertices))
 
 
 def scene_info(scene):
@@ -130,6 +153,7 @@ def reuse_object(asset_id, object_name):
     duplicate.parent = None
     duplicate.matrix_world = world
     del duplicate['gen3d_reference_asset']
+    # Convenience labels only; geometry masks below own multi-source provenance.
     duplicate['gen3d_reused_from'] = asset_id
     duplicate['gen3d_reused_object'] = object_name
     duplicate['gen3d_reuse_method'] = 'reuse_reference_mesh'
@@ -162,6 +186,7 @@ def reuse_object(asset_id, object_name):
             if duplicate.data.materials[i].node_tree:
                 copy_nodes(duplicate.data.materials[i].node_tree, {})
     bpy.context.scene.collection.objects.link(duplicate)
+    tag_reused_geometry(duplicate, asset_id, object_name)
     return {'object': duplicate.name, 'assetId': asset_id, 'objectName': object_name, 'method': 'reuse_reference_mesh'}
 
 
@@ -240,6 +265,7 @@ def validate_deliverable(manifest):
     """Check evaluated meshes and source dependencies before removing inspection scenes."""
     allowed = {r['assetId']: r for r in manifest if r['permission'] == 'reuse-edit'}
     provenance = []
+    registry = json.loads(bpy.context.scene.get(ORIGIN_REGISTRY, '{}'))
     depsgraph = bpy.context.evaluated_depsgraph_get()
     sources = {o for o in bpy.data.objects if o.get('gen3d_reference_asset')}
     source_materials = {m for s in sources if s.type == 'MESH' for m in s.data.materials if m}
@@ -276,14 +302,20 @@ def validate_deliverable(manifest):
         try:
             if not obj.hide_render and (not mesh.vertices or not mesh.polygons or any(not math.isfinite(v) for p in mesh.vertices for v in evaluated.matrix_world @ p.co)):
                 raise RuntimeError('Modifier produced unusable mesh: ' + obj.name)
+            for attribute in mesh.attributes:
+                if not attribute.name.startswith(ORIGIN_PREFIX):
+                    continue
+                origin = registry.get(attribute.name)
+                if not origin or attribute.domain != 'POINT' or attribute.data_type != 'BOOLEAN':
+                    raise RuntimeError('Invalid reference geometry provenance: ' + obj.name)
+                if not any(point.value for point in attribute.data):
+                    continue  # This source's geometry was removed from this part.
+                asset_id = origin['assetId']
+                if asset_id not in allowed:
+                    raise RuntimeError('Unapproved reference reuse')
+                provenance.append({**origin, 'targetObject': obj.name, 'sha256': allowed[asset_id]['sha256']})
         finally:
             evaluated.to_mesh_clear()
-        asset_id = obj.get('gen3d_reused_from')
-        if asset_id:
-            if asset_id not in allowed:
-                raise RuntimeError('Unapproved reference reuse')
-            provenance.append({'assetId': asset_id, 'objectName': obj.get('gen3d_reused_object'), 'targetObject': obj.name,
-                               'method': obj.get('gen3d_reuse_method'), 'sha256': allowed[asset_id]['sha256']})
     return provenance
 
 

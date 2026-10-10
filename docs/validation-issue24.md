@@ -79,3 +79,39 @@ and incomplete saved-render whitelisting during refinement. The final four-GLB
 trial completed after those fixes. Its observed audit order also satisfies the
 subsequently added enforced inspection-before-modeling guard. No automatic
 usage-limit retries occurred.
+
+## Combined-mesh provenance correction
+
+The review fix was validated on 2026-10-10 with Blender 5.1.2. Ordinary
+`bpy.ops.object.join()` now preserves geometry-origin masks instead of relying
+on the active object's single-source labels. The deterministic real Blender
+regression joins Body and Collar from one approved GLB, then joins Hair from a
+second approved GLB with Hair active. All three source objects retain separate
+provenance entries pointing to the same combined target. It checks each
+contributor's permission, refuses reference-only copies, and verifies that
+deleting Hair's vertices removes only Hair's surviving provenance.
+
+The combined saved `.blend` reopens with identical provenance and one mesh;
+the reimported GLB retains all contributed vertex positions, triangle counts
+and three material slots. Both original fixture files and managed library
+copies retain their hashes, and inspection geometry/attributes remain unchanged.
+The existing shape-key/Displacement/Subdivision check also retains provenance.
+
+Checks actually performed for this correction: `npm test` (98 passed, zero
+failed/skipped), `npm run check`, `npm run test:browser`,
+`npm run test:library-blender`, Python compilation and `git diff --check`.
+This correction used no Codex generation or human visual assessment and makes
+no claim about improved likeness.
+
+Saved deterministic evidence:
+[report](validation/issue24/combination/report.json),
+[per-source provenance](validation/issue24/combination/reference-provenance.json),
+[fixture role decisions](validation/issue24/combination/decisions.json),
+[GLB](validation/issue24/combination/model.glb),
+[scene](validation/issue24/combination/scene.blend),
+[render](validation/issue24/combination/preview.png),
+[GLB roundtrip render](validation/issue24/combination/model-roundtrip.png),
+and original fixture GLBs for
+[Body/Collar](validation/issue24/combination/sources/parts.glb),
+[Hair](validation/issue24/combination/sources/hair.glb) and
+[visual-only style](validation/issue24/combination/sources/style.glb).

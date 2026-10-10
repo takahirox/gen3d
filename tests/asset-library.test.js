@@ -137,7 +137,7 @@ test('text and image job snapshots keep all selected provenance through retry/re
     runner.start(p.id, { kind: 'revision', sourceVersionId: first.id, feedback: 'Adjust face' }, 'web'); await runner.pending;
     for (const v of p.versions) { assert.deepEqual(v.modelReferences, first.modelReferences); assert.equal(v.visualInput, first.visualInput); }
     const prompt = taskPrompt(p, first); assert.match(prompt, /inspect_reference_model for EVERY/); assert.match(prompt, /reuse_reference_mesh/); assert.match(prompt, /reference-only/);
-    const exporter = exportCode('/fixture', first); assert.ok(exporter.indexOf('refs.remove_references()') < exporter.indexOf('meshes =')); assert.match(exporter, /Unapproved reference reuse/);
+    const exporter = exportCode('/fixture', first); assert.ok(exporter.indexOf('refs.remove_references()') < exporter.indexOf('meshes =')); assert.match(exporter, /refs.validate_deliverable/);
     await store.selectModels(p.id, { models: [] }, 'web'); assert.equal(first.modelReferences.length, 2);
     runner.start(p.id, { kind: 'revision', sourceVersionId: first.id, feedback: 'Keep original reference lineage' }, 'web'); await runner.pending;
     assert.deepEqual(p.versions.at(-1).modelReferences, first.modelReferences);

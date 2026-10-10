@@ -117,6 +117,26 @@ test('scratch remains available while approved suitable starting geometry is pre
   assert.throws(() => referenceDecisions([model], [], []), /Missing suitability/);
 });
 
+test('combined geometry records every contributing asset and source object under the shared target', () => {
+  const models = [
+    { assetId: 'body', name: 'Body', role: 'body', permission: 'reuse-edit', sha256: 'a'.repeat(64) },
+    { assetId: 'hair', name: 'Hair', role: 'hair', permission: 'reuse-edit', sha256: 'b'.repeat(64) },
+    { assetId: 'style', name: 'Style', role: 'style', permission: 'reference-only', sha256: 'c'.repeat(64) },
+  ];
+  const audit = models.map(m => ({ tool: 'choose_reference_usage', assetId: m.assetId,
+    usage: m.permission === 'reuse-edit' ? 'reuse' : 'visual-only', reason: 'Use the permitted parts for their assigned role.' }));
+  const provenance = [['body', 'Torso'], ['body', 'Collar'], ['hair', 'Hair']].map(([assetId, objectName]) => ({
+    assetId, objectName, targetObject: 'Combined_roles', method: 'reuse_reference_mesh', sha256: models.find(m => m.assetId === assetId).sha256,
+  }));
+  const decisions = referenceDecisions(models, audit, provenance);
+  assert.deepEqual(decisions.map(d => d.objects.map(o => o.objectName)), [['Torso', 'Collar'], ['Hair'], []]);
+  assert.ok(decisions.slice(0, 2).every(d => d.objects.every(o => o.targetObject === 'Combined_roles')));
+  assert.throws(() => referenceDecisions(models, audit, provenance.filter(o => o.assetId !== 'body')), /no permitted surviving geometry: Body/);
+  assert.throws(() => referenceDecisions([{ ...models[0], permission: 'reference-only' }, ...models.slice(1)], audit, provenance), /no permitted surviving geometry: Body/);
+  assert.throws(() => referenceDecisions(models, [{ ...audit[0], usage: 'visual-only' }, ...audit.slice(1)], provenance), /contradicts reused geometry: Body/);
+  assert.throws(() => referenceDecisions(models, audit, [{ ...provenance[0], sha256: models[1].sha256 }, ...provenance.slice(1)]), /Invalid reference object provenance: Body/);
+});
+
 test('comparison attaches every role sheet and rejects missing, contradictory or mismatched role feedback', async t => {
   const dir = temporary(t), image = path.join(dir, 'input.png'); fs.writeFileSync(image, png);
   const models = ['face', 'hair', 'clothes', 'pose'].map(role => ({ assetId: randomUUID(), role, label: role + ' sheet', file: image }));

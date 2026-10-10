@@ -1,0 +1,52 @@
+[
+  {
+    "assetId": "a0594fc5-e371-40c0-9643-db825a8f3f1b",
+    "role": "body and collar",
+    "permission": "reuse-edit",
+    "sha256": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f",
+    "usage": "reuse",
+    "reason": "Apply each approved part to its assigned role; style stays visual-only.",
+    "objects": [
+      {
+        "assetId": "a0594fc5-e371-40c0-9643-db825a8f3f1b",
+        "objectName": "Body",
+        "method": "reuse_reference_mesh",
+        "targetObject": "Combined_roles",
+        "sha256": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f"
+      },
+      {
+        "assetId": "a0594fc5-e371-40c0-9643-db825a8f3f1b",
+        "objectName": "Collar",
+        "method": "reuse_reference_mesh",
+        "targetObject": "Combined_roles",
+        "sha256": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f"
+      }
+    ]
+  },
+  {
+    "assetId": "a8a86c1e-4f25-441b-b561-e71912edb5d2",
+    "role": "hair",
+    "permission": "reuse-edit",
+    "sha256": "3382cba37f75b79522e7095fb8eed000fe12f0bcfc02d0efb923d4396e50628b",
+    "usage": "reuse",
+    "reason": "Apply each approved part to its assigned role; style stays visual-only.",
+    "objects": [
+      {
+        "assetId": "a8a86c1e-4f25-441b-b561-e71912edb5d2",
+        "objectName": "Hair",
+        "method": "reuse_reference_mesh",
+        "targetObject": "Combined_roles",
+        "sha256": "3382cba37f75b79522e7095fb8eed000fe12f0bcfc02d0efb923d4396e50628b"
+      }
+    ]
+  },
+  {
+    "assetId": "605bbf58-241d-4285-bd86-a83718a81664",
+    "role": "style",
+    "permission": "reference-only",
+    "sha256": "89b49f004f2ae1915346b4037195a3f2b5be680e5d352e775f9bfeb83d2a7c2a",
+    "usage": "visual-only",
+    "reason": "Apply each approved part to its assigned role; style stays visual-only.",
+    "objects": []
+  }
+]
