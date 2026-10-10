@@ -1,0 +1,3 @@
+Refined the cabinet with deeper teal paint, subtle packed wood-grain textures, and saturated orange knobs and feet. Lowered the camera elevation and updated input framing.
+
+Preserved the reused body and 8% height increase. All four references were inspected; doors guided panel placement, hardware guided knob shape, and feet guided taper and placement without copying those sources. Verified the result in a Blender render.

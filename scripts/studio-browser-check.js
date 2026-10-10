@@ -44,6 +44,9 @@ const app = createApp({
     if (releaseModel) await new Promise(resolve => { releaseModel = resolve; });
     if (failModel) throw new Error('Fixture Blender bridge unavailable');
     for (const name of ['model.glb', 'scene.blend', 'preview.png', 'mcp-audit.jsonl']) fs.copyFileSync(path.join(assets, 'model-1', name), path.join(dir, name));
+    // UI fixtures stand in for saved sheets; real rendering is separately checked
+    // by library-Blender/live validation, not claimed by this browser replay.
+    if (v.modelReferences.length) v.modelReferenceVisuals = v.modelReferences.map(r => ({ assetId: r.assetId, name: r.name, role: r.role, permission: r.permission, sheet: v.visualInput, views: [] }));
     if (v.refinementSettings?.enabled) {
       fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: (v.refinementCycle ? 'b' : 'a').repeat(64) }));
       for (const view of ['input', 'front', 'side', 'back', 'three-quarter']) fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, view + '.png'));
@@ -195,6 +198,22 @@ try {
   assert.equal(await evaluate('document.querySelectorAll("#reference-sets img").length'), 5);
   await screenshot('desktop-views');
   check('concept and base/front/side/back/three-quarter images accessible after automatic generation');
+
+  const visualProject = await request('/projects', 'POST', { name: 'Reference sheet history', mode: 'image', image: 'data:image/png;base64,' + png.toString('base64'), checkpoints });
+  const visualModels = app.store.get(automatic.id).modelReferences.map(({ assetId, role, permission }) => ({ assetId, role, permission }));
+  await request(`/projects/${visualProject.id}/model-references`, 'POST', { models: visualModels });
+  for (const r of visualModels) await request(`/projects/${visualProject.id}/model-references/${r.assetId}/review`, 'POST', { decision: 'approved' });
+  await request(`/projects/${visualProject.id}/generate`, 'POST', {}); await app.runner.pending;
+  await chooseProject(visualProject.id); await stage('model');
+  await wait('document.querySelectorAll("#model-sources img").length === 2');
+  await wait('[...document.querySelectorAll("#model-sources img")].every(i => i.complete && i.naturalWidth > 0)');
+  assert.ok(await evaluate('document.querySelector("#model-sources").textContent.includes("What Codex saw")'));
+  await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
+  await screenshot('reference-sheets-narrow');
+  await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await chooseProject(automatic.id);
+  check('versioned role/permission reference sheets are visible and load at desktop/390px (injected sheet fixtures)');
 
   await stage('input');
   await fill('#edit', { prompt: 'Unsaved local design' });

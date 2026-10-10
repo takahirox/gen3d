@@ -203,12 +203,13 @@ test('comparison validation requires every view/category, truthful verdict and u
 });
 
 test('real inspector invocation attaches references and renders together, saves bounded schema and has no Blender tools', async t => {
-  const dir = temporary(t), images = [{ label: 'approved input', file: '/original.png' }], renders = [{ view: 'input', label: 'model input view', file: '/render.png' }];
+  const dir = temporary(t), images = [{ label: 'approved input', file: path.join(dir, 'original.png') }], renders = [{ view: 'input', label: 'model input view', file: path.join(dir, 'render.png') }];
+  fs.writeFileSync(images[0].file, png); fs.writeFileSync(renders[0].file, png);
   const inspector = new CodexModelInspector({ env: { OPENAI_API_KEY: 'must-be-removed' }, processRunner: async (command, args, opts) => {
     assert.equal(opts.env.OPENAI_API_KEY, undefined);
     if (args[0] === 'login') return 'Logged in using ChatGPT';
     assert.ok(args.includes('read-only')); assert.ok(args.includes('--ignore-user-config')); assert.ok(!args.some(a => a.includes('mcp_servers')));
-    assert.deepEqual(args.filter((a, i) => args[i - 1] === '--image'), ['/original.png', '/render.png']);
+    assert.deepEqual(args.filter((a, i) => args[i - 1] === '--image'), [images[0].file, renders[0].file]);
     assert.match(fs.readFileSync(path.join(dir, 'COMPARISON.md'), 'utf8'), /unseen detail is uncertain/);
     fs.writeFileSync(path.join(dir, 'comparison.json'), JSON.stringify(comparison()));
   } });

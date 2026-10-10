@@ -1,0 +1,40 @@
+[
+  {
+    "image": "input.png",
+    "label": "original uploaded input",
+    "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+  },
+  {
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/cb8b3fc9-8a4b-4d81-abd1-bc80435aab10/contact-sheet.png",
+    "label": "3D reference cb8b3fc9-8a4b-4d81-abd1-bc80435aab10 (body.glb), role: overall body proportions and standalone starting mesh; adapt to a slightly taller cabinet, axis-labeled views",
+    "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+    "role": "overall body proportions and standalone starting mesh; adapt to a slightly taller cabinet",
+    "sha256": "0aba5dcd3dc66cf306074aaea8ef3f1338adc90cf40d340808810fa5d284cf3c"
+  },
+  {
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/743cf1d5-bc50-4a63-a8f2-1c94d9f702d7/contact-sheet.png",
+    "label": "3D reference 743cf1d5-bc50-4a63-a8f2-1c94d9f702d7 (doors.glb), role: door panel shape and placement, axis-labeled views",
+    "assetId": "743cf1d5-bc50-4a63-a8f2-1c94d9f702d7",
+    "role": "door panel shape and placement",
+    "sha256": "ca6e9adf4ccba5bc12e4e2437b433210ffc5de915909cb1497a2dec11711f977"
+  },
+  {
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/4e879ca5-cf5f-4995-8781-005ebaf51858/contact-sheet.png",
+    "label": "3D reference 4e879ca5-cf5f-4995-8781-005ebaf51858 (hardware.glb), role: round orange knob shapes and color; inspect only, axis-labeled views",
+    "assetId": "4e879ca5-cf5f-4995-8781-005ebaf51858",
+    "role": "round orange knob shapes and color; inspect only",
+    "sha256": "9f4dc2cf9888b992c7eec63824b8d83fd66a299cb397e7310f187dd195e41396"
+  },
+  {
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/f61fead0-57fb-457f-805e-4dc5398de282/contact-sheet.png",
+    "label": "3D reference f61fead0-57fb-457f-805e-4dc5398de282 (feet.glb), role: orange foot shape and placement; inspect only, axis-labeled views",
+    "assetId": "f61fead0-57fb-457f-805e-4dc5398de282",
+    "role": "orange foot shape and placement; inspect only",
+    "sha256": "13ebb2b5f04714dc1a2bf591a49b5c5e90f0bf2424fc919cd40465075d88234a"
+  },
+  {
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/refinement/1/input.png",
+    "label": "model render: input",
+    "sha256": "da21c2a5ba1b6f1baae71990724d2528847bee650a7a948d6bc02a40e4123a96"
+  }
+]

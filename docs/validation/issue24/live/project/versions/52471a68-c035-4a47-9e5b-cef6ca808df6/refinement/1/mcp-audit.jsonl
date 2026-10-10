@@ -1,0 +1,13 @@
+{"tool":"get_scene_info","at":"2026-10-10T10:58:43.108Z"}
+{"tool":"inspect_reference_model","at":"2026-10-10T10:58:43.114Z","assetId":"cb8b3fc9-8a4b-4d81-abd1-bc80435aab10"}
+{"tool":"inspect_reference_model","at":"2026-10-10T10:58:43.115Z","assetId":"743cf1d5-bc50-4a63-a8f2-1c94d9f702d7"}
+{"tool":"inspect_reference_model","at":"2026-10-10T10:58:43.117Z","assetId":"4e879ca5-cf5f-4995-8781-005ebaf51858"}
+{"tool":"inspect_reference_model","at":"2026-10-10T10:58:43.117Z","assetId":"f61fead0-57fb-457f-805e-4dc5398de282"}
+{"tool":"choose_reference_usage","at":"2026-10-10T10:58:56.798Z","assetId":"cb8b3fc9-8a4b-4d81-abd1-bc80435aab10","usage":"reuse","reason":"Existing authorized independent reused cabinet parts already preserve the body design and taller proportions; retain these copies during material and camera refinement."}
+{"tool":"choose_reference_usage","at":"2026-10-10T10:58:56.800Z","assetId":"743cf1d5-bc50-4a63-a8f2-1c94d9f702d7","usage":"visual-only","reason":"Paired flat door panels and narrow center seam confirm existing panel placement; reference-only geometry remains untouched."}
+{"tool":"choose_reference_usage","at":"2026-10-10T10:58:56.802Z","assetId":"4e879ca5-cf5f-4995-8781-005ebaf51858","usage":"visual-only","reason":"Round flattened knob silhouettes confirm existing shape; input image governs saturated orange paint rather than pale contact sheet lighting."}
+{"tool":"choose_reference_usage","at":"2026-10-10T10:58:56.803Z","assetId":"f61fead0-57fb-457f-805e-4dc5398de282","usage":"visual-only","reason":"Four short tapered feet confirm placement and shape; use input saturated orange and restrained wood grain without copying this reference."}
+{"tool":"execute_blender_code","at":"2026-10-10T10:58:56.806Z","codeHash":"567f6d816ea3c65b002cd1ec7f461e1731be2f9dbd7094f04cd18ddbb197c146"}
+{"tool":"execute_blender_code","at":"2026-10-10T10:59:11.669Z","codeHash":"bc0b31a2f5411427c7c6185f6e5e79f4c7df0478e6abe713155a6cc758bea3d6"}
+{"tool":"execute_blender_code","at":"2026-10-10T10:59:35.914Z","codeHash":"7823cbbe1d853d7d7819f0ef39a7ba3b818431a8ed2a7df532ef70f62800e286"}
+{"tool":"execute_blender_code","at":"2026-10-10T10:59:55.580Z","codeHash":"9dafcf0ce1f062070a6d5aa88f7401f50908add47959cee733e420642e8ac77d"}

@@ -1,0 +1,36 @@
+[
+  {
+    "index": 0,
+    "image": "input.png",
+    "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+    "purpose": "original approved image"
+  },
+  {
+    "index": 1,
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/cb8b3fc9-8a4b-4d81-abd1-bc80435aab10/contact-sheet.png",
+    "sha256": "0aba5dcd3dc66cf306074aaea8ef3f1338adc90cf40d340808810fa5d284cf3c",
+    "purpose": "3D reference contact sheet",
+    "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10"
+  },
+  {
+    "index": 2,
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/743cf1d5-bc50-4a63-a8f2-1c94d9f702d7/contact-sheet.png",
+    "sha256": "ca6e9adf4ccba5bc12e4e2437b433210ffc5de915909cb1497a2dec11711f977",
+    "purpose": "3D reference contact sheet",
+    "assetId": "743cf1d5-bc50-4a63-a8f2-1c94d9f702d7"
+  },
+  {
+    "index": 3,
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/4e879ca5-cf5f-4995-8781-005ebaf51858/contact-sheet.png",
+    "sha256": "9f4dc2cf9888b992c7eec63824b8d83fd66a299cb397e7310f187dd195e41396",
+    "purpose": "3D reference contact sheet",
+    "assetId": "4e879ca5-cf5f-4995-8781-005ebaf51858"
+  },
+  {
+    "index": 4,
+    "image": "versions/52471a68-c035-4a47-9e5b-cef6ca808df6/reference-renders/f61fead0-57fb-457f-805e-4dc5398de282/contact-sheet.png",
+    "sha256": "13ebb2b5f04714dc1a2bf591a49b5c5e90f0bf2424fc919cd40465075d88234a",
+    "purpose": "3D reference contact sheet",
+    "assetId": "f61fead0-57fb-457f-805e-4dc5398de282"
+  }
+]

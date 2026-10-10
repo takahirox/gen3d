@@ -10,6 +10,30 @@ Each structured `comparison.json` contains an overall verdict, summary, per-view
 
 Concrete discrepancies become `NEXT-REVISION.md`. Each new report lists `revisionTargets`: `geometry`, `materials` and/or `camera`, identifying every type of correction required. The following cycle copies the saved scene to `source.blend`, retains the executed instructions and required targets in `REVISION.md`, opens that scene through the existing local Blender bridge, and modifies it. Geometry corrections require a changed hash of evaluated mesh vertices/topology in world coordinates. Material corrections require changed exported materials, embedded textures or material assignments (`materials.json`); camera corrections require changed direction or framing (`cameras.json`). Every requested target must change before re-evaluation. Material-only and camera-only corrections can proceed with unchanged meshes and record `geometryChanged: false`. Reports must include explicit revision targets; old reports are unsupported. Changed evidence establishes the type of edit, not visual improvement.
 
+## Role-specific 3D references
+
+With selected 3D references, the same comparison call additionally receives
+**every asset's original material-rendered contact sheet**. Original concept,
+required views/upload and approved supplementary images remain attached.
+`comparison-inputs.json` records attachment order, roles, image hashes and labels.
+The existing bounded loop, Off/On setting, cycle cap and review/usage stops apply.
+No separate reference-refinement loop is created.
+
+`comparison.json.modelReferences` has one entry per asset with its exact ID/role,
+`intendedTraits`, `deliberateDifferences` and concrete per-trait observations
+(`acceptable`, `discrepancy`, `uncertain`). Face references guide face shape;
+hair/clothing/pose references guide those roles. Pose sources do not dictate skin
+color or costume. Primary design requirements take precedence, and the output is
+never required to match several entire unrelated models. Details hidden in the
+available output view remain uncertain. A concrete role discrepancy prevents a
+pass even when primary per-view categories agree, and revision instructions name
+the asset/role and requested geometry/material/camera changes in the same scene.
+
+History shows reference sheets with each comparison's saved renders/reports.
+Revisions keep and hash-check the complete original reference renders and source
+approval snapshot; changed/missing evidence stops explicitly. Matching metadata
+or mentioning a source in a summary is not evidence of visual improvement.
+
 ## Stops and review
 
 The shared `version.refinement.status` distinguishes `off`, `running`, `passed`, `iteration-limit`, `failed`, `usage-limit`, `review-requested` and `interrupted`. The cycle status and stage show modeling, revising or comparing, with timestamps, reports and errors.

@@ -1,0 +1,5 @@
+Required changes: materials, camera.
+For input, lower the camera elevation while preserving the front-right viewing direction. Update the saved direction properties and input gen3d_reference_camera_framing center and orthoScale so the top occupies less of the visible cabinet and the cabinet fills the frame similarly to the approved image.
+Edit the existing cabinet materials to use the approved deeper teal and subtle painted wood grain across the top, doors, frame, and side. Keep the grain restrained to preserve the stylized design.
+For assetId 4e879ca5-cf5f-4995-8781-005ebaf51858, role 'round orange knob shapes and color; inspect only', change the existing knob material from pale peach to the approved saturated orange while retaining the round shape.
+For assetId f61fead0-57fb-457f-805e-4dc5398de282, role 'orange foot shape and placement; inspect only', change the existing foot material from pale peach-orange to the approved saturated orange, with subtle wood texture.
