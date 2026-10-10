@@ -1,0 +1,142 @@
+{
+  "acceptable": false,
+  "summary": "The cabinet preserves the main design and taller body, but its pale colors, weak wood texture, small knobs and feet, and camera angle differ from the approved image.",
+  "revisionInstructions": [
+    "Edit the existing scene materials to match the approved image's deeper teal paint and saturated orange knobs and feet. For assetId 4e879ca5-cf5f-4995-8781-005ebaf51858, role: round orange knob shapes and color; inspect only, use the approved image to resolve the contact sheet's paler orange appearance.",
+    "Add subtle painted wood grain and restrained surface variation to the body, doors, knobs and feet, preserving the clean stylized finish.",
+    "For assetId 4e879ca5-cf5f-4995-8781-005ebaf51858, role: round orange knob shapes and color; inspect only, enlarge the existing round knob heads modestly while preserving their placement near the central seam.",
+    "For assetId f61fead0-57fb-457f-805e-4dc5398de282, role: orange foot shape and placement; inspect only, increase the existing feet's visible height and thickness to better match the approved image, retaining their tapered shape and corner placement.",
+    "Lower the input camera elevation slightly and reduce the sideward angle to match the approved front-right view's smaller top and right-side exposure. Update the saved direction properties and the input entry in gen3d_reference_camera_framing, adjusting center and orthoScale to preserve comparable framing."
+  ],
+  "revisionTargets": [
+    "geometry",
+    "materials",
+    "camera"
+  ],
+  "modelReferences": [
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "role": "overall body proportions and standalone starting mesh; adapt to a slightly taller cabinet",
+      "intendedTraits": "Rectangular cabinet, shallow overhanging top, narrow front stiles and bottom rail, and solid side panel.",
+      "deliberateDifferences": "The cabinet body should be eight percent taller than the reusable source while retaining its design.",
+      "observations": [
+        {
+          "trait": "Body structure and silhouette",
+          "status": "acceptable",
+          "detail": "The visible top overhang, front frame and solid right side preserve the source structure."
+        },
+        {
+          "trait": "Taller body",
+          "status": "acceptable",
+          "detail": "The front panels appear taller relative to their width than the source's front view; the exact eight percent change cannot be verified visually."
+        },
+        {
+          "trait": "Hidden structure",
+          "status": "uncertain",
+          "detail": "The output does not reveal the back or underside for comparison."
+        }
+      ]
+    },
+    {
+      "assetId": "743cf1d5-bc50-4a63-a8f2-1c94d9f702d7",
+      "role": "door panel shape and placement",
+      "intendedTraits": "Two flat rectangular doors of equal width, separated by a narrow central seam and fitted within the front frame.",
+      "deliberateDifferences": "Door height follows the authorized taller cabinet body.",
+      "observations": [
+        {
+          "trait": "Panel shape and placement",
+          "status": "acceptable",
+          "detail": "Both doors are rectangular, aligned at their upper and lower edges, and meet at a narrow vertical seam."
+        },
+        {
+          "trait": "Panel thickness",
+          "status": "uncertain",
+          "detail": "The closed frontal view does not expose enough door edge to assess thickness reliably."
+        }
+      ]
+    },
+    {
+      "assetId": "4e879ca5-cf5f-4995-8781-005ebaf51858",
+      "role": "round orange knob shapes and color; inspect only",
+      "intendedTraits": "Two rounded orange knob heads with shallow projecting profiles.",
+      "deliberateDifferences": "The approved image requires stronger orange saturation than the pale contact-sheet appearance.",
+      "observations": [
+        {
+          "trait": "Round shape",
+          "status": "acceptable",
+          "detail": "Both visible heads have round outlines and rounded surfaces."
+        },
+        {
+          "trait": "Knob scale",
+          "status": "discrepancy",
+          "detail": "The heads appear smaller relative to the doors than in the approved image."
+        },
+        {
+          "trait": "Orange color",
+          "status": "discrepancy",
+          "detail": "The output knobs are peach-colored rather than the approved saturated orange."
+        },
+        {
+          "trait": "Mounting stems",
+          "status": "uncertain",
+          "detail": "The stems are largely occluded by the heads."
+        }
+      ]
+    },
+    {
+      "assetId": "f61fead0-57fb-457f-805e-4dc5398de282",
+      "role": "orange foot shape and placement; inspect only",
+      "intendedTraits": "Four short tapered orange block feet positioned beneath the cabinet corners.",
+      "deliberateDifferences": "The approved image governs orange saturation and apparent foot mass; sheet lighting is supplementary.",
+      "observations": [
+        {
+          "trait": "Taper and placement",
+          "status": "acceptable",
+          "detail": "The output shows tapered block feet beneath the front and rear corner regions."
+        },
+        {
+          "trait": "Foot proportions",
+          "status": "discrepancy",
+          "detail": "The exposed feet look shorter and lighter in mass relative to the cabinet than the approved image."
+        },
+        {
+          "trait": "Rear-foot geometry",
+          "status": "uncertain",
+          "detail": "The cabinet partially occludes the rear feet, limiting comparison of their full shapes."
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "view": "input",
+      "observations": [
+        {
+          "category": "silhouette",
+          "status": "discrepancy",
+          "detail": "The cabinet has the correct overall outline, but the view exposes proportionally more top and right side than the approved image, indicating a slightly higher and more sideward camera."
+        },
+        {
+          "category": "proportions",
+          "status": "discrepancy",
+          "detail": "The taller body is consistent with the requested adaptation, but the knob heads and exposed feet appear undersized relative to it."
+        },
+        {
+          "category": "partPlacement",
+          "status": "acceptable",
+          "detail": "The paired doors sit within the front frame, the knobs flank the center seam near mid-height, and the feet occupy the corner regions."
+        },
+        {
+          "category": "features",
+          "status": "acceptable",
+          "detail": "The two doors, two round knobs, overhanging top, front stiles, bottom rail and tapered feet are present. No concrete extra structural feature is visible."
+        },
+        {
+          "category": "colorsMaterials",
+          "status": "discrepancy",
+          "detail": "The body is pale cyan rather than deep teal, the orange parts are washed out, and the surfaces lack the approved image's visible painted wood grain."
+        }
+      ]
+    }
+  ]
+}

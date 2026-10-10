@@ -1,0 +1,240 @@
+{
+  "realBlender": true,
+  "codexUsed": false,
+  "checkedAt": "2026-10-10T12:11:57.346Z",
+  "checks": [
+    "real GLB managed import",
+    "real .blend folder inspection",
+    "modern .blend header",
+    "reject valid-header corrupt file",
+    "reject unpacked missing/external textures",
+    "load both into separate scenes",
+    "reject reference-only duplication",
+    "reuse independent mesh/materials/shape keys/node groups/images",
+    "semantic shape-key edit and optional subdivision",
+    "reimport GLB and verify evaluated subdivision geometry",
+    "reject inspection-object modifier dependencies",
+    "reject empty evaluated modifier results",
+    "strip incidental geometry from render/GLB/.blend",
+    "reopen .blend and check single mesh and scene",
+    "unchanged library/source file hashes",
+    "ordinary joins preserve multiple assets and same-asset source objects",
+    "joined contributor permissions and removed geometry checked",
+    "combined GLB geometry/materials and saved .blend provenance verified"
+  ],
+  "sourceHashes": {
+    "605bbf58-241d-4285-bd86-a83718a81664": "89b49f004f2ae1915346b4037195a3f2b5be680e5d352e775f9bfeb83d2a7c2a",
+    "d604bab4-d851-4857-95ea-ec54bbd59d3e": "568b8d3017af126e03999aef488860c61128375a0901f017487ea97bfd8a9e77"
+  },
+  "combinedSourceHashes": {
+    "a0594fc5-e371-40c0-9643-db825a8f3f1b": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f",
+    "a8a86c1e-4f25-441b-b561-e71912edb5d2": "3382cba37f75b79522e7095fb8eed000fe12f0bcfc02d0efb923d4396e50628b",
+    "605bbf58-241d-4285-bd86-a83718a81664": "89b49f004f2ae1915346b4037195a3f2b5be680e5d352e775f9bfeb83d2a7c2a"
+  },
+  "fixtureHashes": {
+    "parts.glb": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f",
+    "hair.glb": "3382cba37f75b79522e7095fb8eed000fe12f0bcfc02d0efb923d4396e50628b",
+    "style.glb": "89b49f004f2ae1915346b4037195a3f2b5be680e5d352e775f9bfeb83d2a7c2a"
+  },
+  "combinedProvenance": [
+    {
+      "assetId": "a8a86c1e-4f25-441b-b561-e71912edb5d2",
+      "objectName": "Hair",
+      "method": "reuse_reference_mesh",
+      "targetObject": "Combined_roles",
+      "sha256": "3382cba37f75b79522e7095fb8eed000fe12f0bcfc02d0efb923d4396e50628b"
+    },
+    {
+      "assetId": "a0594fc5-e371-40c0-9643-db825a8f3f1b",
+      "objectName": "Body",
+      "method": "reuse_reference_mesh",
+      "targetObject": "Combined_roles",
+      "sha256": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f"
+    },
+    {
+      "assetId": "a0594fc5-e371-40c0-9643-db825a8f3f1b",
+      "objectName": "Collar",
+      "method": "reuse_reference_mesh",
+      "targetObject": "Combined_roles",
+      "sha256": "be49745707592f8859d40b3407098f134855df3ff903ec01116a7db32bf5716f"
+    }
+  ],
+  "isolation": {
+    "loaded": [
+      {
+        "assetId": "605bbf58-241d-4285-bd86-a83718a81664",
+        "scene": "gen3d_reference_605bbf58-241d-4285-bd86-a83718a81664",
+        "role": "overall style",
+        "permission": "reference-only",
+        "objects": [
+          {
+            "name": "Stylized_head",
+            "type": "MESH",
+            "vertices": 360,
+            "polygons": 168,
+            "edges": 432,
+            "materials": [
+              "Peach_stylized"
+            ],
+            "materialDetails": [
+              {
+                "name": "Peach_stylized",
+                "baseColor": [
+                  0.800000011920929,
+                  0.800000011920929,
+                  0.800000011920929,
+                  1
+                ],
+                "nodeTypes": [
+                  "ShaderNodeBsdfPrincipled",
+                  "ShaderNodeOutputMaterial"
+                ],
+                "textures": []
+              }
+            ],
+            "bounds": [
+              [
+                -1.6500000953674316,
+                -0.699999988079071,
+                -1.2000000476837158
+              ],
+              [
+                -1.6500000953674316,
+                -0.699999988079071,
+                1.2000000476837158
+              ],
+              [
+                -1.6500000953674316,
+                0.699999988079071,
+                1.2000000476837158
+              ],
+              [
+                -1.6500000953674316,
+                0.699999988079071,
+                -1.2000000476837158
+              ],
+              [
+                1.6500000953674316,
+                -0.699999988079071,
+                -1.2000000476837158
+              ],
+              [
+                1.6500000953674316,
+                -0.699999988079071,
+                1.2000000476837158
+              ],
+              [
+                1.6500000953674316,
+                0.699999988079071,
+                1.2000000476837158
+              ],
+              [
+                1.6500000953674316,
+                0.699999988079071,
+                -1.2000000476837158
+              ]
+            ],
+            "shapeKeys": [
+              "Basis",
+              "Anime_cheeks"
+            ]
+          }
+        ],
+        "vertices": 360,
+        "meshes": 1
+      },
+      {
+        "assetId": "d604bab4-d851-4857-95ea-ec54bbd59d3e",
+        "scene": "gen3d_reference_d604bab4-d851-4857-95ea-ec54bbd59d3e",
+        "role": "face",
+        "permission": "reuse-edit",
+        "objects": [
+          {
+            "name": "Stylized_head.001",
+            "type": "MESH",
+            "vertices": 86,
+            "polygons": 96,
+            "edges": 180,
+            "materials": [
+              "Peach_stylized.001"
+            ],
+            "materialDetails": [
+              {
+                "name": "Peach_stylized.001",
+                "baseColor": [
+                  0.800000011920929,
+                  0.30000001192092896,
+                  0.20000000298023224,
+                  1
+                ],
+                "nodeTypes": [
+                  "ShaderNodeBsdfPrincipled",
+                  "ShaderNodeOutputMaterial",
+                  "ShaderNodeGroup"
+                ],
+                "textures": []
+              }
+            ],
+            "bounds": [
+              [
+                -1,
+                -1,
+                -1
+              ],
+              [
+                -1,
+                -1,
+                1
+              ],
+              [
+                -1,
+                1,
+                1
+              ],
+              [
+                -1,
+                1,
+                -1
+              ],
+              [
+                1,
+                -1,
+                -1
+              ],
+              [
+                1,
+                -1,
+                1
+              ],
+              [
+                1,
+                1,
+                1
+              ],
+              [
+                1,
+                1,
+                -1
+              ]
+            ],
+            "shapeKeys": [
+              "Basis",
+              "Anime_cheeks"
+            ]
+          }
+        ],
+        "vertices": 86,
+        "meshes": 1
+      }
+    ],
+    "deliverableMeshes": 1,
+    "permissionRefusal": true,
+    "independentMeshMaterialsShapeKeys": true,
+    "semanticShapeKeyValue": 0.699999988079071,
+    "sourceVertices": 86,
+    "evaluatedVertices": 362,
+    "sourceDependencyRejected": true,
+    "emptyModifierRejected": true
+  },
+  "outputMeshes": 1
+}

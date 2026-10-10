@@ -101,3 +101,12 @@ This repository is managed by ProjectWeave. For contribution and review guidance
 - [Review guidelines](docs/review-guidelines.md)
 
 Optional [local 3D model references](docs/model-library.md) can be imported once or selected from human-configured folders, then reused across Text or Image projects with per-model inspection/reuse approval.
+
+Every selected model is rendered locally in eight labeled material views before
+modeling, with its contact sheet supplied to Codex vision alongside the required
+input images. Codex records each role's suitability, prefers approved suitable
+meshes as editable bases and leaves other models visual-only with reasons.
+Semantic edits and optional modifiers are encouraged when appropriate; export
+checks reject unusable evaluated meshes and source dependencies. The existing
+[refinement loop](docs/refinement.md) compares role-specific reference sheets as
+well as primary images and retains per-role feedback, renders and reuse provenance.

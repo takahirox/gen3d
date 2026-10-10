@@ -250,7 +250,7 @@ test('CLI invocation uses image attachments, ChatGPT auth, workspace sandbox and
   assert.ok(args.includes('workspace-write')); assert.ok(args.includes('--ignore-user-config')); assert.ok(args.includes('forced_login_method="chatgpt"'));
   assert.equal(args.filter(a => a === '--image').length, 2); assert.ok(!args.includes('--model')); assert.ok(!args.includes('--dangerously-bypass-approvals-and-sandbox'));
   assert.ok(args.includes('mcp_servers.gen3d_blender.tools.execute_blender_code.approval_mode="approve"'));
-  assert.ok(args.includes('mcp_servers.gen3d_blender.enabled_tools=["get_scene_info","execute_blender_code","inspect_reference_model","reuse_reference_mesh"]'));
+  assert.ok(args.includes('mcp_servers.gen3d_blender.enabled_tools=["get_scene_info","execute_blender_code","inspect_reference_model","reuse_reference_mesh","choose_reference_usage"]'));
   assert.equal(args.at(-2), '--');
 });
 
@@ -271,7 +271,7 @@ test('Blender MCP exposes modeling and reference tools, dispatches to the bridge
   t.after(async () => { await client.close(); await new Promise(resolve => bridge.close(resolve)); });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('src/blender-mcp.js')],
     env: { ...process.env, GEN3D_BLENDER_PORT: String(bridge.address().port), GEN3D_AUDIT_DIR: dir }, stderr: 'pipe' }));
-  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['inspect_reference_model', 'reuse_reference_mesh', 'get_scene_info', 'execute_blender_code']);
+  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['inspect_reference_model', 'reuse_reference_mesh', 'choose_reference_usage', 'get_scene_info', 'execute_blender_code']);
   assert.equal((await client.callTool({ name: 'get_scene_info', arguments: {} })).isError, undefined);
   assert.equal((await client.callTool({ name: 'execute_blender_code', arguments: { code: 'import bpy' } })).isError, undefined);
   assert.deepEqual(requests.map(r => r.type), ['get_scene_info', 'execute_code']);

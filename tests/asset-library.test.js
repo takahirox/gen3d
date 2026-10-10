@@ -10,6 +10,8 @@ import { Store } from '../src/store.js';
 import { validateModel } from '../src/asset-library.js';
 import { Runner, taskPrompt, exportCode } from '../src/runner.js';
 import { categories } from '../src/refinement.js';
+import { referenceViews } from '../src/model-reference-visuals.js';
+import { Transformer } from '@napi-rs/image';
 import { createApp } from '../src/server.js';
 
 const fixture = 'docs/validation/issue10/prop/model-1';
@@ -135,7 +137,7 @@ test('text and image job snapshots keep all selected provenance through retry/re
     runner.start(p.id, { kind: 'revision', sourceVersionId: first.id, feedback: 'Adjust face' }, 'web'); await runner.pending;
     for (const v of p.versions) { assert.deepEqual(v.modelReferences, first.modelReferences); assert.equal(v.visualInput, first.visualInput); }
     const prompt = taskPrompt(p, first); assert.match(prompt, /inspect_reference_model for EVERY/); assert.match(prompt, /reuse_reference_mesh/); assert.match(prompt, /reference-only/);
-    const exporter = exportCode('/fixture', first); assert.ok(exporter.indexOf('refs.remove_references()') < exporter.indexOf('meshes =')); assert.match(exporter, /Unapproved reference reuse/);
+    const exporter = exportCode('/fixture', first); assert.ok(exporter.indexOf('refs.remove_references()') < exporter.indexOf('meshes =')); assert.match(exporter, /refs.validate_deliverable/);
     await store.selectModels(p.id, { models: [] }, 'web'); assert.equal(first.modelReferences.length, 2);
     runner.start(p.id, { kind: 'revision', sourceVersionId: first.id, feedback: 'Keep original reference lineage' }, 'web'); await runner.pending;
     assert.deepEqual(p.versions.at(-1).modelReferences, first.modelReferences);
@@ -152,18 +154,19 @@ test('bounded refinement with multiple models retains original per-asset permiss
     const snapshots = store.library.snapshot(p.modelReferences), jobs = [];
     const runner = new Runner(store, { conceptGenerator: { generate: async () => ({ bytes: png, ext: 'png' }), generateViews: async ({ onImage }) => { for (const view of ['front', 'side', 'back', 'three-quarter']) await onImage({ view, side: view === 'side' ? 'left' : undefined, bytes: png, ext: 'png' }); } },
       inspectReferences: async () => ({ consistent: true, issues: [] }),
-      inspectModel: async ({ dir, renders }) => {
+      inspectModel: async ({ dir, renders, modelReferences }) => {
+        assert.equal(modelReferences.length, 2);
         const acceptable = path.basename(dir) === '1';
-        return { acceptable, summary: 'Synthetic reference-aware refinement fixture', revisionTargets: acceptable ? [] : ['geometry'], revisionInstructions: acceptable ? [] : ['Adjust the body proportions'], views: renders.map(r => ({ view: r.view, observations: categories.map(category => ({ category, status: acceptable ? 'acceptable' : 'discrepancy', detail: 'Synthetic observation' })) })) };
+        return { acceptable, modelReferences: modelReferences.map(r => ({ assetId: r.assetId, role: r.role, intendedTraits: 'role-specific shape', deliberateDifferences: 'input has priority', observations: [{ trait: 'shape', status: 'uncertain', detail: 'Synthetic fixture' }] })), summary: 'Synthetic reference-aware refinement fixture', revisionTargets: acceptable ? [] : ['geometry'], revisionInstructions: acceptable ? [] : ['Adjust the body proportions'], views: renders.map(r => ({ view: r.view, observations: categories.map(category => ({ category, status: acceptable ? 'acceptable' : 'discrepancy', detail: 'Synthetic observation' })) })) };
       },
       generate: async (p, v, dir) => {
-        assert.deepEqual(v.modelReferences, snapshots); jobs.push(structuredClone(v)); artifacts(dir);
+        assert.deepEqual(v.modelReferences, snapshots); v.modelReferenceVisuals = snapshots.map(r => ({ ...r, sheet: v.visualInput, views: [] })); jobs.push(structuredClone(v)); artifacts(dir);
         fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: (v.refinementCycle ? 'b' : 'a').repeat(64) }));
         for (const label of ['input', 'front', 'side', 'back', 'three-quarter']) fs.writeFileSync(path.join(dir, label + '.png'), png);
       }
     });
     runner.start(p.id, {}, 'web'); await runner.pending;
-    const v = p.versions[0]; assert.equal(v.status, 'ready'); assert.equal(v.refinement.status, 'passed'); assert.equal(jobs.length, 2);
+    const v = p.versions[0]; assert.equal(v.status, 'ready', v.error); assert.equal(v.refinement.status, 'passed', v.refinement.error); assert.equal(jobs.length, 2);
     assert.deepEqual(jobs[0].imageInputs, jobs[1].imageInputs);
     assert.equal(jobs[0].imageInputs.length, mode === 'text' ? 5 : 1);
     assert.equal(v.refinement.iterations.length, 2);
@@ -175,8 +178,30 @@ test('real modeling path loads every approved reference before Codex and records
   await store.selectModels(p.id, { models: [model(a), model(b, 'reuse-edit')] }, 'web');
   for (const r of p.modelReferences) store.reviewModelReference(p.id, r.assetId, 'approved', 'web');
   const calls = []; let inspectAll = true;
-  const runner = new Runner(store, { processRunner: async (command, args) => { if (args[0] === 'login') return 'Logged in using ChatGPT'; calls.push('codex'); fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), (inspectAll ? [a, b] : [a]).map(a => JSON.stringify({ tool: 'inspect_reference_model', assetId: a.id })).join('\n')); assert.ok(calls.some(c => c.includes('load_references'))); }, blender: async (type, params) => { if (type === 'execute_code') { calls.push(params.code); return { output: 'import diagnostics\nGEN3D_REFERENCES=[]\n' }; } return {}; } });
-  const v = { kind: 'generate', modelReferences: store.library.snapshot(p.modelReferences), visualInput: p.inputImage, imageInputs: [p.inputImage], modelingImages: [], referenceIds: [] }, dir = temporary(t);
+  const dir = path.join(store.dir(p.id), 'versions', 'test'); fs.mkdirSync(dir, { recursive: true });
+  const v = { id: 'test', kind: 'generate', modelReferences: store.library.snapshot(p.modelReferences), visualInput: p.inputImage, imageInputs: [p.inputImage], modelingImages: [], referenceIds: [] };
+  p.versions.push(v);
+  const tile = await Transformer.fromSvg('<svg xmlns="http://www.w3.org/2000/svg" width="384" height="384"><rect width="384" height="384" fill="white"/><rect x="80" y="60" width="220" height="260" fill="red"/></svg>').resize(384, 384).png();
+  const runner = new Runner(store, { processRunner: async (command, args) => {
+    if (args[0] === 'login') return 'Logged in using ChatGPT';
+    calls.push('codex');
+    fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), (inspectAll ? [a, b] : [a]).flatMap(a => [{ tool: 'inspect_reference_model', assetId: a.id }, { tool: 'choose_reference_usage', assetId: a.id, usage: 'visual-only', reason: 'No suitable parts for this fixture.' }]).map(e => JSON.stringify(e)).join('\n'));
+    assert.ok(calls.some(c => c.includes('load_references')));
+    assert.equal(args.filter(a => a === '--image').length, 3);
+    for (const r of v.modelReferenceVisuals) assert.ok(args.includes(store.imageArtifact(p.id, r.sheet)));
+  }, blender: async (type, params) => {
+    if (type !== 'execute_code') return {};
+    calls.push(params.code);
+    if (params.code.includes('refs.render_reference(')) {
+      const id = [a.id, b.id].find(id => params.code.includes(id));
+      const directory = path.join(dir, 'reference-renders', id); fs.mkdirSync(directory, { recursive: true });
+      const views = referenceViews.map(view => { fs.writeFileSync(path.join(directory, view + '.png'), tile); return { view, image: view + '.png', direction: [1, 0, 0], center: [0, 0, 0], orthoScale: 2, projection: 'orthographic' }; });
+      return { output: 'GEN3D_REFERENCE_VIEWS=' + JSON.stringify(views) };
+    }
+    if (params.code.includes('refs.load_references')) fs.writeFileSync(path.join(dir, 'reference-load.json'), '[]');
+    if (params.code.includes('refs.validate_deliverable')) fs.writeFileSync(path.join(dir, 'reference-provenance.json'), '[]');
+    return { output: 'import diagnostics\nGEN3D_REFERENCES=[]\n' };
+  } });
   await runner.realGenerate(p, v, dir);
   const load = calls.find(c => c.includes('load_references'));
   assert.ok(load.includes(a.id) && load.includes(b.id)); assert.ok(load.includes('reference-only') && load.includes('reuse-edit'));

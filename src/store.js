@@ -253,7 +253,7 @@ export class Store {
   }
   artifact(id, relative) {
     const p = this.get(id);
-    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => [...Object.values(v.artifacts || {}), ...(v.refinement?.iterations || []).flatMap(c => Object.values(c.artifacts || {}))])].filter(Boolean);
+    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => [...Object.values(v.artifacts || {}), ...(v.modelReferenceVisuals || []).flatMap(r => [r.sheet, ...r.views.map(view => view.image)]), ...(v.refinement?.iterations || []).flatMap(c => Object.values(c.artifacts || {}))])].filter(Boolean);
     if (!files.includes(relative)) throw new AppError('Artifact not found', 404);
     const file = path.resolve(this.dir(id), relative);
     if (!file.startsWith(this.dir(id) + path.sep) || !fs.lstatSync(file).isFile()

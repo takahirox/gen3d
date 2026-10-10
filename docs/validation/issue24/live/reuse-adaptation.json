@@ -1,0 +1,157 @@
+{
+  "adaptedMeshes": 19,
+  "objects": [
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Overhanging flat top",
+      "targetObject": "reused_Overhanging flat top",
+      "sourceGeometrySha256": "b7acfa0143ea90bd5baddd898f0323e45b1b8c35ba01a20104195ca0a038df08",
+      "targetGeometrySha256": "5170f57750d197f37f0946866d1b82a85edda891168ba15961e1a53ecaf0b706",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left side panel",
+      "targetObject": "reused_Left side panel",
+      "sourceGeometrySha256": "d1ecb3de1aa9bfc2da095a7aac847ff1a6688a929e6fa7f26607bf9c5c16e56d",
+      "targetGeometrySha256": "6c7f45f329074d80e2254bdf337e824e1a7cf977347e8fdba394d0a1122e1880",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right side panel",
+      "targetObject": "reused_Right side panel",
+      "sourceGeometrySha256": "8d5fdeac6d300c391320ef5202a0f435c1d618e79e01e1256884e7bf3fde9248",
+      "targetGeometrySha256": "038b0574ce6bdf82ee7d03f35fde4a8766ca65eb417d0bfe9047e611f00030f8",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Plain full back",
+      "targetObject": "reused_Plain full back",
+      "sourceGeometrySha256": "e019a32fb2a895d3827b1361e64693ab6cceb9b13ee24501503b882223a5ab48",
+      "targetGeometrySha256": "c888c58834f81b2e882e682ca9b05b6201133261f5a28026ca22c424a336080a",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Bottom board",
+      "targetObject": "reused_Bottom board",
+      "sourceGeometrySha256": "64e9ee3066b9fb7857f48fd4723eb34be50aedb701868741701425f5d38176e1",
+      "targetGeometrySha256": "a2e96283c46cb1a0c3f3fb447d599cc3d1aa2c0323c1eb9260fb63fb50f76835",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Front bottom rail",
+      "targetObject": "reused_Front bottom rail",
+      "sourceGeometrySha256": "297ca6362c845612444940cf3867599f43a6be1e7a75469c9b73c12b6a7ab4fb",
+      "targetGeometrySha256": "23a06c35a0bffea7c8da81c6eb41094a69fdacebf4f2c380a683f020770cd08c",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left front stile",
+      "targetObject": "reused_Left front stile",
+      "sourceGeometrySha256": "5406aed74d7642c6e08d06b870e101f03a7b2ae93f42ea1e5d0c630496d93b00",
+      "targetGeometrySha256": "28f2b3ca477c5794afd0abdcfd89ab1cbabfb8a1cf11fb7328b076377a50d997",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right front stile",
+      "targetObject": "reused_Right front stile",
+      "sourceGeometrySha256": "0a328e86f52e47a2a484f5e2f6fb9804af123c56ab30aa69104734857d7607dc",
+      "targetGeometrySha256": "bc8dfa5847e516edbb520a3e7c786db24a5c6fb40cd25a6e4cadc788b8dbf49e",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Interior shelf",
+      "targetObject": "reused_Interior shelf",
+      "sourceGeometrySha256": "36b8f8cbd9f4002a1079eabe0d0ecde4833b337c69a5b38ee34561b75afc6510",
+      "targetGeometrySha256": "98c06d9c2be11e542d04f7a3903332e8477fb009f67647ed52c18d80dc5cd73b",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left door",
+      "targetObject": "reused_Left door",
+      "sourceGeometrySha256": "0934f24b5a358c35fc4497e0f01674b6d0581ea63870595e0ba5005740fe9544",
+      "targetGeometrySha256": "559b490389732e2dabd8a2fe8bccbe22b4557cc3993baadaea39a88b38ec57e3",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right door",
+      "targetObject": "reused_Right door",
+      "sourceGeometrySha256": "21884b2aab4a57b63cb880ff4c52c3079d6d5aad7e2ac0ca81412805ef30a47b",
+      "targetGeometrySha256": "0597ca673facb48669935ffd9fe47f0d7c2cea4f99cdc385976b07f2cb9b3238",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left front orange foot",
+      "targetObject": "reused_Left front orange foot",
+      "sourceGeometrySha256": "f9412d3992d2a35ce201b6b5b03b8c94c18d85f7103aaaceceb967b23c82013a",
+      "targetGeometrySha256": "76cc5bc0ce21ed1723c74d8d15db3ace92b571c492ce9c10f6bfa262b79fbfbf",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left rear orange foot",
+      "targetObject": "reused_Left rear orange foot",
+      "sourceGeometrySha256": "fd7cf8d4700ae1dae44dc836ce3563d49d9b6386891a09e904880ba8fe8aaeb7",
+      "targetGeometrySha256": "6b1b3dddcb5cccb13e1ad9f8eeb46e18a7a42dab3d17f027c6c60ba03a5f701c",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right front orange foot",
+      "targetObject": "reused_Right front orange foot",
+      "sourceGeometrySha256": "6364f902c71a02cd41be3eab088ce29e8ca76ed7e12c3f2ddab94e06b821a370",
+      "targetGeometrySha256": "d65c6336461e07d294f93a8bea9ceffac9acfb9a2fb55cb3f09a0a0abdc28177",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right rear orange foot",
+      "targetObject": "reused_Right rear orange foot",
+      "sourceGeometrySha256": "8e2e9405811a2ad656d1f28e48b2f2fad553a8b1da771dc26165a68ff68c1df9",
+      "targetGeometrySha256": "c711e84e8d6c9061cf4d5c71715fe70965f312691376b7b183d9eb9b88f5b814",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left round orange knob",
+      "targetObject": "reused_Left round orange knob",
+      "sourceGeometrySha256": "81571831e5a94e593af123c751198bc96d356719b8e0e67f4cd369e49e1f2be8",
+      "targetGeometrySha256": "7778a80bd498a80078fc094ba074214bc5f806005e6df3e5ef91ee35633af638",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Left knob neck",
+      "targetObject": "reused_Left knob neck",
+      "sourceGeometrySha256": "29a0b00b46f505d5cf47ffe9d9c96df49e574def4c8824b673e78a2f465c6794",
+      "targetGeometrySha256": "ac3a5d8dbd964cd8aebd8e49e4512b435426b20b5e82d34f085c6b83ac4cd352",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right round orange knob",
+      "targetObject": "reused_Right round orange knob",
+      "sourceGeometrySha256": "3a4ba924e5488986998e26fb9be12005824767b5e381ef2ceb1e72d8efbbe296",
+      "targetGeometrySha256": "47809e35147b1c369e300d3a2725ab1f4999ffaf67dc0d5b2e6fdb1a0ea481e3",
+      "adapted": true
+    },
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "objectName": "Right knob neck",
+      "targetObject": "reused_Right knob neck",
+      "sourceGeometrySha256": "9c237b786cf9394018409383de303b709bb9cae18b593d8f11ae567d3b629e09",
+      "targetGeometrySha256": "f9a607c647845266c865e420d61238864bd8fc9859858f4c84407bb7798df6d4",
+      "adapted": true
+    }
+  ]
+}

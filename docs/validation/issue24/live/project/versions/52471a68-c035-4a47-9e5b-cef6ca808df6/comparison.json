@@ -1,0 +1,125 @@
+{
+  "acceptable": false,
+  "summary": "The render preserves the cabinet design and appears slightly taller, but the camera looks down too steeply and the materials are much paler and smoother than the approved image.",
+  "revisionInstructions": [
+    "For input, lower the camera elevation while preserving the front-right viewing direction. Update the saved direction properties and input gen3d_reference_camera_framing center and orthoScale so the top occupies less of the visible cabinet and the cabinet fills the frame similarly to the approved image.",
+    "Edit the existing cabinet materials to use the approved deeper teal and subtle painted wood grain across the top, doors, frame, and side. Keep the grain restrained to preserve the stylized design.",
+    "For assetId 4e879ca5-cf5f-4995-8781-005ebaf51858, role 'round orange knob shapes and color; inspect only', change the existing knob material from pale peach to the approved saturated orange while retaining the round shape.",
+    "For assetId f61fead0-57fb-457f-805e-4dc5398de282, role 'orange foot shape and placement; inspect only', change the existing foot material from pale peach-orange to the approved saturated orange, with subtle wood texture."
+  ],
+  "revisionTargets": [
+    "materials",
+    "camera"
+  ],
+  "modelReferences": [
+    {
+      "assetId": "cb8b3fc9-8a4b-4d81-abd1-bc80435aab10",
+      "role": "overall body proportions and standalone starting mesh; adapt to a slightly taller cabinet",
+      "intendedTraits": "Rectangular cabinet body, overhanging slab top, narrow front frame, and short corner feet.",
+      "deliberateDifferences": "The body should be eight percent taller than the reusable source while preserving its design.",
+      "observations": [
+        {
+          "trait": "Body structure",
+          "status": "acceptable",
+          "detail": "The visible body retains the slab top, rectangular side, and narrow bottom rail."
+        },
+        {
+          "trait": "Height adaptation",
+          "status": "uncertain",
+          "detail": "The cabinet appears taller than the source, but the exact eight percent change cannot be verified from differently framed images."
+        }
+      ]
+    },
+    {
+      "assetId": "743cf1d5-bc50-4a63-a8f2-1c94d9f702d7",
+      "role": "door panel shape and placement",
+      "intendedTraits": "Two equal flat rectangular doors separated by a narrow center seam and fitted within the front frame.",
+      "deliberateDifferences": "Door height should follow the taller cabinet body.",
+      "observations": [
+        {
+          "trait": "Door shape and placement",
+          "status": "acceptable",
+          "detail": "Two plain panels occupy the front opening with a centered vertical seam and narrow perimeter gaps."
+        }
+      ]
+    },
+    {
+      "assetId": "4e879ca5-cf5f-4995-8781-005ebaf51858",
+      "role": "round orange knob shapes and color; inspect only",
+      "intendedTraits": "Two rounded orange knobs mounted near the center seam.",
+      "deliberateDifferences": "The primary image governs orange saturation where the contact-sheet lighting produces a peach appearance.",
+      "observations": [
+        {
+          "trait": "Knob shape",
+          "status": "acceptable",
+          "detail": "Both visible knobs have round, convex faces consistent with the source."
+        },
+        {
+          "trait": "Knob color",
+          "status": "discrepancy",
+          "detail": "The rendered knobs are pale peach instead of the saturated orange in the primary image."
+        },
+        {
+          "trait": "Mounting stems",
+          "status": "uncertain",
+          "detail": "The mounting stems are concealed in the available render."
+        }
+      ]
+    },
+    {
+      "assetId": "f61fead0-57fb-457f-805e-4dc5398de282",
+      "role": "orange foot shape and placement; inspect only",
+      "intendedTraits": "Short tapered block feet positioned beneath the cabinet corners.",
+      "deliberateDifferences": "The primary image governs saturated orange color rather than the lighter contact-sheet appearance.",
+      "observations": [
+        {
+          "trait": "Visible foot shape and placement",
+          "status": "acceptable",
+          "detail": "Three visible feet are short tapered blocks beneath the front corners and rear right corner."
+        },
+        {
+          "trait": "Foot color",
+          "status": "discrepancy",
+          "detail": "The visible feet are pale peach-orange and lack the approved saturated orange wood finish."
+        },
+        {
+          "trait": "Fourth foot",
+          "status": "uncertain",
+          "detail": "The rear left foot is hidden behind the cabinet."
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "view": "input",
+      "observations": [
+        {
+          "category": "silhouette",
+          "status": "acceptable",
+          "detail": "The overhanging rectangular top, box body, and short tapered feet preserve the approved cabinet silhouette."
+        },
+        {
+          "category": "proportions",
+          "status": "discrepancy",
+          "detail": "The camera elevation exposes substantially more top surface relative to the door height than the approved view. The front-right direction is correct, but the cabinet also occupies less of the frame."
+        },
+        {
+          "category": "partPlacement",
+          "status": "acceptable",
+          "detail": "The doors meet at the center, the knobs flank that seam at matching heights, and the visible feet sit beneath the corners."
+        },
+        {
+          "category": "features",
+          "status": "acceptable",
+          "detail": "Both doors, two round knobs, slab top, front rails, and visible corner feet are present. No extra decorative features are visible; the fourth foot is occluded."
+        },
+        {
+          "category": "colorsMaterials",
+          "status": "discrepancy",
+          "detail": "The body is pale cyan rather than deeper teal, and the knobs and feet are peach rather than saturated orange. The surfaces lack the subtle painted wood grain visible throughout the approved image."
+        }
+      ]
+    }
+  ]
+}
