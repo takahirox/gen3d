@@ -20,6 +20,11 @@ let refinementPass = true, partialModelState;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
 const app = createApp({
   dataDir: path.join(temp, 'data'),
+  inspectAsset: async a => {
+    const dir = path.join(app.store.library.root, a.id); fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, 'preview.png'));
+    return { meshes: 19, vertices: 5702, objects: [{ name: 'Fixture mesh', type: 'MESH' }] };
+  },
   conceptGenerator: {
     async generate() { if (failConcept) throw new Error('Fixture image provider unavailable'); return { bytes: png, ext: 'png' }; },
     async generateViews({ onImage }) {
@@ -111,6 +116,57 @@ try {
   assert.ok(await evaluate(visible('download')));
   await screenshot('desktop-model');
   check('automatic text workflow, dominant GLB preview, source links and exports');
+
+  // Actual import/configure/multi-selection UI; Blender inspection is injected.
+  await stage('input'); await click('#select-models'); await wait('document.querySelector("#library-dialog").open');
+  await evaluate('document.querySelector("#library-import").closest("details").open = true');
+  async function modelUpload(file) {
+    const dom = await call('DOM.getDocument');
+    const node = await call('DOM.querySelector', { nodeId: dom.root.nodeId, selector: '#library-file' });
+    await call('DOM.setFileInputFiles', { nodeId: node.nodeId, files: [file] });
+    await submit('#library-import');
+  }
+  await modelUpload(path.join(assets, 'model-1/model.glb')); await wait('document.querySelectorAll("#library-assets input").length === 1');
+  await modelUpload(path.join(assets, 'model-1/scene.blend')); await wait('document.querySelectorAll("#library-assets input").length === 2');
+  await evaluate('document.querySelectorAll("#library-assets input").forEach(e => e.click())');
+  await wait('document.querySelectorAll("#library-selected fieldset").length === 2');
+  await evaluate(`const rows = document.querySelectorAll('#library-selected fieldset'); rows[0].querySelector('textarea').value = 'overall shape/style'; rows[0].querySelector('textarea').dispatchEvent(new Event('input')); rows[1].querySelector('select').value = 'reuse-edit'; rows[1].querySelector('select').dispatchEvent(new Event('change'));`);
+  await submit('#library-selection'); await wait('!document.querySelector("#library-dialog").open');
+  assert.equal(app.store.get(automatic.id).modelReferences.length, 2);
+  await stage('input');
+  assert.ok(await evaluate('document.querySelector("#model-references").textContent.includes("Allow duplication & editing")'));
+  assert.ok(await evaluate('document.querySelector("#generate").disabled'));
+  await evaluate('document.querySelectorAll(".model-reference").forEach(row => row.querySelector("button").click())');
+  await until(() => app.store.get(automatic.id).modelReferences.every(r => r.review === 'approved'), '3D reference approvals');
+  await click('#select-models'); await wait('document.querySelectorAll("#library-assets input:checked").length === 2');
+  await fill('#library-selection', {});
+  const folder = path.join(temp, 'model-folder'); fs.mkdirSync(folder);
+  for (let i = 0; i < 55; i++) fs.copyFileSync(path.join(assets, 'model-1/model.glb'), path.join(folder, `folder-${i}.glb`));
+  await evaluate(`document.querySelector('#library-directory').value = ${JSON.stringify(folder)}`);
+  await submit('#library-folder'); await wait('document.querySelector("#library-status").textContent.includes("57 models")');
+  assert.equal(await evaluate('document.querySelectorAll("#library-assets input").length'), 40);
+  await click('#library-next'); await wait('document.querySelectorAll("#library-assets input").length === 17');
+  await evaluate('document.querySelector("#library-search").value = "folder-54"; document.querySelector("#library-search").dispatchEvent(new Event("input"))');
+  await wait('document.querySelectorAll("#library-assets input").length === 1');
+  await click('#library-assets input');
+  await submit('#library-selection'); await wait('!document.querySelector("#library-dialog").open');
+  assert.equal(app.store.get(automatic.id).modelReferences.length, 3);
+  const folderAsset = app.store.library.list({ search: 'folder-54' }).assets[0];
+  assert.ok(!fs.existsSync(path.join(app.store.library.root, folderAsset.id, 'model.glb')));
+  await click('#select-models'); await wait('document.querySelectorAll("#library-assets input").length === 1');
+  fs.unlinkSync(path.join(folder, 'folder-54.glb'));
+  await evaluate('document.querySelector("#library-search").dispatchEvent(new Event("input"))');
+  await wait('document.querySelector("#library-assets").textContent.includes("unavailable")');
+  assert.ok(await evaluate('document.querySelector("#library-assets input").disabled'));
+  await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  assert.ok(await evaluate('document.querySelector("#library-dialog").scrollWidth <= document.querySelector("#library-dialog").clientWidth + 1'));
+  await screenshot('library-narrow');
+  await call('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+  await click('#close-library'); await stage('input');
+  // Detach the missing folder file; managed selections remain reusable.
+  await request(`/projects/${automatic.id}/model-references`, 'POST', { models: app.store.get(automatic.id).modelReferences.filter(r => r.assetId !== folderAsset.id).map(({ assetId, role, permission }) => ({ assetId, role, permission })) });
+  await stage('model');
+  check('library GLB/.blend browser imports, multiple roles/permissions and approval, 57-entry pagination/search, external-folder no-copy/missing-file feedback, 390px dialog');
 
   const box = await evaluate(`(() => { const r = document.querySelector('#viewer canvas').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
   const imageHash = async () => (await call('Page.captureScreenshot', { format: 'png' })).data;
@@ -313,6 +369,17 @@ try {
   await wait('document.querySelector("#next-action").textContent === "Review references"'); await click('#next-action');
   assert.ok(await evaluate('document.querySelector("#references").closest("details").open'));
   await click('#references button'); await wait('document.querySelector("#references figcaption").textContent.includes("approved")');
+  await stage('input'); await click('#select-models');
+  await evaluate('document.querySelector("#library-search").value = "scene.blend"; document.querySelector("#library-search").dispatchEvent(new Event("input"))');
+  await wait('document.querySelectorAll("#library-assets input").length === 1 && document.querySelector("#library-assets").textContent.includes("scene.blend")'); await click('#library-assets input');
+  await submit('#library-selection'); await wait('!document.querySelector("#library-dialog").open');
+  assert.equal(app.store.get(imageProject.id).modelReferences.length, 1);
+  await stage('input'); await click('.model-reference button');
+  await until(() => app.store.get(imageProject.id).modelReferences[0].review === 'approved', 'reused library model approval');
+  await click('#select-models'); await wait('document.querySelectorAll("#library-selected fieldset").length === 1');
+  await click('#library-selected button'); await submit('#library-selection'); await wait('!document.querySelector("#library-dialog").open');
+  assert.equal(app.store.get(imageProject.id).modelReferences.length, 0);
+  check('image project reuses an existing .blend library entry without another import and detaches to zero references');
   check('browser project creation/image upload, reduced image path, model rejection/retry and MCP supplementary review');
 
   failConcept = true;

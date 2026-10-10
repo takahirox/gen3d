@@ -12,7 +12,7 @@ blender -b --python blender/gen3d_bridge.py -- --serve
 
 Then run `npm start` in a second terminal and open http://127.0.0.1:3333. `npm start` binds only to loopback. The Blender bridge also binds only to loopback, on port 9877. Both processes must run on the same machine with access to the project directory. Headless rendering uses Cycles on the CPU and requires no interactive GPU viewport.
 
-For interactive Blender instead, install `blender/gen3d_bridge.py` through **Edit → Preferences → Add-ons → Install from Disk** (in recent Blender, under the Add-ons menu). Enable the add-on, open the 3D View sidebar with **N**, and click **Start gen3d bridge** in the **gen3d** tab. Use a dedicated empty scene: new generation replaces its geometry. Revision opens the selected version's copied scene. The bridge runs Python on Blender's main thread; use it with trusted local clients and modeling instructions.
+For interactive Blender instead, install `blender/gen3d_bridge.py` through **Edit → Preferences → Add-ons → Install from Disk** (in recent Blender, under the Add-ons menu). Before enabling it, copy `blender/reference_runtime.py` into the same installed add-on directory as `gen3d_bridge.py` (not just the source/download directory). Enable the add-on, open the 3D View sidebar with **N**, and click **Start gen3d bridge** in the **gen3d** tab. Use a dedicated empty scene: new generation replaces its geometry. Revision opens the selected version's copied scene. The bridge runs Python on Blender's main thread; use it with trusted local clients and modeling instructions.
 
 ## Model and review
 
@@ -92,13 +92,16 @@ The **project MCP** interface manages workflow state. The separate **Blender MCP
 
 ## Persistence and configuration
 
-The default store is `~/.gen3d/`. A project contains `project.json`, its input/reference images, `concepts/<uuid>/` directories with generated PNG/task/output metadata, `reference-sets/<uuid>/` directories with separate images, provider tasks/audits and consistency reports, and `versions/<uuid>/` directories holding its task snapshot, model, scene, render and MCP audit. The audit records successful Blender MCP operation names, timestamps and code hashes. Raw Codex streams and credentials are not stored or served. A bounded final modeling summary is kept with the version. Projects use only the current schema (`schemaVersion: 1`); earlier schemas are unsupported. Backups of the current schema can preserve projects. The repository's `.gen3d/` is ignored for development data.
+The [local 3D model library](model-library.md) supports reusable managed imports, configured folder sources and per-project multi-selection with human inspection/reuse approval. It is stored in `<dataDir>/library/`, shared across projects. External source folders are never removed when clearing managed project data.
+
+The default store is `~/.gen3d/`. A project contains `project.json`, its input/reference images, `concepts/<uuid>/` directories with generated PNG/task/output metadata, `reference-sets/<uuid>/` directories with separate images, provider tasks/audits and consistency reports, and `versions/<uuid>/` directories holding its task snapshot, model, scene, render and MCP audit. The audit records successful Blender MCP operation names, timestamps and code hashes. Raw Codex streams and credentials are not stored or served. A bounded final modeling summary is kept with the version. Projects use only the current schema (`schemaVersion: 2`); earlier schemas are unsupported. Backups of the current schema can preserve projects. The repository's `.gen3d/` is ignored for development data.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GEN3D_DATA_DIR` | `~/.gen3d` | Server's project storage directory |
 | `GEN3D_PORT` | `3333` | Local app port |
 | `GEN3D_BLENDER_PORT` | `9877` | Dedicated bridge port; set for both Blender and server |
+| `GEN3D_BLENDER_BIN` | `blender` | Local Blender binary for model-library inspection |
 | `GEN3D_CODEX_BIN` | `codex` | Path to the installed CLI executable |
 | `GEN3D_URL` | `http://127.0.0.1:3333` | App URL used by project MCP/browser check |
 

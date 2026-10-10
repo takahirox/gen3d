@@ -6,9 +6,9 @@ import { crc32 } from 'node:zlib';
 import { Transformer } from '@napi-rs/image';
 import { referenceProfile, validateViewSet, consistencySettings, consistencyAllowsModeling } from './reference-set.js';
 
-export class AppError extends Error {
-  constructor(message, status = 400) { super(message); this.status = status; }
-}
+import { AppError } from './errors.js';
+export { AppError } from './errors.js';
+import { AssetLibrary } from './asset-library.js';
 export function text(value, name, max = 12000) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new AppError(`${name} must contain 1–${max} characters`);
   return value.trim();
@@ -60,16 +60,17 @@ export function currentReferenceSet(p, set) {
 
 // Only the HTTP server owns this store. MCP clients always use that server's API.
 export class Store {
-  constructor(root) {
+  constructor(root, options = {}) {
     this.root = path.resolve(root);
     fs.mkdirSync(this.root, { recursive: true });
     this.projects = new Map();
+    this.library = new AssetLibrary(this.root, options);
     for (const entry of fs.readdirSync(this.root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const file = path.join(this.root, entry.name, 'project.json');
       if (!fs.existsSync(file)) continue;
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (project.schemaVersion !== 1) throw new AppError('Unsupported project schema. Start fresh by clearing only the gen3d-managed data store; see docs/local-setup.md#start-fresh.');
+      if (project.schemaVersion !== 2) throw new AppError('Unsupported project schema. Start fresh by clearing only the gen3d-managed data store; see docs/local-setup.md#start-fresh.');
       this.projects.set(project.id, project);
       for (const set of project.referenceSets) {
         if (set.status === 'running') {
@@ -121,7 +122,7 @@ export class Store {
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
     const profile = referenceProfile(input.profile, prompt);
-    const p = { schemaVersion: 1, id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], versions: [], activity: [], updatedAt: '' };
+    const p = { schemaVersion: 2, id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], modelReferences: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -172,6 +173,37 @@ export class Store {
     // This boundary is human review, even when the reference was supplied by an AI.
     if (actor !== 'web') throw new AppError('Reference approval requires the web UI', 403);
     r.review = decision; this.event(p, actor, 'reference_reviewed', { referenceId: refId, decision }); this.save(p); return p;
+  }
+  async selectModels(id, input, actor) {
+    const p = this.get(id); this.idle(p);
+    if (!Array.isArray(input.models) || input.models.length > 32) throw new AppError('Select zero to 32 library models');
+    const seen = new Set();
+    const selections = [];
+    for (const item of input.models) {
+      if (!item || typeof item.assetId !== 'string' || seen.has(item.assetId)) throw new AppError('Choose unique library model IDs');
+      seen.add(item.assetId);
+      if (!['reference-only', 'reuse-edit'].includes(item.permission)) throw new AppError('Specify reference-only or reuse-edit permission');
+      if (item.role !== undefined && (typeof item.role !== 'string' || item.role.length > 1000)) throw new AppError('Role must contain at most 1000 characters');
+      const a = await this.library.inspected(item.assetId);
+      const selection = { assetId: a.id, name: a.name, origin: a.sourceId ? 'folder' : 'managed', role: (item.role || '').trim(), permission: item.permission, sha256: a.sha256, review: 'pending' };
+      const previous = p.modelReferences.find(r => r.assetId === a.id);
+      if (previous && previous.role === selection.role && previous.permission === selection.permission && previous.sha256 === a.sha256) selection.review = previous.review;
+      selections.push(selection);
+    }
+    // An asynchronous inspection must not mutate a newly running project.
+    this.idle(p);
+    p.modelReferences = selections;
+    this.event(p, actor, 'model_references_selected', { models: structuredClone(selections) }); this.save(p); return p;
+  }
+  reviewModelReference(id, assetId, decision, actor) {
+    const p = this.get(id); this.idle(p);
+    if (actor !== 'web') throw new AppError('3D reference and reuse permission approval requires the web UI', 403);
+    if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
+    const r = p.modelReferences.find(r => r.assetId === assetId);
+    if (!r) throw new AppError('Selected model not found', 404);
+    if (decision === 'approved' && this.library.verify(this.library.get(assetId)).sha256 !== r.sha256) throw new AppError('Model changed; reselect it before approval', 409);
+    r.review = decision;
+    this.event(p, actor, 'model_reference_reviewed', { assetId, role: r.role, permission: r.permission, sha256: r.sha256, decision }); this.save(p); return p;
   }
   reviewVersion(id, versionId, decision, actor) {
     const p = this.get(id);

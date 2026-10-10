@@ -121,3 +121,16 @@ dialog .panel-heading label { max-width: none; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 #refinement-history { overflow-wrap: anywhere; }
 #refinement-cycles pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 340px; overflow: auto; font-size: 12px; }
+
+#library-dialog { width: min(850px, calc(100vw - 32px)); max-height: 90vh; overflow: auto; }
+#library-assets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; }
+.library-card { display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--border, #526071); border-radius: 8px; }
+.library-card input { width: auto; }
+.library-card img, .model-reference img { width: 64px; height: 64px; object-fit: contain; }
+.library-card span, #library-sources p, #model-sources p, #library-selected legend { overflow-wrap: anywhere; min-width: 0; }
+.model-reference { padding: 12px 0; border-bottom: 1px solid #526071; }
+.model-reference button { margin: 4px; }
+#library-selection, #library-folder { margin-top: 20px; }
+#library-selected fieldset { margin-bottom: 12px; min-width: 0; }
+
+.model-reference p { overflow-wrap: anywhere; }

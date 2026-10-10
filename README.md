@@ -99,3 +99,5 @@ This repository is managed by ProjectWeave. For contribution and review guidance
 
 - [Development flow](docs/development-flow.md)
 - [Review guidelines](docs/review-guidelines.md)
+
+Optional [local 3D model references](docs/model-library.md) can be imported once or selected from human-configured folders, then reused across Text or Image projects with per-model inspection/reuse approval.

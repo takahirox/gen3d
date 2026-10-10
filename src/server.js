@@ -8,11 +8,11 @@ import { Runner } from './runner.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.json': 'application/json', '.jsonl': 'text/plain', '.md': 'text/plain', '.txt': 'text/plain' };
-async function body(req) {
+async function body(req, maxBytes = 14_100_000) {
   let size = 0; const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 14_100_000) throw new AppError('Request too large', 413);
+    if (size > maxBytes) throw new AppError('Request too large', 413);
     chunks.push(chunk);
   }
   try {
@@ -31,7 +31,7 @@ function sendFile(res, file, download) {
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
 
-export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, inspectReferences, inspectModel, env = process.env } = {}) {
+export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, inspectReferences, inspectModel, inspectAsset, env = process.env } = {}) {
   // A single server owns the data directory, even if a second process starts.
   fs.mkdirSync(dataDir, { recursive: true });
   const lockFile = path.join(path.resolve(dataDir), 'server.lock');
@@ -42,7 +42,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
   }
   fs.writeFileSync(lockFile, String(process.pid), { flag: 'wx' });
   let store;
-  try { store = new Store(dataDir); }
+  try { store = new Store(dataDir, { env, inspect: inspectAsset }); }
   catch (e) { fs.unlinkSync(lockFile); throw e; }
   const runner = new Runner(store, { generate, conceptGenerator, inspectReferences, inspectModel, env });
   const server = http.createServer(async (req, res) => {
@@ -60,6 +60,21 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         const actor = req.headers['x-gen3d-client'] === 'mcp' ? 'mcp' : 'web';
         if (req.method !== 'GET' && !req.headers['content-type']?.startsWith('application/json')) throw new AppError('Use application/json', 415);
         if (parts[1] === 'status' && req.method === 'GET') return json(res, 200, { busy: runner.active, usageLimited: runner.usageLimited, blenderPort: Number(env.GEN3D_BLENDER_PORT || 9877) });
+        if (parts[1] === 'library') {
+          const library = store.library;
+          if (parts.length === 2 && req.method === 'GET') return json(res, 200, library.list(Object.fromEntries(url.searchParams)));
+          if (parts[2] === 'imports' && req.method === 'POST') return json(res, 201, await library.import(await body(req, 90_000_000)));
+          if (parts[2] === 'sources' && parts.length === 3 && req.method === 'POST') return json(res, 201, library.addSource(await body(req), actor));
+          if (parts[2] === 'sources' && parts[4] === 'scan' && req.method === 'POST') return json(res, 200, library.scan(parts[3]));
+          if (parts[2] === 'assets' && parts.length === 4 && req.method === 'GET') return json(res, 200, library.get(parts[3]));
+          if (parts[2] === 'assets' && parts[4] === 'inspect' && req.method === 'POST') return json(res, 200, await library.inspected(parts[3]));
+          if (parts[2] === 'assets' && parts[4] === 'preview' && req.method === 'GET') return sendFile(res, library.preview(parts[3]));
+          throw new AppError('Library route not found', 404);
+        }
+        if (parts[1] === 'projects' && parts[3] === 'model-references' && req.method === 'POST') {
+          if (parts.length === 4) return json(res, 200, await store.selectModels(parts[2], await body(req), actor));
+          if (parts[5] === 'review') return json(res, 200, store.reviewModelReference(parts[2], parts[4], (await body(req)).decision, actor));
+        }
         if (parts[1] !== 'projects') throw new AppError('Route not found', 404);
         const id = parts[2];
         if (!id && req.method === 'GET') return json(res, 200, store.list());
