@@ -1,3 +1,0 @@
-Refined the existing model through gen3d_blender MCP: slimmer calves, flatter chest, adjusted jaw and nose, warmer skin, fuller hair, garment seams, and slimmer sneakers. Corrected the side and three-quarter cameras and inspected the renders.
-
-Preserved MPFB topology, targets, properties, and helper masking. Facial likeness, hair, and fine fabric details remain approximate.

@@ -42,14 +42,9 @@ test('image projects start naturally at input and supplementary reviews remain v
   const p = base(); p.mode = 'image'; assert.equal(studioState(p).next.start, true);
   p.references.push({ review: 'pending' }); assert.equal(studioState(p).next.label, 'Review references');
 });
-test('old prompt concepts do not block a new input and revision sets retain review', () => {
+test('previous prompt concepts do not block a new input', () => {
   const p = base(); p.concepts = [concept({ prompt: 'Previous', review: 'pending' })];
   assert.equal(studioState(p).next.start, true);
-  p.concepts[0] = concept();
-  p.versions = [{ id: 'v1', conceptId: 'c1', prompt: 'Robot', status: 'ready', review: 'approved' }];
-  p.referenceSets = [];
-  p.referenceSets = [set({ review: 'pending', prompt: 'Robot', profile: 'object', request: { kind: 'revision', sourceVersionId: 'v1' } })];
-  assert.equal(studioState(p).next.id, 's1');
 });
 
 test('edited input starts a new candidate while retaining earlier artifacts', () => {

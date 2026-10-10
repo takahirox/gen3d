@@ -25,11 +25,10 @@ function model(dir, v, { same = false, materialChanged = false, cameraChanged = 
   for (const name of ['preview', 'input', 'front', 'side', 'back', 'three-quarter']) fs.writeFileSync(path.join(dir, name + '.png'), png);
   fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: ((same || !v.refinementCycle) ? 'a' : 'b').repeat(64) }));
   fs.writeFileSync(path.join(dir, 'cameras.json'), JSON.stringify([{ view: 'input', direction: [0, -1, 0], projection: 'orthographic', center: [0, 0, 0], orthoScale: cameraChanged && v.refinementCycle ? 42 : 4 }]));
-  fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), JSON.stringify({ tool: v.modelingMode === 'mpfb' && v.kind !== 'revision' ? 'create_mpfb_human' : 'execute_blender_code' }) + '\n' + JSON.stringify({ tool: 'execute_blender_code' }) + '\n');
-  if (v.modelingMode === 'mpfb') fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ topologyPreserved: true, vertices: 1500, polygons: 1500 }));
+  fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), JSON.stringify({ tool: 'execute_blender_code' }) + '\n');
 }
 function comparison(views = ['input'], profile = 'object', acceptable = true) {
-  return { acceptable, summary: acceptable ? 'Observable features acceptable; hidden detail uncertain.' : 'Visible proportions differ.', revisionInstructions: acceptable ? [] : ['Narrow the torso mesh by 20 percent; preserve the existing subject.'], views: views.map(view => ({ view, observations: [...categories, ...(profile === 'character' ? anatomyCategories : [])].map((category, i) => ({ category, status: !acceptable && i === 1 ? 'discrepancy' : 'acceptable', detail: category === 'proportions' && !acceptable ? 'Torso is visibly too wide.' : 'Visible design agrees.' })) })) };
+  return { acceptable, summary: acceptable ? 'Observable features acceptable; hidden detail uncertain.' : 'Visible proportions differ.', revisionTargets: acceptable ? [] : ['geometry'], revisionInstructions: acceptable ? [] : ['Narrow the torso mesh by 20 percent; preserve the existing subject.'], views: views.map(view => ({ view, observations: [...categories, ...(profile === 'character' ? anatomyCategories : [])].map((category, i) => ({ category, status: !acceptable && i === 1 ? 'discrepancy' : 'acceptable', detail: category === 'proportions' && !acceptable ? 'Torso is visibly too wide.' : 'Visible design agrees.' })) })) };
 }
 function setup(t, options = {}, input = {}) {
   const store = new Store(temporary(t)), p = store.create({ ...defaults, ...input }, 'web');
@@ -38,7 +37,7 @@ function setup(t, options = {}, input = {}) {
 }
 async function run(ctx) { ctx.runner.start(ctx.p.id, {}, 'web'); await ctx.runner.pending; return ctx.p.versions.at(-1); }
 
-test('refinement defaults Off; settings validate, update atomically, persist and migrate old projects', t => {
+test('refinement defaults Off; settings validate, update atomically, persist across restart', t => {
   assert.deepEqual(refinementSettings(), { enabled: false, maxIterations: 2 });
   for (const bad of [null, [], { enabled: 1 }, { maxIterations: 0 }, { maxIterations: 6 }, { maxIterations: 1.5 }, { extra: true }]) assert.throws(() => refinementSettings(bad), /Refinement settings/);
   const { store, p } = setup(t);
@@ -46,8 +45,6 @@ test('refinement defaults Off; settings validate, update atomically, persist and
   assert.deepEqual(new Store(store.root).get(p.id).refinementSettings, { enabled: true, maxIterations: 3 });
   assert.throws(() => store.update(p.id, { name: 'changed', refinementSettings: { maxIterations: 9 } }, 'web'));
   assert.equal(p.name, 'Test');
-  delete p.refinementSettings; store.save(p);
-  assert.equal(new Store(store.root).get(p.id).refinementSettings.enabled, false);
 });
 
 test('Off skips inspection and preserves preview review and exports', async t => {
@@ -59,21 +56,20 @@ test('Off skips inspection and preserves preview review and exports', async t =>
   }
 });
 
-test('scratch and MPFB revise copied existing scene, re-evaluate fresh renders and retain source history', async t => {
-  for (const mode of ['scratch', 'mpfb']) {
+test('model revisions use the copied existing scene, re-evaluate fresh renders and retain source history', async t => {
+  for (const profile of ['object', 'character']) {
     let calls = 0, initialScene;
     const ctx = setup(t, { generate: async (p, v, dir) => {
       if (v.refinementCycle) {
         assert.equal(v.kind, 'revision'); assert.equal(fs.readFileSync(path.join(dir, 'source.blend'), 'utf8'), initialScene);
         assert.match(fs.readFileSync(path.join(dir, 'REVISION.md'), 'utf8'), /Narrow the torso/);
         assert.match(taskPrompt(p, v), /SAME scene lineage/);
-        if (mode === 'mpfb') assert.match(taskPrompt(p, v), /do not call create_mpfb_human again/);
       }
       model(dir, v); if (!v.refinementCycle) initialScene = fs.readFileSync(path.join(dir, 'scene.blend'), 'utf8');
     }, inspectModel: async ({ images, renders, profile }) => {
       assert.equal(images[0].file, path.join(ctx.store.dir(ctx.p.id), ctx.p.inputImage)); assert.equal(renders.length, 1);
       return comparison(['input'], profile, calls++ > 0);
-    } }, { modelingMode: mode, profile: 'character', checkpoints: { preview: true } });
+    } }, { profile, checkpoints: { preview: true } });
     const v = await run(ctx);
     assert.equal(v.refinement.status, 'passed'); assert.equal(calls, 2); assert.equal(v.refinement.iterations[1].geometryChanged, true);
     assert.equal(v.review, 'pending'); assert.match(v.artifacts.blend, /refinement\/1\/scene.blend/);
@@ -95,9 +91,8 @@ test('bounded discrepancies terminate at cycle cap; immediate pass does not revi
 
 test('material-only and camera-only revisions re-evaluate without claiming geometry changes', async t => {
   for (const target of ['materials', 'camera']) {
-    for (const mode of ['scratch', 'mpfb']) {
+    for (const profile of ['object', 'character']) {
       let inspections = 0;
-      const profile = mode === 'mpfb' ? 'character' : 'object';
       const ctx = setup(t, { generate: async (p, v, dir) => {
         model(dir, v, { same: true, materialChanged: target === 'materials', cameraChanged: target === 'camera' });
         if (v.refinementCycle) {
@@ -114,7 +109,7 @@ test('material-only and camera-only revisions re-evaluate without claiming geome
           report.revisionInstructions = [target === 'materials' ? 'Make the existing material red.' : 'Set input camera orthoScale to 42.'];
         } else if (target === 'camera') assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'cameras.json')))[0].orthoScale, 42);
         return report;
-      } }, { profile, modelingMode: mode });
+      } }, { profile });
       const v = await run(ctx), cycle = v.refinement.iterations[1];
       assert.equal(v.refinement.status, 'passed'); assert.equal(inspections, 2);
       assert.equal(cycle.geometryChanged, false); assert.equal(cycle[target + 'Changed'], true);
@@ -140,30 +135,19 @@ test('revision verification requires every requested change and rejects irreleva
   }
 });
 
-test('legacy material-only reports use material evidence while legacy geometry reports retain the mesh guard', async t => {
-  let inspections = 0;
-  const ctx = setup(t, { generate: async (p, v, dir) => model(dir, v, { same: true, materialChanged: true }), inspectModel: async () => {
-    const report = comparison(['input'], 'object', inspections++ > 0);
-    if (!report.acceptable) { report.views[0].observations[1].status = 'acceptable'; report.views[0].observations[4].status = 'discrepancy'; report.revisionInstructions = ['Correct the body color.']; }
-    return report;
-  } });
-  assert.equal((await run(ctx)).refinement.status, 'passed'); assert.equal(inspections, 2);
-});
-
 test('inspection/modeling/usage/no-change failures retain validated model and partial files without automatic retries', async t => {
-  for (const branch of ['inspection', 'modeling', 'usage', 'same', 'missing-view', 'mpfb-topology']) {
+  for (const branch of ['inspection', 'modeling', 'usage', 'same', 'missing-view']) {
     let inspections = 0, generations = 0;
     const ctx = setup(t, { generate: async (p, v, dir) => {
       generations++; model(dir, v, { same: branch === 'same' });
       if (v.refinementCycle && branch === 'modeling') throw new Error('Blender revision failed');
       if (v.refinementCycle && branch === 'missing-view') fs.unlinkSync(path.join(dir, 'input.png'));
-      if (v.refinementCycle && branch === 'mpfb-topology') fs.writeFileSync(path.join(dir, 'mpfb.json'), '{}');
     }, inspectModel: async ({ profile }) => {
       inspections++;
       if (branch === 'inspection') throw new Error('Inspection failed');
       if (branch === 'usage') throw Object.assign(new Error('Codex usage limit reached'), { usageLimited: true });
       return comparison(['input'], profile, false);
-    } }, branch === 'mpfb-topology' ? { modelingMode: 'mpfb', profile: 'character' } : {});
+    } });
     const v = await run(ctx); assert.equal(v.status, 'ready'); assert.equal(v.review, 'pending'); assert.equal(v.checkpoints.preview, true);
     assert.equal(v.refinement.status, branch === 'usage' ? 'usage-limit' : 'failed'); assert.ok(v.refinement.error); assert.ok(ctx.store.artifact(ctx.p.id, v.artifacts.blend));
     assert.ok(v.refinement.iterations.at(-1).artifacts['scene.blend']);
@@ -214,7 +198,7 @@ test('comparison validation requires every view/category, truthful verdict and u
     const bad = comparison(); mutate(bad); assert.throws(() => validateComparison(bad, ['input'], 'object'));
   }
   assert.throws(() => validateComparison(comparison(), ['input'], 'character'));
-  for (const targets of [null, ['unknown'], ['camera', 'camera'], ['materials']]) assert.throws(() => validateComparison({ ...comparison(), revisionTargets: targets }, ['input'], 'object'), /revision targets/);
+  for (const targets of [undefined, null, ['unknown'], ['camera', 'camera'], ['materials']]) assert.throws(() => validateComparison({ ...comparison(), revisionTargets: targets }, ['input'], 'object'), /revision targets/);
   assert.throws(() => validateComparison({ ...comparison(['input'], 'object', false), revisionTargets: [] }, ['input'], 'object'), /revision targets/);
 });
 

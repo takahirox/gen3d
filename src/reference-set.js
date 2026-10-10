@@ -12,7 +12,7 @@ export function consistencySettings(value = {}, previous = { enabled: true, onFa
 }
 
 export function consistencyAllowsModeling(set) {
-  const settings = consistencySettings(set.consistencySettings);
+  const settings = set.consistencySettings;
   return set.consistency?.status === 'passed'
     || (set.consistency?.status === 'failed' && settings.enabled && settings.onFailure === 'continue')
     || (set.consistency?.status === 'skipped' && !settings.enabled);
