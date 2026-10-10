@@ -26,7 +26,7 @@ async function preparation(kind, dir) {
     }
   });
   await assert.rejects(runner.realGenerate({ mode: 'image', inputImage: 'input.png', concepts: [], references: [] },
-    { kind, visualInput: 'input.png', imageInputs: ['input.png'], referenceIds: [], modelingMode: 'scratch' }, dir), error => error === captured);
+    { kind, visualInput: 'input.png', imageInputs: ['input.png'], modelingImages: [], referenceIds: [] }, dir), error => error === captured);
   return code;
 }
 const revisionPreparation = await preparation('revision', path.join(output, 'reopened'));

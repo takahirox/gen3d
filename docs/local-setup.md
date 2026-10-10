@@ -14,10 +14,6 @@ Then run `npm start` in a second terminal and open http://127.0.0.1:3333. `npm s
 
 For interactive Blender instead, install `blender/gen3d_bridge.py` through **Edit → Preferences → Add-ons → Install from Disk** (in recent Blender, under the Add-ons menu). Enable the add-on, open the 3D View sidebar with **N**, and click **Start gen3d bridge** in the **gen3d** tab. Use a dedicated empty scene: new generation replaces its geometry. Revision opens the selected version's copied scene. The bridge runs Python on Blender's main thread; use it with trusted local clients and modeling instructions.
 
-## Optional MPFB humanoids
-
-For a locally generated continuous human base mesh, see [MPFB setup](mpfb.md). It documents compatible versions, enabling the add-on in this same Blender process, optional local assets, the availability check, explicit modeling selection and comparisons. Existing Blender modeling and props remain usable without MPFB.
-
 ## Model and review
 
 1. Click **New project** (+) and create a project using either a text description or a PNG/JPEG/WebP upload (maximum 10 MB). Image projects can optionally include modeling instructions. They do not require a preceding text/concept stage.
@@ -35,7 +31,7 @@ Use the concept/view selectors or compact thumbnails for earlier image candidate
 
 The browser polls shared project state every 1.5 seconds. New artifacts and MCP edits appear without refresh; browsing an explicitly selected historical candidate stays stable when a newer one arrives. Unsaved form edits survive polling. Revisions, regeneration and acceptance resume following the current workflow; the **Next step** button can also take you from a historical artifact to a pending review. On narrow screens, project navigation becomes a horizontal strip and contextual actions sit below the preview. Keyboard users can Tab through stage buttons, activate them with Enter/Space and use arrow keys to pan a focused 3D viewer; **Fit model** restores framing. If WebGL/model loading fails, inspect the rendered preview and use available exports.
 
-The shared HTTP/MCP setting names are `input`, `concept`, `multiView` and `preview`, each a boolean under `checkpoints`. Disabled checkpoints continue automatically and record automatic acceptance. Changing checkpoint settings does not approve a pending concept/view-set/model/input. Explicit rejection remains effective until input/concept acceptance or deliberate regeneration. Existing text projects also require a concept and complete valid reference set allowed by its saved consistency policy for new modeling; their historical artifacts remain viewable.
+The shared HTTP/MCP setting names are `input`, `concept`, `multiView` and `preview`, each a boolean under `checkpoints`. Disabled checkpoints continue automatically and record automatic acceptance. Changing checkpoint settings does not approve a pending concept/view-set/model/input. Explicit rejection remains effective until input/concept acceptance or deliberate regeneration. Text projects require a concept and complete valid reference set allowed by its saved consistency policy for new modeling; their historical artifacts remain viewable.
 
 Consistency settings use `consistencySettings: { enabled: true, onFailure: "stop" }` in shared HTTP/MCP state. `enabled` is boolean; `onFailure` is `"stop"` or `"continue"`. The failure selector is disabled in the UI when inspection is Off, while retaining its saved preference. Both settings persist in `project.json`; HTTP create/PATCH and MCP `create_project`/`update_project` accept them. Checkpoints remain controlled separately by human review.
 
@@ -96,7 +92,7 @@ The **project MCP** interface manages workflow state. The separate **Blender MCP
 
 ## Persistence and configuration
 
-The default store is `~/.gen3d/`. A project contains `project.json`, its input/reference images, `concepts/<uuid>/` directories with generated PNG/task/output metadata, `reference-sets/<uuid>/` directories with separate images, provider tasks/audits and consistency reports, and `versions/<uuid>/` directories holding its task snapshot, model, scene, render and MCP audit. The audit records successful Blender MCP operation names, timestamps and code hashes. Raw Codex streams and credentials are not stored or served. A bounded final modeling summary is kept with the version. Back up this directory to preserve projects. The repository's `.gen3d/` is ignored for development data.
+The default store is `~/.gen3d/`. A project contains `project.json`, its input/reference images, `concepts/<uuid>/` directories with generated PNG/task/output metadata, `reference-sets/<uuid>/` directories with separate images, provider tasks/audits and consistency reports, and `versions/<uuid>/` directories holding its task snapshot, model, scene, render and MCP audit. The audit records successful Blender MCP operation names, timestamps and code hashes. Raw Codex streams and credentials are not stored or served. A bounded final modeling summary is kept with the version. Projects use only the current schema (`schemaVersion: 1`); earlier schemas are unsupported. Backups of the current schema can preserve projects. The repository's `.gen3d/` is ignored for development data.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -107,6 +103,30 @@ The default store is `~/.gen3d/`. A project contains `project.json`, its input/r
 | `GEN3D_URL` | `http://127.0.0.1:3333` | App URL used by project MCP/browser check |
 
 Only one server may own a data directory. Modeling is serialized globally across projects because Blender has one current scene. Each modeling job uses a fresh Codex session with the prompt, required base and all views/upload image, optional references and selected scene as its context. gen3d uses the CLI default subscription model, does not load unrelated global user MCP integrations/hooks, and does not alter credentials. Shell execution remains sandboxed; Blender Python executes inside the dedicated Blender process.
+
+## Start fresh
+
+This is an intentional breaking change. Use an empty gen3d data store; old projects, reports and generated state are unsupported. There is no migration, import, backfill or automatic deletion on startup. An unsupported `project.json` stops startup with a clean-start error.
+
+1. Stop the gen3d server and its project MCP clients. Wait for any active job to finish so it cannot recreate deleted data.
+2. Confirm the exact store used by the server: `~/.gen3d` by default, or the resolved `GEN3D_DATA_DIR` configured for that server. Check its contents before deleting anything.
+3. If the directory is dedicated exclusively to gen3d, remove it explicitly. For the default store only:
+
+   ```sh
+   rm -r -- "$HOME/.gen3d"
+   ```
+
+   For a custom store, replace that path with its verified absolute path. Do not run a recursive deletion on a shared directory, a home directory, an external asset library or an arbitrary user folder. If unrelated files coexist in the custom store, remove only the confirmed gen3d project directories (UUID directories containing `project.json` and their managed artifacts) and the stopped server's `server.lock`; leave unrelated files untouched. Alternatively point `GEN3D_DATA_DIR` to a new empty directory dedicated to gen3d.
+4. At the gen3d app's own origin (for example `http://127.0.0.1:3333`), remove only its saved browser project selection in the developer console:
+
+   ```js
+   localStorage.removeItem('gen3d-project');
+   ```
+
+   Reload the page after restarting the server. Do not clear all browser data or storage for other apps.
+5. Start the server with the intended `GEN3D_DATA_DIR`, create a new text or image project, and choose its review, consistency and refinement settings.
+
+Resetting gen3d application data discards its projects, reviews and generated artifacts. It never requires uninstalling user-installed Blender add-ons (including standalone MPFB), deleting third-party assets or changing Blender preferences. gen3d does not perform any of those operations.
 
 ## Failures and checks
 
@@ -132,4 +152,4 @@ Set `GEN3D_CHROME_URL` for a different debugging port, `GEN3D_VERSION_ID` for an
 
 ## Optional visual refinement
 
-Enable refinement and choose 1–5 maximum revision cycles in Review & settings; default Off preserves existing behavior. Each comparison/revision consumes the local ChatGPT Codex allowance. Scratch and MPFB humanoid jobs retain original approved references and checkpoints. See [refinement settings, stop reasons, artifacts and API](refinement.md) and [Issue #18 validation](validation-issue18.md).
+Enable refinement and choose 1–5 maximum revision cycles in Review & settings; default Off preserves existing behavior. Each comparison/revision consumes the local ChatGPT Codex allowance. All jobs retain original approved references and checkpoints. See [refinement settings, stop reasons, artifacts and API](refinement.md) and [Issue #18 validation](validation-issue18.md).

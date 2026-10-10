@@ -1,12 +1,6 @@
 // Presentation only: all workflow and review decisions remain server-owned.
 export const stageNames = { input: 'Input', concept: 'Base concept', views: 'Multi-view', model: '3D model' };
-export function currentConcept(p, c) { return c.prompt === p.prompt && (!c.profile || c.profile === p.profile); }
-export function revisionReferenceSet(p, set) {
-  const source = set.request?.kind === 'revision' && p.versions.find(v => v.id === set.request.sourceVersionId && v.status === 'ready');
-  const concept = p.concepts.find(c => c.id === set.conceptId && c.status === 'ready' && c.review === 'approved');
-  return Boolean(source && concept && source.conceptId === concept.id && source.prompt === set.prompt
-    && set.prompt === concept.prompt && (!concept.profile || set.profile === concept.profile));
-}
+export function currentConcept(p, c) { return c.prompt === p.prompt && c.profile === p.profile; }
 export function consistencyAllowsModeling(set) {
   return set.consistency.status === 'passed'
     || (set.consistency.status === 'failed' && set.consistencySettings?.enabled && set.consistencySettings.onFailure === 'continue')
@@ -16,7 +10,7 @@ export function studioState(p) {
   const concept = p.concepts.at(-1), views = p.referenceSets.at(-1), model = p.versions.at(-1);
   const pendingInput = ((p.checkpoints.input || p.inputCheckpoint) && p.inputReview !== 'approved') || p.inputReview === 'rejected';
   const pendingConcept = p.concepts.find(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'pending');
-  const pendingViews = p.referenceSets.find(s => (s.conceptId === p.selectedConceptId || revisionReferenceSet(p, s)) && s.status === 'ready' && s.review === 'pending');
+  const pendingViews = p.referenceSets.find(s => s.conceptId === p.selectedConceptId && s.status === 'ready' && s.review === 'pending');
   const pendingModel = p.versions.find(v => v.status === 'ready' && v.checkpoints?.preview && v.review === 'pending');
   const pendingReference = p.references.some(r => r.review === 'pending');
   const running = [['concept', p.concepts], ['views', p.referenceSets], ['model', p.versions]].find(([, items]) => items.some(a => a.status === 'running'))?.[0];

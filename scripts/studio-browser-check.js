@@ -16,7 +16,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-studio-browser-'));
 const assets = path.join(root, 'docs/validation/issue10/prop');
 const checkpoints = { input: false, concept: false, multiView: false, preview: false };
 const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
-let missingMpfb = false, refinementPass = true, partialModelState;
+let refinementPass = true, partialModelState;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
 const app = createApp({
   dataDir: path.join(temp, 'data'),
@@ -32,23 +32,16 @@ const app = createApp({
   inspectReferences: async () => inspection,
   inspectModel: async ({ dir, renders, profile }) => {
     const acceptable = refinementPass && path.basename(dir) === '1';
-    return { acceptable, summary: acceptable ? 'Fixture visual pass.' : 'Fixture torso discrepancy.', revisionInstructions: acceptable ? [] : ['Narrow the torso mesh.'],
+    return { acceptable, summary: acceptable ? 'Fixture visual pass.' : 'Fixture torso discrepancy.', revisionTargets: acceptable ? [] : ['geometry'], revisionInstructions: acceptable ? [] : ['Narrow the torso mesh.'],
       views: renders.map(r => ({ view: r.view, observations: [...categories, ...(profile === 'character' ? anatomyCategories : [])].map((category, i) => ({ category, status: !acceptable && i === 1 ? 'discrepancy' : 'acceptable', detail: 'Synthetic browser fixture observation.' })) })) };
   },
   generate: async (p, v, dir) => {
     if (releaseModel) await new Promise(resolve => { releaseModel = resolve; });
-    if (v.modelingMode === 'mpfb' && missingMpfb) throw new Error('MPFB is missing or disabled. Install and enable MPFB; see docs/mpfb.md.');
     if (failModel) throw new Error('Fixture Blender bridge unavailable');
     for (const name of ['model.glb', 'scene.blend', 'preview.png', 'mcp-audit.jsonl']) fs.copyFileSync(path.join(assets, 'model-1', name), path.join(dir, name));
     if (v.refinementSettings?.enabled) {
       fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: (v.refinementCycle ? 'b' : 'a').repeat(64) }));
       for (const view of ['input', 'front', 'side', 'back', 'three-quarter']) fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, view + '.png'));
-    }
-    // Recorded prop files below are UI fixtures, never evidence of MPFB generation.
-    if (v.profile === 'character') for (const view of ['front', 'side', 'three-quarter']) fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, view + '.png'));
-    if (v.modelingMode === 'mpfb') {
-      fs.writeFileSync(path.join(dir, 'mpfb.json'), JSON.stringify({ vertices: 19158, polygons: 18486, topologyPreserved: true }));
-      fs.writeFileSync(path.join(dir, 'mcp-audit.jsonl'), fs.readFileSync(path.join(dir, 'mcp-audit.jsonl'), 'utf8').trim() + '\n{"tool":"create_mpfb_human"}\n');
     }
     if (partialModelState) {
       partialModelState.entered(); await partialModelState.gate;
@@ -135,9 +128,9 @@ try {
   const glb = await fetch(download); assert.ok(glb.ok); assert.equal(Buffer.from(await glb.arrayBuffer()).subarray(0, 4).toString(), 'glTF');
   assert.ok((await fetch(await evaluate('document.querySelector("#blend-download").href'))).ok);
   check('GLB and Blender scene download');
-  const legacyCheck = spawn(process.execPath, [path.join(root, 'scripts/browser-check.js')], { env: { ...process.env, GEN3D_URL: url, GEN3D_CHROME_URL: chromeUrl, GEN3D_PROJECT_ID: automatic.id, GEN3D_BROWSER_OUTPUT: path.join(temp, 'legacy-browser-check') }, stdio: ['ignore', 'pipe', 'pipe'] });
-  let legacyError = ''; legacyCheck.stdout.resume(); legacyCheck.stderr.on('data', chunk => { legacyError = (legacyError + chunk.toString()).slice(-4000); });
-  const [legacyExit] = await once(legacyCheck, 'exit'); assert.equal(legacyExit, 0, legacyError);
+  const viewerCheck = spawn(process.execPath, [path.join(root, 'scripts/browser-check.js')], { env: { ...process.env, GEN3D_URL: url, GEN3D_CHROME_URL: chromeUrl, GEN3D_PROJECT_ID: automatic.id, GEN3D_BROWSER_OUTPUT: path.join(temp, 'viewer-browser-check') }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let viewerError = ''; viewerCheck.stdout.resume(); viewerCheck.stderr.on('data', chunk => { viewerError = (viewerError + chunk.toString()).slice(-4000); });
+  const [viewerExit] = await once(viewerCheck, 'exit'); assert.equal(viewerExit, 0, viewerError);
   await call('Page.bringToFront');
   check('existing browser validator adapted to stage selectors (recorded fixture assets)');
   await click('#model-sources button'); await wait(visible('stage-concept'));
@@ -231,28 +224,18 @@ try {
   check('Stop/continued/skipped consistency, effective policy, report access and saved settings');
 
 
-  const humanoid = await request('/projects', 'POST', { name: 'Humanoid mode fixture', mode: 'image', prompt: 'A fictional adult human', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'character', checkpoints });
+  const humanoid = await request('/projects', 'POST', { name: 'Humanoid fixture', mode: 'image', prompt: 'A fictional adult human', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'character', checkpoints });
   await request(`/projects/${humanoid.id}/generate`, 'POST', {}); await app.runner.pending;
   await chooseProject(humanoid.id); await wait(visible('stage-model'));
-  assert.ok(await evaluate('!document.querySelector("#modeling").hidden'));
-  missingMpfb = true;
-  await fill('#modeling', { modelingMode: 'mpfb' }); await submit('#modeling');
-  await until(() => app.store.get(humanoid.id).modelingMode === 'mpfb', 'MPFB selection saved');
-  await click('#retry'); await wait('document.querySelector("#version-info").textContent.includes("Install and enable MPFB")');
-  assert.equal(app.store.get(humanoid.id).versions[1].status, 'failed');
-  assert.equal(app.store.get(humanoid.id).versions[0].modelingMode, 'scratch');
-  missingMpfb = false;
-  await click('#retry'); await wait('document.querySelector("#versions").options.length === 3');
-  await until(() => app.store.get(humanoid.id).versions[2].status === 'ready', 'MPFB fixture ready');
-  await wait('document.querySelector("#comparison-images").querySelectorAll("img").length === 6');
-  assert.ok(await evaluate('document.querySelector("#comparison-info").textContent.includes("exact same")'));
-  assert.ok(await evaluate('document.querySelector("#version-info").textContent.includes("MPFB-assisted")'));
+  assert.ok(await evaluate('!document.querySelector("[name=modelingMode]") && !document.querySelector("#comparison")'));
+  await click('#retry');
+  await until(() => app.store.get(humanoid.id).versions.length === 2 && app.store.get(humanoid.id).versions[1].status === 'ready', 'humanoid retry ready');
+  await wait('document.querySelector("#versions").options.length === 2');
   await stage('input');
   assert.ok(await evaluate('!document.querySelector("#edit").elements.profile.closest("label").hidden'));
-  await fill('#edit', { profile: 'object' });
-  assert.equal(await evaluate('document.querySelector("#edit").elements.modelingMode.value'), 'scratch');
-  assert.ok(await evaluate('document.querySelector("#edit option[value=mpfb]").disabled'));
-  check('humanoid mode selection, visible missing-MPFB failure, immutable baseline and same-reference render comparison (mocked)');
+  await fill('#edit', { profile: 'object' }); await submit('#edit');
+  await until(() => app.store.get(humanoid.id).profile === 'object', 'image profile saved');
+  check('single Blender flow, humanoid retry and editable image profile (injected fixtures)');
 
   const refining = await request('/projects', 'POST', { name: 'Refinement fixture', mode: 'image', image: 'data:image/png;base64,' + png.toString('base64'), profile: 'object', checkpoints: { ...checkpoints, preview: true } });
   await chooseProject(refining.id); await click('#show-settings');
