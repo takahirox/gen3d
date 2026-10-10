@@ -1,0 +1,141 @@
+{
+  "realBlender": true,
+  "codexUsed": false,
+  "checkedAt": "2026-10-10T02:42:18.459Z",
+  "checks": [
+    "material-only edit changes exported GLB and input render while preserving mesh hash",
+    "camera-only edit changes input render while preserving mesh hash",
+    "scale 42 and target [1,2,3] preserved by production existing-scene revision and export",
+    "consecutive fresh generation and retry clear stale camera directions/framing and export bounds-based scale 2.6 and center [0,0,0]",
+    "all four views honor independent scales and target centers",
+    "invalid scale/center overrides fail explicitly"
+  ],
+  "geometryHashes": [
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0",
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0",
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0",
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0",
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0",
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0",
+    "6d10aab979c8874b41f69cf872b319e84a739bea1bf9be899e989670487808e0"
+  ],
+  "cameras": [
+    {
+      "view": "input",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "projection": "orthographic",
+      "orthoScale": 42,
+      "center": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "fresh": [
+    {
+      "view": "input",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "projection": "orthographic",
+      "orthoScale": 2.5999999046325684,
+      "center": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "retry": [
+    {
+      "view": "input",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "projection": "orthographic",
+      "orthoScale": 2.5999999046325684,
+      "center": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "multiView": [
+    {
+      "view": "front",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "projection": "orthographic",
+      "orthoScale": 5,
+      "center": [
+        0,
+        0,
+        0.5
+      ]
+    },
+    {
+      "view": "side",
+      "direction": [
+        -1,
+        0,
+        0
+      ],
+      "projection": "orthographic",
+      "orthoScale": 6,
+      "center": [
+        0.10000000149011612,
+        0,
+        0.5
+      ]
+    },
+    {
+      "view": "back",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "projection": "orthographic",
+      "orthoScale": 7,
+      "center": [
+        0.20000000298023224,
+        0,
+        0.5
+      ]
+    },
+    {
+      "view": "three-quarter",
+      "direction": [
+        -1,
+        -1,
+        0.1
+      ],
+      "projection": "orthographic",
+      "orthoScale": 8,
+      "center": [
+        0.30000001192092896,
+        0,
+        0.5
+      ]
+    }
+  ],
+  "renderHashes": {
+    "initial": "026a2b584dab17bccc7111aa670dc138628fda0b0373e3049b4cfba457a0a94e",
+    "material": "b6de3c4ed0418d9d3ab94c889681aaf90f4bda4b2f219de3a94cb8e4bb8f22a4",
+    "camera": "8c935f244f17260cd57852e1daae6464e3057d7f190ba119d109165676902135"
+  },
+  "limitation": "Deterministic Blender export check, not a fresh Codex modeling/inspection trial or evidence of visual quality improvement."
+}

@@ -4,6 +4,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { stageNames, studioState, currentConcept, consistencyAllowsModeling } from './studio-state.js';
 
+import { setupLibrary } from './library.js';
+
 const $ = id => document.getElementById(id);
 let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId = null, loaded = '', model = null, lastState = '', loadToken = 0;
 let stage = 'input', stagePinned = false, conceptId = null, viewId = null;
@@ -200,6 +202,22 @@ function render() {
   if (!regenerableSets.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'Selected base concept'; target.append(o); }
   if (!$('views-retry').dataset.dirty && regenerableSets.some(s => s.id === set?.id)) target.value = set.id;
   else if (regenerableSets.some(s => s.id === previous)) target.value = previous;
+  const modelPanel = $('model-references');
+  const modelSignature = JSON.stringify([p.id, p.modelReferences, projectBusy]);
+  if (modelPanel.dataset.state !== modelSignature) {
+    modelPanel.dataset.state = modelSignature;
+    modelPanel.replaceChildren(...p.modelReferences.map(r => {
+      const row = document.createElement('div'); row.className = 'model-reference';
+      const image = document.createElement('img'); image.src = `/api/library/assets/${r.assetId}/preview`; image.loading = 'lazy'; image.alt = ''; image.onerror = () => image.remove();
+      const info = document.createElement('p'); info.textContent = `${r.name} · ${r.origin === 'folder' ? 'External folder' : 'Managed import'} · ${r.role || 'General shape/style'} · ${r.permission === 'reuse-edit' ? 'Allow duplication & editing' : 'Inspect only'} · ${r.review}`;
+      row.append(image, info);
+      for (const decision of ['approved', 'rejected']) row.append(button(decision === 'approved' ? (r.permission === 'reuse-edit' ? 'Approve use & reuse/edit' : 'Approve inspection only') : 'Reject', () => api(`/projects/${p.id}/model-references/${r.assetId}/review`, 'POST', { decision }), projectBusy));
+      row.append(button('Detach', () => api(`/projects/${p.id}/model-references`, 'POST', { models: p.modelReferences.filter(x => x.assetId !== r.assetId).map(({ assetId, role, permission }) => ({ assetId, role, permission })) }), projectBusy));
+      return row;
+    }));
+    if (!p.modelReferences.length) modelPanel.append(placeholder('No 3D references selected. Text or Image generation works without them.'));
+  }
+  $('select-models').disabled = projectBusy;
   $('reference-count').textContent = `(${p.references.length})`;
   $('references').replaceChildren(...p.references.map(r => {
     const node = figure(r.file, `${r.label} · ${r.review}`), actions = document.createElement('div'); actions.className = 'actions';
@@ -219,6 +237,10 @@ function render() {
     ...(sourceSet ? [button(`Source view set ${sourceSet.number}`, () => { viewId = sourceSet.id; chooseStage('views'); })] : []),
     ...(v && p.mode === 'image' ? [button('Source input image', () => chooseStage('input'))] : [])
   ]);
+  for (const r of v?.modelReferences || []) {
+    const info = document.createElement('p'); info.textContent = `3D source: ${r.name} · ${r.role || 'General shape/style'} · ${r.permission} · ${r.origin} · SHA-256 ${r.sha256}`; $('model-sources').append(info);
+  }
+  if (v?.artifacts.modelReferences) { const link = document.createElement('a'); link.href = artifact(v.artifacts.modelReferences); link.textContent = '3D source inspection evidence'; $('model-sources').append(link); }
   for (const [id, key] of [['download', 'glb'], ['blend-download', 'blend']]) {
     $(id).hidden = stage !== 'model' || v?.status !== 'ready' || !v?.artifacts[key] || (v.checkpoints?.preview && v.review !== 'approved');
     if (v?.artifacts[key]) { $(id).href = artifact(v.artifacts[key]) + '?download=1'; $(id).download = key === 'glb' ? 'model.glb' : 'scene.blend'; }
@@ -295,5 +317,6 @@ for (const [buttonId, detailsId] of [['show-settings', 'advanced'], ['show-histo
   const details = $(detailsId); details.open = true; details.scrollIntoView({ block: 'start' }); details.querySelector('summary').focus({ preventScroll: true });
 };
 $('fit').onclick = fit;
+setupLibrary({ api, project, refresh });
 await safe(refresh);
 setInterval(() => refresh().catch(() => {}), 1500);

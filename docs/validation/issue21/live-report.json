@@ -1,0 +1,50 @@
+{
+  "live": true,
+  "realBlender": true,
+  "codexUsed": true,
+  "status": "ready",
+  "error": null,
+  "usageLimited": false,
+  "elapsedMs": 72923,
+  "sourceHashes": {
+    "c7de4889-5bb5-4af1-9343-e0a115a456c4": "b0d3c893438a6fc0513d7c398e0ec56634aaaae1d831d44c76e0ce94fb36db62",
+    "88f06ce8-9b6d-479b-837a-d7176e6495e2": "71ce71d7f4fefbac0ff749ba84aa54ac1681a50364b87d04a0862db61ed48d97"
+  },
+  "unchangedSources": true,
+  "modelReferences": [
+    {
+      "assetId": "c7de4889-5bb5-4af1-9343-e0a115a456c4",
+      "name": "stylized-cabinet.glb",
+      "role": "Reusable stylized cabinet body, doors, knobs and feet",
+      "permission": "reuse-edit",
+      "sha256": "b0d3c893438a6fc0513d7c398e0ec56634aaaae1d831d44c76e0ce94fb36db62",
+      "origin": "managed",
+      "format": "glb"
+    },
+    {
+      "assetId": "88f06ce8-9b6d-479b-837a-d7176e6495e2",
+      "name": "scene.blend",
+      "role": "Inspect stylized proportions and materials; no geometry incorporation",
+      "permission": "reference-only",
+      "sha256": "71ce71d7f4fefbac0ff749ba84aa54ac1681a50364b87d04a0862db61ed48d97",
+      "origin": "folder",
+      "format": "blend"
+    }
+  ],
+  "isolation": {
+    "scenes": 1,
+    "referenceObjects": 0,
+    "reusedMeshes": 19,
+    "meshes": 19
+  },
+  "artifacts": {
+    "glb": "docs/validation/issue21/live/model.glb",
+    "blend": "docs/validation/issue21/live/scene.blend",
+    "render": "docs/validation/issue21/live/preview.png",
+    "task": "docs/validation/issue21/live/TASK.md",
+    "audit": "docs/validation/issue21/live/mcp-audit.jsonl",
+    "modelReferences": "docs/validation/issue21/live/model-references.json"
+  },
+  "summary": "Created and inspected the teal cabinet with two doors, round orange knobs, four tapered orange feet, and an overhanging top.\n\nReused the authorized GLB geometry and refined its materials. The inspection-only .blend guided proportions and finish; none of its geometry was incorporated. All 19 mesh parts have materials and are ready for GLB export.",
+  "limitation": "Real image-input cabinet trial with two local references; not an anime character aesthetic comparison or live text image-generation trial. Human final preview remains pending."
+}

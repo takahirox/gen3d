@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-10",
+  "base": "d30321eedda2 (current main including #20), merged into assigned GitWeave worktree",
+  "npm test": {
+    "passed": 91,
+    "failed": 0
+  },
+  "npm run check": "passed",
+  "npm run test:browser": "passed (22 checks; injected generation/inspection)",
+  "npm run test:library-blender": "passed (real Blender 5.1.2)",
+  "node scripts/refinement-export-check.js": "passed (real Blender)",
+  "npm run validate:library-live": "passed (one real Codex/Blender image-input trial; no reset/purchase/model switch)",
+  "limitations": [
+    "Live text image-generation and an anime aesthetic comparison were not run",
+    "Unit/browser generation fixtures do not prove AI use; live MCP audit records both actual reference inspections and 19 authorized mesh copies",
+    "Only self-contained GLB and packed uncompressed .blend are supported"
+  ]
+}

@@ -8,8 +8,10 @@
     "start": "node src/server.js",
     "mcp": "node src/mcp.js",
     "test": "node --test",
+    "test:library-blender": "node scripts/library-blender-check.js",
+    "validate:library-live": "node scripts/library-live-validation.js",
     "test:browser": "node scripts/studio-browser-check.js",
-    "check": "node --check src/server.js && node --check src/store.js && node --check src/runner.js && node --check src/refinement.js && node --check src/codex.js && node --check src/concept.js && node --check src/reference-set.js && node --check src/mcp.js && node --check src/blender-mcp.js && node --check src/blender.js && node --check web/app.js && node --check web/studio-state.js && node --check scripts/refinement-validation.js && node --check scripts/refinement-export-check.js && node --check scripts/browser-check.js && node --check scripts/studio-browser-check.js"
+    "check": "node --check src/asset-library.js && node --check src/errors.js && node --check src/server.js && node --check src/store.js && node --check src/runner.js && node --check src/refinement.js && node --check src/codex.js && node --check src/concept.js && node --check src/reference-set.js && node --check src/mcp.js && node --check src/blender-mcp.js && node --check src/blender.js && node --check web/library.js && node --check web/app.js && node --check web/studio-state.js && node --check scripts/refinement-validation.js && node --check scripts/refinement-export-check.js && node --check scripts/browser-check.js && node --check scripts/studio-browser-check.js && node --check scripts/library-blender-check.js && node --check scripts/library-live-validation.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

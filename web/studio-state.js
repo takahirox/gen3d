@@ -12,7 +12,7 @@ export function studioState(p) {
   const pendingConcept = p.concepts.find(c => currentConcept(p, c) && c.status === 'ready' && c.review === 'pending');
   const pendingViews = p.referenceSets.find(s => s.conceptId === p.selectedConceptId && s.status === 'ready' && s.review === 'pending');
   const pendingModel = p.versions.find(v => v.status === 'ready' && v.checkpoints?.preview && v.review === 'pending');
-  const pendingReference = p.references.some(r => r.review === 'pending');
+  const pendingReference = p.references.some(r => r.review === 'pending') || p.modelReferences?.some(r => r.review === 'pending');
   const running = [['concept', p.concepts], ['views', p.referenceSets], ['model', p.versions]].find(([, items]) => items.some(a => a.status === 'running'))?.[0];
   function artifactState(a) {
     if (!a) return 'Future';
@@ -36,7 +36,7 @@ export function studioState(p) {
   else if (pendingConcept) next = { stage: 'concept', id: pendingConcept.id, label: 'Review concept', message: 'Choose whether to accept, reject or regenerate the concept.' };
   else if (pendingViews) next = { stage: 'views', id: pendingViews.id, label: states.views === 'Failed' ? 'Inspect blocked views' : 'Review views', message: states.views === 'Failed' ? 'Consistency blocked this set. Inspect the report and regenerate the views.' : 'Compare the views, then explicitly accept, reject or regenerate the set.' };
   else if (pendingModel) next = { stage: 'model', id: pendingModel.id, label: 'Review model', message: 'Inspect the model and render. Approve the preview to unlock export.' };
-  else if (pendingReference) next = { stage: 'input', label: 'Review references', message: 'Review the pending supplementary images before modeling.' };
+  else if (pendingReference) next = { stage: 'input', label: 'Review references', message: 'Review the pending supplementary images and 3D model permissions before modeling.' };
   else {
     const failure = ['concept', 'views', 'model'].find(key => states[key] === 'Failed');
     if (freshInput) next = { stage: 'input', label: 'Start workflow', message: 'Your input is ready. Start a new candidate; earlier artifacts remain available.', start: true };

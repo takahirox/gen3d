@@ -13,7 +13,7 @@ export function createMcp({ url = process.env.GEN3D_URL || 'http://127.0.0.1:333
   const consistencySettings = z.object({ enabled: z.boolean().optional(), onFailure: z.enum(['stop', 'continue']).optional() }).optional();
   const refinementSettings = z.object({ enabled: z.boolean().optional(), maxIterations: z.number().int().min(1).max(5).optional() }).optional();
   async function request(route, method = 'GET', data) {
-    const response = await fetch(new URL(route, target), { method, headers: { 'Content-Type': 'application/json', 'X-Gen3d-Client': 'mcp' }, body: data ? JSON.stringify(data) : undefined, signal: AbortSignal.timeout(15000) });
+    const response = await fetch(new URL(route, target), { method, headers: { 'Content-Type': 'application/json', 'X-Gen3d-Client': 'mcp' }, body: data ? JSON.stringify(data) : undefined, signal: AbortSignal.timeout(180000) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
     return result;
@@ -26,6 +26,13 @@ export function createMcp({ url = process.env.GEN3D_URL || 'http://127.0.0.1:333
       } catch (e) { return { isError: true, content: [{ type: 'text', text: e.message }] }; }
     });
   }
+  tool('list_model_library', 'Browse the shared local GLB/.blend library with pagination, filename search, managed/folder filter, previews, inspection and availability. Folder access is configured only by a human in the Web UI.', { search: z.string().max(200).optional(), sourceId: z.string().optional(), offset: z.number().int().min(0).optional(), limit: z.number().int().min(1).max(100).optional() }, i => request('/api/library?' + new URLSearchParams(i)));
+  tool('get_library_model', 'Read saved library metadata and Blender geometry inspection for a model.', { assetId: id }, i => request(`/api/library/assets/${i.assetId}`));
+  tool('inspect_library_model', 'Validate/reinspect a local library model in isolated Blender; does not modify its source or authorize use.', { assetId: id }, i => request(`/api/library/assets/${i.assetId}/inspect`, 'POST', {}));
+  tool('import_library_model', 'Import a self-contained GLB or packed uncompressed .blend once. data is raw base64, at most 64 MiB. Blender validates the model; project approval is still required.', { name: z.string().max(200), data: z.string() }, i => request('/api/library/imports', 'POST', i));
+  tool('scan_model_folder', 'Rescan an already human-configured local source. No new host directory access and no file writes to that source.', { sourceId: id }, i => request(`/api/library/sources/${i.sourceId}/scan`, 'POST', {}));
+  tool('select_model_references', 'Replace project 3D selections with zero to 32 library models, each with optional role and explicit permission. New selections and changed roles/permissions/content await human Web UI approval. MCP cannot approve reference use or reuse/edit permission. Selections are supplementary to Text OR Image.', { projectId: id, models: z.array(z.object({ assetId: id, role: z.string().max(1000).optional(), permission: z.enum(['reference-only', 'reuse-edit']) })).max(32) }, i => request(`/api/projects/${i.projectId}/model-references`, 'POST', i));
+  server.registerResource('model-library', 'gen3d://library', { description: 'Shared local 3D library (first page; query list_model_library for more)', mimeType: 'application/json' }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(await request('/api/library')) }] }));
   tool('list_projects', 'Read projects and history shared with the local web UI.', {}, () => request('/api/projects'));
   tool('get_project', 'Read shared checkpoint and consistency settings, inspection statuses/reports/warnings/outcomes, refinement cycles/renders/instructions/stop reasons, input review, concept images, typed reference sets, reviews, image/model linkage, artifacts and history.', { projectId: id }, i => request(`/api/projects/${i.projectId}`));
   tool('create_project', 'Create text or image input. image is a PNG/JPEG/WebP base64 data URL. Refinement defaults Off (maxIterations 1–5 revision cycles); each cycle consumes Codex time/usage. Consistency defaults to enabled with stop on failure. Does not start modeling.', { name: z.string(), mode: z.enum(['text', 'image']), profile: z.enum(['character', 'object']).optional(), prompt: z.string().optional(), image: z.string().optional(), checkpoints, consistencySettings, refinementSettings }, i => request('/api/projects', 'POST', i));

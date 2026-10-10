@@ -14,6 +14,8 @@ import socket
 import sys
 import threading
 import bpy
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import reference_runtime as refs
 
 _listener = None
 _requests = queue.Queue()
@@ -23,6 +25,10 @@ def dispatch(request):
     try:
         if request["type"] == "get_scene_info":
             result = {"objects": [{"name": o.name, "type": o.type, "vertices": len(o.data.vertices) if o.type == "MESH" else 0} for o in bpy.context.scene.objects]}
+        elif request["type"] == "inspect_reference":
+            result = refs.inspect_reference(request["params"]["assetId"])
+        elif request["type"] == "reuse_reference":
+            result = refs.reuse_object(request["params"]["assetId"], request["params"]["objectName"])
         elif request["type"] == "execute_code":
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
