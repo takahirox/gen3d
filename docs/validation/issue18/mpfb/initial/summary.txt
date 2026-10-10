@@ -1,5 +1,0 @@
-Created and inspected the model through gen3d_blender MCP: a continuous MPFB human with teal T-shirt, charcoal trousers, dark sneakers, eyes, and short mesh hair.
-
-Adjusted height, shoulders, stance, arm pose, head, chin, and nose. Original topology and helper masking remain intact. All four views were checked.
-
-Facial likeness, hair, and fabric realism remain approximate; no local clothing or hair assets were available.
