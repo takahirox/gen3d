@@ -82,6 +82,142 @@ bpy.ops.wm.save_as_mainfile(filepath=out + '/edited.blend', compress=False)
 bpy.ops.export_scene.gltf(filepath=out + '/edited.glb', export_format='GLB', export_apply=False, export_animations=False)
 report = p.validate(out + '/prepared/baseline.json', scope, out + '/edited.blend', out + '/edited.glb', out + '/preservation.json')
 checks = ['complete GLB base import and roundtrip', 'unchanged library source hash', 'complete scene copy', 'rig and weights retained', 'Smile expression retained', 'UV and material retention', 'authorized Hair geometry changed', 'GLB reopened and compared']
+# Surface preservation: scene shading flags and effective corner normals must
+# survive, while exported face orientation must not be erased by sorting.
+surface_evidence = {'blocked':[], 'valid':[]}
+for feature in ['smooth', 'custom-normals']:
+    bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+    body = bpy.data.objects['Body'].data
+    if feature == 'smooth':
+        for face in body.polygons:
+            face.use_smooth = True
+    else:
+        body.normals_split_custom_set([(0.2, 0.3, 0.9)] * len(body.loops))
+    blend, glb = out + '/surface-' + feature + '.blend', out + '/surface-' + feature + '.glb'
+    bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
+    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=False, export_animations=False)
+    for kind, scene in [('scene', blend), ('export-only', out + '/edited.blend')]:
+        evidence = out + '/surface-' + feature + '-' + kind + '-validation.json'
+        if os.path.exists(evidence):
+            os.remove(evidence)
+        try:
+            p.validate(out + '/prepared/baseline.json', scope, scene, glb, evidence)
+            raise AssertionError('Protected Body shading became success evidence: ' + feature + ' ' + kind)
+        except RuntimeError as error:
+            assert 'Body' in str(error) and 'geometry' in str(error), str(error)
+            if kind == 'export-only':
+                assert 'GLB roundtrip mismatch' in str(error), str(error)
+            assert not os.path.exists(evidence)
+            surface_evidence['blocked'].append({'feature':feature, 'kind':kind, 'diagnostic':str(error), 'publicationEvidenceWritten':False})
+            checks.append('blocked protected Body ' + feature + ' ' + kind)
+    # The same shading is valid when it belongs to the approved base. Export
+    # splits vertices at seams; equality must use surface corners, not indices
+    # or Blender's imported smooth/custom-normal authoring flags.
+    directory = out + '/surface-base-' + feature
+    os.makedirs(directory, exist_ok=True)
+    p.prepare(blend, directory, scope)
+    for v in bpy.data.objects['Hair'].data.vertices:
+        v.co.x *= 1.1
+    candidate, exported = directory + '/edited.blend', directory + '/edited.glb'
+    bpy.ops.wm.save_as_mainfile(filepath=candidate, compress=False)
+    scene_vertices = len(bpy.data.objects['Body'].data.vertices)
+    bpy.ops.export_scene.gltf(filepath=exported, export_format='GLB', export_apply=False, export_animations=False)
+    valid = p.validate(directory + '/baseline.json', scope, candidate, exported, directory + '/validation.json')
+    p.open_base(exported)
+    exported_vertices = len(bpy.data.objects['Body'].data.vertices)
+    assert exported_vertices > scene_vertices
+    assert valid['passed'] and valid['roundtrip']['passed'] and 'Body' in valid['unchangedObjects']
+    surface_evidence['valid'].append({'shading':feature, 'sceneVertices':scene_vertices, 'glbVertices':exported_vertices, 'passed':True})
+    checks.append('authorized Hair edit preserves approved ' + feature + ' Body shading across GLB vertex splits')
+
+# Enable culling in the approved scene, then alter only the GLB index buffer.
+# Keeping POSITION/NORMAL/UV accessors unchanged isolates face winding from
+# shading, geometry, skinning or material changes in the saved scene.
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+bpy.data.materials['CharacterMaterial'].use_backface_culling = True
+culled_scene = out + '/culled.blend'
+bpy.ops.wm.save_as_mainfile(filepath=culled_scene, compress=False)
+culled_baseline = out + '/culled-baseline.json'
+bpy.ops.wm.open_mainfile(filepath=out + '/prepared/base.blend', use_scripts=False)
+bpy.data.materials['CharacterMaterial'].use_backface_culling = True
+p.write(culled_baseline, p.snapshot())
+bpy.ops.wm.open_mainfile(filepath=culled_scene, use_scripts=False)
+culled_glb = out + '/culled.glb'
+bpy.ops.export_scene.gltf(filepath=culled_glb, export_format='GLB', export_apply=False, export_animations=False)
+p.validate(culled_baseline, scope, culled_scene, culled_glb, out + '/culled-validation.json')
+import struct
+content = bytearray(open(culled_glb, 'rb').read())
+gltf = p.preflight_glb(culled_glb)
+assert all(not m.get('doubleSided', False) for m in gltf['materials'])
+binary_start = 20 + struct.unpack_from('<I', content, 12)[0] + 8
+body_node = next(n for n in gltf['nodes'] if n.get('name') == 'Body')
+def rewrite_winding(reverse):
+    changed = bytearray(content)
+    count = 0
+    for primitive in gltf['meshes'][body_node['mesh']]['primitives']:
+        accessor = gltf['accessors'][primitive['indices']]
+        view = gltf['bufferViews'][accessor['bufferView']]
+        fmt = {5121:'B', 5123:'H', 5125:'I'}[accessor['componentType']]
+        size = struct.calcsize('<' + fmt)
+        stride = view.get('byteStride', size)
+        start = binary_start + view.get('byteOffset', 0) + accessor.get('byteOffset', 0)
+        for i in range(0, accessor['count'], 3):
+            offsets = [start + (i + j) * stride for j in range(3)]
+            values = [struct.unpack_from('<' + fmt, content, offset)[0] for offset in offsets]
+            values = [values[0], values[2], values[1]] if reverse else values[1:] + values[:1]
+            for offset, value in zip(offsets, values):
+                struct.pack_into('<' + fmt, changed, offset, value)
+            count += 1
+    assert count > 0
+    return changed, count
+rotated, count = rewrite_winding(False)
+rotated_glb = out + '/cyclic-corners.glb'
+with open(rotated_glb, 'wb') as f:
+    f.write(rotated)
+p.validate(culled_baseline, scope, culled_scene, rotated_glb, out + '/cyclic-validation.json')
+checks.append('cyclic face-corner rotation preserves winding and passes exported surface validation')
+reversed_content, count = rewrite_winding(True)
+reversed_glb = out + '/reversed-body.glb'
+with open(reversed_glb, 'wb') as f:
+    f.write(reversed_content)
+evidence = out + '/reversed-body-validation.json'
+if os.path.exists(evidence):
+    os.remove(evidence)
+try:
+    p.validate(culled_baseline, scope, culled_scene, reversed_glb, evidence)
+    raise AssertionError('Reversed protected Body faces became successful GLB evidence')
+except RuntimeError as error:
+    assert 'GLB roundtrip mismatch' in str(error) and 'Body' in str(error) and 'topology' in str(error), str(error)
+    assert not os.path.exists(evidence)
+    surface_evidence['blocked'].append({'feature':'reversed-winding', 'kind':'export-only', 'triangles':count, 'backfaceCulling':True, 'diagnostic':str(error), 'publicationEvidenceWritten':False})
+    checks.append('blocked export-only reversed Body winding with backface culling and unchanged normal/position accessors')
+# Swapping two different exported normals retains the entire normal multiset,
+# but changes their corner/position associations. This must fail as well.
+primitive = gltf['meshes'][body_node['mesh']]['primitives'][0]
+accessor = gltf['accessors'][primitive['attributes']['NORMAL']]
+assert accessor['componentType'] == 5126 and accessor['type'] == 'VEC3'
+view = gltf['bufferViews'][accessor['bufferView']]
+start = binary_start + view.get('byteOffset', 0) + accessor.get('byteOffset', 0)
+stride = view.get('byteStride', 12)
+first = bytes(content[start:start + 12])
+other = next(start + i * stride for i in range(1, accessor['count']) if bytes(content[start + i * stride:start + i * stride + 12]) != first)
+swapped = bytearray(content)
+swapped[start:start + 12], swapped[other:other + 12] = content[other:other + 12], content[start:start + 12]
+swapped_glb = out + '/swapped-body-normals.glb'
+with open(swapped_glb, 'wb') as f:
+    f.write(swapped)
+evidence = out + '/swapped-body-normals-validation.json'
+if os.path.exists(evidence):
+    os.remove(evidence)
+try:
+    p.validate(culled_baseline, scope, culled_scene, swapped_glb, evidence)
+    raise AssertionError('Reassigned protected Body corner normals became successful GLB evidence')
+except RuntimeError as error:
+    assert 'GLB roundtrip mismatch' in str(error) and 'Body' in str(error) and 'geometry' in str(error), str(error)
+    assert not os.path.exists(evidence)
+    surface_evidence['blocked'].append({'feature':'reassigned-corner-normals', 'kind':'export-only', 'diagnostic':str(error), 'publicationEvidenceWritten':False})
+    checks.append('blocked export-only reassigned Body corner normals with unchanged normal multiset')
+assert hashlib.sha256(open(source, 'rb').read()).hexdigest() == source_hash
 # Collection visibility is inherited independently of object hide flags. Use
 # nested collections to exercise visibility settings on an ancestor.
 def group_body():
@@ -596,7 +732,7 @@ try:
 except RuntimeError as error:
     assert 'materials' in str(error), str(error)
     checks.append('blocked export-only emission change: ' + str(error))
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence})
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence, 'surfacePreservation':surface_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });

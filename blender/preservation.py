@@ -17,6 +17,56 @@ def nums(value):
     return [(round(float(v), 5) or 0.0) for v in value]
 
 
+def oriented_face(corners):
+    # A cyclic rotation describes the same face; reversing its corners does
+    # not. Keep duplicates and corner associations, including split normals.
+    return min(json.dumps(corners[i:] + corners[:i]) for i in range(len(corners)))
+
+
+def same_geometry(before, after):
+    if digest(before) == digest(after):
+        return True
+    # Saved scenes retain exact shading settings/normals. Only semantic GLB
+    # evidence (without authoring flags) permits normal encoding roundoff.
+    if not isinstance(before, dict) or not isinstance(after, dict) or 'shading' in before or 'shading' in after:
+        return False
+    if before['vertices'] != after['vertices']:
+        return False
+
+    def surfaces(geometry):
+        result = {}
+        for face in geometry['corners']:
+            corners = json.loads(face)
+            key = oriented_face([c[0] for c in corners])
+            result.setdefault(key, []).append(corners)
+        return result
+
+    old, new = surfaces(before), surfaces(after)
+    if old.keys() != new.keys():
+        return False
+    for key, faces in old.items():
+        remaining = list(new[key])
+        for face in faces:
+            matched = False
+            for index, candidate in enumerate(remaining):
+                for offset in range(len(candidate)):
+                    rotated = candidate[offset:] + candidate[:offset]
+                    # Blender encodes imported custom normals with finite
+                    # precision. Bound vector error to 0.0002 (~0.012 degrees)
+                    # while keeping positions, orientation and multiplicity exact.
+                    if len(face) == len(rotated) and all(a[0] == b[0] and sum((x - y) ** 2 for x, y in zip(a[1], b[1])) <= 0.0002 ** 2 for a, b in zip(face, rotated)):
+                        remaining.pop(index)
+                        matched = True
+                        break
+                if matched:
+                    break
+            if not matched:
+                return False
+        if remaining:
+            return False
+    return True
+
+
 def material(m, semantic=False):
     if m is None:
         return None
@@ -184,9 +234,26 @@ def snapshot(semantic=False):
                 # glTF stores skinned geometry in a different local frame;
                 # world-space surface/weights/morphs are the export invariant.
                 record.pop('transform')
-            # Ignore vertex ordering/splits at UV seams while retaining per-corner UVs.
-            record['geometry'] = sorted(set(json.dumps(c) for c in coords)) if semantic else coords
-            record['topology'] = sorted(json.dumps(sorted(coords[i] for i in p.vertices)) for p in mesh.polygons) if semantic else [list(p.vertices) for p in mesh.polygons]
+            # GLB may reorder/split vertices at UV seams or sharp edges. Compare
+            # oriented surface corners in world space, with each normal bound
+            # to its own face/position rather than an unordered normal set.
+            normal_matrix = o.matrix_world.to_3x3().inverted().transposed() if semantic else None
+            normals = [nums((normal_matrix @ n.vector).normalized() if semantic else n.vector) for n in mesh.corner_normals]
+            corners = [[[coords[mesh.loops[i].vertex_index], normals[i]] for i in p.loop_indices] for p in mesh.polygons]
+            record['geometry'] = {
+                'vertices': sorted(set(json.dumps(c) for c in coords)) if semantic else coords,
+                'corners': sorted(oriented_face(face) for face in corners) if semantic else corners
+            }
+            if not semantic:
+                # GLB represents shading through split corner normals, not
+                # Blender's smooth/custom-normal authoring flags. Preserve both
+                # the scene settings and their effective exported appearance.
+                record['geometry']['shading'] = {
+                    'smooth': [p.use_smooth for p in mesh.polygons],
+                    'sharpEdges': [e.use_edge_sharp for e in mesh.edges],
+                    'customNormals': mesh.has_custom_normals
+                }
+            record['topology'] = sorted(oriented_face([coords[i] for i in p.vertices]) for p in mesh.polygons) if semantic else [list(p.vertices) for p in mesh.polygons]
             record['weights'] = sorted(set(json.dumps([coords[v.index] if semantic else v.index, sorted([o.vertex_groups[g.group].name, round(g.weight, 5)] for g in v.groups if g.weight > 0)]) for v in mesh.vertices if v.groups))
             # Weights and a target name alone do not establish working skinning.
             # Preserve stack order, enable flags, binding mode and influence masks.
@@ -196,7 +263,7 @@ def snapshot(semantic=False):
             record['uvs'] = {'layers': record['uvs']}
             if not semantic:
                 record['uvs'].update({'names': [layer.name for layer in mesh.uv_layers], 'active': mesh.uv_layers.active_index, 'render': [layer.active_render for layer in mesh.uv_layers]})
-            record['materials'] = {'slots': [material(m, semantic) for m in mesh.materials], 'faces': sorted(json.dumps([sorted(coords[i] for i in p.vertices) if semantic else p.index, p.material_index]) for p in mesh.polygons)}
+            record['materials'] = {'slots': [material(m, semantic) for m in mesh.materials], 'faces': sorted(json.dumps([oriented_face([coords[i] for i in p.vertices]) if semantic else p.index, p.material_index]) for p in mesh.polygons)}
         objects[o.name] = record
     if not any(o['type'] == 'MESH' for o in objects.values()):
         raise RuntimeError('Base has no editable meshes')
@@ -264,7 +331,7 @@ def compare(before, after, scope, require_change=True):
     protected = []
     for name, original in old.items():
         current = new[name]
-        changes = [key for key in set(original) | set(current) if digest(original.get(key)) != digest(current.get(key))]
+        changes = [key for key in set(original) | set(current) if not (same_geometry(original.get(key), current.get(key)) if key == 'geometry' else digest(original.get(key)) == digest(current.get(key)))]
         if not changes:
             protected.append(name)
             continue

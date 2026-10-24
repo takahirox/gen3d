@@ -1,5 +1,22 @@
 # Issue #26 validation
 
+## Review fix: protected shading and face orientation
+
+The shading/winding finding from PR #27 was fixed and checked locally on 2026-10-24 with Blender 5.1.2. Geometry evidence now records face-corner normals and saved-scene smooth/sharp/custom-normal settings. Semantic GLB evidence binds each normal to an oriented face corner in world space, allowing vertex splits and cyclic corner rotations while rejecting reversed winding. Only exported normal directions permit encoding roundoff (vector error at most 0.0002, approximately 0.012 degrees); saved-scene shading comparisons remain exact. Positions retain the existing five-decimal precision.
+
+Using the original validator, real Blender reproduced both reported false successes: a protected Body smoothing change with only Hair authorized, and reversed Body triangles in only the GLB with backface culling enabled. The fixed validator rejects both before writing success evidence. Additional regressions reject scene/export-only custom-normal changes and exported normals reassigned between corners despite an unchanged normal multiset. Approved smooth/custom-normal bases still support a valid Hair edit, including GLB vertex splits from 12 to 55/56 Body vertices, and the source file hash remains unchanged.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 119 passed, 0 failed, 0 skipped |
+| `npm run check` | Passed |
+| `npm run test:workflow-blender` | 135 real Blender checks passed; no Codex calls |
+| `npm run test:browser` | 11 checks passed; injected providers/recorded assets |
+| `GEN3D_WORKFLOW_ARTIFACT_INPUT=docs/validation/issue26/live npm run test:workflow-artifacts` | Four saved scene/GLB outputs revalidated; original hashes unchanged |
+| `git diff --check` | Passed |
+
+Saved reports: [original-validator reproduction](validation/issue26/shading-winding-fix/before-report.json), [Blender preservation](validation/issue26/shading-winding-fix/blender-report.json), [browser](validation/issue26/shading-winding-fix/browser-report.json), [saved-output revalidation](validation/issue26/shading-winding-fix/artifact-report.json). The first expanded Blender run rejected a valid smooth base because imported custom normals differ slightly in encoding; the bounded normal-direction tolerance resolved that harness-discovered compatibility issue. Final failures/skipped/unavailable checks: none. No new Codex generation or human approval was performed; earlier generation evidence below remains historical.
+
 ## Review fix: protected armature evaluation mode
 
 The armature evaluation finding from PR #27 was fixed and checked locally on 2026-10-24 with Blender 5.1.2. Scene and semantic GLB snapshots now record `Armature.pose_position` as `posePosition`. Unauthorized POSE/REST changes fail candidate preservation, and base preparation explicitly rejects GLB roundtrips that normalize the evaluation mode.

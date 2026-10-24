@@ -1,0 +1,16 @@
+{
+  "realBlender": true,
+  "codexUsed": false,
+  "cases": [
+    {
+      "mutation": "smooth",
+      "priorValidatorPassed": true,
+      "protectedBodyListedUnchanged": true
+    },
+    {
+      "mutation": "reversed-winding",
+      "priorValidatorPassed": true,
+      "protectedBodyListedUnchanged": true
+    }
+  ]
+}
