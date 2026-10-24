@@ -17,7 +17,7 @@ import { categories } from '../src/refinement.js';
 const fixture = path.resolve('docs/validation/issue10/prop');
 const png = fs.readFileSync(path.join(fixture, 'concept-1/concept.png'));
 const off = { input: false, concept: false, multiView: false, preview: false };
-function setup(t, { mode = 'image', checkpoints = off, inspect, failViews = false, refinement = false } = {}) {
+function setup(t, { mode = 'image', checkpoints, inspect, failViews = false, refinement = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-graph-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const store = new Store(root), calls = [];
@@ -37,6 +37,22 @@ function setup(t, { mode = 'image', checkpoints = off, inspect, failViews = fals
   const run = async input => { engine.start(p.id, input, 'web'); await runner.pending; return p.workflowRuns.at(-1); };
   return { root, store, runner, engine, p, calls, run };
 }
+
+test('new projects continue to export by default while retaining required text references and all checkpoints', async t => {
+  for (const mode of ['text', 'image']) await t.test(mode, async t => {
+    const c = setup(t, { mode });
+    assert.deepEqual(c.p.checkpoints, off);
+    const r = await c.run();
+    assert.equal(r.status, 'completed', r.error);
+    assert.equal(r.checkpoints.length, 9);
+    assert.deepEqual(r.decisions, []);
+    assert.equal(c.p.versions[0].modelingImages.length, mode === 'text' ? 4 : 0);
+    assert.deepEqual(c.calls, mode === 'text' ? ['concept', 'views', 'consistency', 'model'] : ['model']);
+    assert.equal(c.store.canExport(c.p.id, c.p.versions[0].id).review, 'approved');
+    assert.equal(c.p.activity.find(e => e.type === 'model_reviewed').actor, 'system');
+    assert.deepEqual(new Store(c.root).get(c.p.id).checkpoints, off);
+  });
+});
 
 test('graph contracts reject cycles, incompatible/duplicate ports, unknown settings and missing dependencies', () => {
   for (const kind of ['object', 'humanoid']) assert.equal(validateGraph(workflowPreset(kind)).graph.nodes.length, kind === 'object' ? 9 : 10);

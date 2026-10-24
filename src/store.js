@@ -46,7 +46,7 @@ export function imageData(value) {
   return { bytes, ext: match[1] === 'jpeg' ? 'jpg' : match[1] };
 }
 
-export function checkpoints(value = {}, previous = { input: false, concept: true, multiView: true, preview: true }) {
+export function checkpoints(value = {}, previous = { input: false, concept: false, multiView: false, preview: false }) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.entries(value).some(([key, v]) => !['input', 'concept', 'multiView', 'preview'].includes(key) || typeof v !== 'boolean')) throw new AppError('Checkpoint settings must be input, concept, multiView and preview booleans');
   return { ...previous, ...value };

@@ -4,8 +4,7 @@ Primary input stays **Text OR Image**. Text still creates a concept and all four
 modeling views, with consistency inspection; Image still uses its upload.
 Optional 3D references supplement those images. They never replace them.
 
-Open **3D model library** in the sidebar, or **Browse & select models** under
-Input → Optional 3D references. Import a model once and select it for any number
+Open **Add 3D source** in the studio Sources panel, or **Asset library** in the navigation. Import a model once and select it for any number
 of projects. Select zero, one or several models (up to 32); use filename search,
 source filters and 40-entry pages. Blender creates small, solid material-color
 previews on import/first selection. These previews show shape rather than a
@@ -24,9 +23,12 @@ and Blender inspection happen when selecting a model. Uninspected folder entries
 have no thumbnail until first selection.
 
 For each selection, optionally specify a role or instruction (face, proportions,
-hair, clothing, pose, topology, overall style, etc.). Choose **Inspect only** or
-**Allow duplication & editing**. Save selections, then explicitly approve each
-selection in the project. Inspection-only permission does not authorize copying
+hair, clothing, pose, topology, overall style, etc.). Choose **Reference-only** or
+**Reuse / edit**, then explicitly **Authorize selected sources** in the same dialog.
+That action records human permission for each pending selection before execution.
+Selections proposed through MCP remain pending, with contextual authorization
+buttons in the studio. An editable base always needs separate source and part-scope
+authorization, even if reuse/edit permission was already granted. Inspection-only permission does not authorize copying
 meshes, materials or shape keys. New selections and changes to instructions,
 permission or file content require human approval. Rejected entries are excluded;
 pending entries block generation even if other checkpoints are disabled. MCP
@@ -40,8 +42,8 @@ the source version's original model-reference snapshot, just as they retain its
 input imagery. Changing current selections affects a new generation/retry; revise
 an existing model with its original approved sources. Source content is checked
 again before loading/export; replacing a source requires reinspection and a new
-approval, rather than silently changing an in-progress job. History and the model
-source panel show the exact sources, instructions, permissions and hashes.
+approval, rather than silently changing an in-progress job. The studio shows selected sources, instructions and permissions; Workflow editor
+checkpoint details retain exact source identities and hashes.
 
 ## Generation visuals and editable starting geometry
 
