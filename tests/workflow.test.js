@@ -74,7 +74,7 @@ test('text and image inputs persist and invalid images leave no project', t => {
   assert.throws(() => store.create({ name: 'bad', mode: 'image', image: 'data:image/png;base64,YmFk' }, 'web'), /Invalid/);
   assert.equal(store.list().length, 2);
   const reloaded = new Store(dir);
-  assert.equal(a.schemaVersion, 2); assert.equal(b.schemaVersion, 2);
+  assert.equal(a.schemaVersion, 3); assert.equal(b.schemaVersion, 3);
   assert.deepEqual(reloaded.get(a.id), a); assert.deepEqual(reloaded.get(b.id), b);
 });
 

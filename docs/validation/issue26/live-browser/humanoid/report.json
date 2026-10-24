@@ -1,0 +1,17 @@
+{
+  "title": "Live humanoid base edit",
+  "version": "a560a56b-897a-4d41-b643-68cacc54240f",
+  "canvas": true,
+  "download": "http://127.0.0.1:64569/api/projects/2dc2a8c4-fdca-49a3-8078-7f1198cc3a74/artifacts/runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb?download=1",
+  "activity": 33,
+  "checkpointCards": 10,
+  "projectId": "2dc2a8c4-fdca-49a3-8078-7f1198cc3a74",
+  "versionId": "a560a56b-897a-4d41-b643-68cacc54240f",
+  "glbBytes": 34896,
+  "glbSha256": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73",
+  "orbit": "passed",
+  "pan": "passed",
+  "zoom": "passed",
+  "exceptions": [],
+  "checkedAt": "2026-10-24T02:58:28.085Z"
+}

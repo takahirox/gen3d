@@ -1,0 +1,162 @@
+{
+  "realBlender": true,
+  "codexUsed": false,
+  "cases": [
+    {
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "metrics": {
+        "meshes": 17
+      },
+      "hashes": {
+        "blend": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+        "glb": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c"
+      },
+      "reopened": {
+        "sceneMeshes": 17,
+        "glbMeshes": 17,
+        "materials": 3
+      }
+    },
+    {
+      "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "metrics": {
+        "meshes": 17
+      },
+      "hashes": {
+        "blend": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+        "glb": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c"
+      },
+      "reopened": {
+        "sceneMeshes": 17,
+        "glbMeshes": 17,
+        "materials": 3
+      }
+    },
+    {
+      "runId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+      "metrics": {
+        "meshes": 7
+      },
+      "hashes": {
+        "blend": "0333257554682df5e57ea41fb3ca2d8aea35c4ebb7664c39b74197a5001a86da",
+        "glb": "6a4a9f072ef810959443c4b3a53f86f84d2c92dc1c6e4fac419e9a4776e36e44"
+      },
+      "preservation": {
+        "passed": true,
+        "changed": [
+          {
+            "object": "Hair",
+            "features": [
+              "geometry"
+            ]
+          }
+        ],
+        "unchangedObjects": [
+          "Rig",
+          "Body",
+          "HeadMesh",
+          "ArmMesh.L",
+          "ArmMesh.R",
+          "LegMesh.L",
+          "LegMesh.R"
+        ],
+        "addedObjects": [],
+        "beforeHash": "afd802fa9af26b3a7c9377a9e8257ca451e39efd4946062fc628db0dd1bf6bef",
+        "afterHash": "486ec6a3dee40778b9aac2f600dd57bb3d12cbeca68a52a955f620da70ebb14f",
+        "scope": {
+          "editableObjects": [
+            "Hair"
+          ],
+          "allowChanges": [],
+          "allowNewObjects": false
+        },
+        "roundtrip": {
+          "passed": true,
+          "changed": [],
+          "unchangedObjects": [
+            "Rig",
+            "Body",
+            "HeadMesh",
+            "Hair",
+            "ArmMesh.L",
+            "ArmMesh.R",
+            "LegMesh.L",
+            "LegMesh.R"
+          ],
+          "addedObjects": [],
+          "beforeHash": "eadeea5e7f5bb78937d1167f649b40c5728bb40aa6fd5dbcdc57bcca7b65c53f",
+          "afterHash": "eadeea5e7f5bb78937d1167f649b40c5728bb40aa6fd5dbcdc57bcca7b65c53f",
+          "scope": {
+            "editableObjects": [],
+            "allowChanges": [],
+            "allowNewObjects": false
+          }
+        },
+        "kind": "edited-scene-and-glb-preservation"
+      }
+    },
+    {
+      "runId": "84898582-c9f2-4897-8fe5-64ad460b7724",
+      "metrics": {
+        "meshes": 7
+      },
+      "hashes": {
+        "blend": "a118f2ca3f3b5d4bb15a3f60e35167cf18a96564b5565751c5e7de727587dd10",
+        "glb": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73"
+      },
+      "preservation": {
+        "passed": true,
+        "changed": [
+          {
+            "object": "Hair",
+            "features": [
+              "geometry"
+            ]
+          }
+        ],
+        "unchangedObjects": [
+          "Rig",
+          "Body",
+          "HeadMesh",
+          "ArmMesh.L",
+          "ArmMesh.R",
+          "LegMesh.L",
+          "LegMesh.R"
+        ],
+        "addedObjects": [],
+        "beforeHash": "afd802fa9af26b3a7c9377a9e8257ca451e39efd4946062fc628db0dd1bf6bef",
+        "afterHash": "1604793397e447d7c10d2f45e9f816e2b714429f5e6c4ef61c1ee7888a7f1851",
+        "scope": {
+          "editableObjects": [
+            "Hair"
+          ],
+          "allowChanges": [],
+          "allowNewObjects": false
+        },
+        "roundtrip": {
+          "passed": true,
+          "changed": [],
+          "unchangedObjects": [
+            "Rig",
+            "Body",
+            "HeadMesh",
+            "Hair",
+            "ArmMesh.L",
+            "ArmMesh.R",
+            "LegMesh.L",
+            "LegMesh.R"
+          ],
+          "addedObjects": [],
+          "beforeHash": "a0d684c9811d074d71dc41b207501d8c6de71b940b1c3e6e58e49dad04c792d7",
+          "afterHash": "a0d684c9811d074d71dc41b207501d8c6de71b940b1c3e6e58e49dad04c792d7",
+          "scope": {
+            "editableObjects": [],
+            "allowChanges": [],
+            "allowNewObjects": false
+          }
+        },
+        "kind": "edited-scene-and-glb-preservation"
+      }
+    }
+  ]
+}

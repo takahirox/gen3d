@@ -1,0 +1,77 @@
+{
+  "realBlender": true,
+  "codexUsed": false,
+  "checks": [
+    "complete GLB base import and roundtrip",
+    "unchanged library source hash",
+    "complete scene copy",
+    "rig and weights retained",
+    "Smile expression retained",
+    "UV and material retention",
+    "authorized Hair geometry changed",
+    "GLB reopened and compared",
+    "blocked weights: Protected object changed: Body (weights)",
+    "blocked shapeKeys: Protected object changed: HeadMesh (shapeKeys)",
+    "blocked uvs: Protected object changed: Body (uvs)",
+    "blocked materials: Protected object changed: Body (materials)",
+    "blocked armature: Protected object changed: Rig (armature)",
+    "blocked pose: Protected object changed: Rig (armature)",
+    "blocked uv-name: Protected object changed: Body (uvs)",
+    "blocked protected-object: Protected object changed: Body (geometry)"
+  ],
+  "preservation": {
+    "passed": true,
+    "changed": [
+      {
+        "object": "Hair",
+        "features": [
+          "geometry"
+        ]
+      }
+    ],
+    "unchangedObjects": [
+      "Rig",
+      "Body",
+      "HeadMesh",
+      "ArmMesh.L",
+      "ArmMesh.R",
+      "LegMesh.L",
+      "LegMesh.R"
+    ],
+    "addedObjects": [],
+    "beforeHash": "4eeb164c5b8cb00ea64cca312ff6a0f776dc4566b5589a8702fe31062f40df45",
+    "afterHash": "95c16ff80dcc930da8c37c28c9a5d06591d79a537861d08f7ca1860c28790ed1",
+    "scope": {
+      "editableObjects": [
+        "Hair"
+      ],
+      "allowChanges": [],
+      "allowNewObjects": false
+    },
+    "roundtrip": {
+      "passed": true,
+      "changed": [],
+      "unchangedObjects": [
+        "Rig",
+        "Body",
+        "HeadMesh",
+        "Hair",
+        "ArmMesh.L",
+        "ArmMesh.R",
+        "LegMesh.L",
+        "LegMesh.R"
+      ],
+      "addedObjects": [],
+      "beforeHash": "3c141ff59458ed4fcf4b581ba3e34523210156808be0d30ef9dafd621d459038",
+      "afterHash": "3c141ff59458ed4fcf4b581ba3e34523210156808be0d30ef9dafd621d459038",
+      "scope": {
+        "editableObjects": [],
+        "allowChanges": [],
+        "allowNewObjects": false
+      }
+    },
+    "kind": "edited-scene-and-glb-preservation"
+  },
+  "sourceSha256": "9153d51ff1d27da97db066123c9873480a7b36427d8e1ebf502ffe229f6e5660",
+  "validatedAt": "2026-10-24T03:03:00.685Z"
+}

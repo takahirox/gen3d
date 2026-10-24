@@ -1,12 +1,10 @@
 # gen3d
 
-gen3d aims to be a local-first environment where humans and AI agents collaboratively create 3D models. Its focus is an iterative, reviewable workflow: inspect intermediate results, make decisions, revise earlier steps, and continue toward a useful final model.
-
-The first MVP is a local browser application: enter text to generate a base concept and four modeling views **or** upload an image, then let subscription-authenticated Codex model those images through Blender MCP, inspect and revise the model, and download a GLB. Projects, inputs, renders, Blender scenes, reviews and version history persist on your machine. The direction follows [Project vision and goals (Issue #3)](https://github.com/takahirox/gen3d/issues/3).
+gen3d is a local-first modeling studio where humans and AI share projects, assets, executable workflows and review history. Choose a preset in the Model studio, or edit its actual node graph in the Workflow editor. Codex uses a ChatGPT subscription and local Blender MCP to model approved images. Every completed node saves a typed, hashed checkpoint; branches retain earlier candidates and accepted models.
 
 ## Run locally
 
-Prerequisites: Node.js 24+, Blender 4+ with Cycles and the bundled glTF exporter, and an installed Codex CLI supporting `--ignore-user-config` and per-tool MCP approval configuration (tested with 0.161.0). Sign in with your existing ChatGPT subscription with native image-generation access for text input; no separate LLM/image API or 3D-generation service is required. Text workflows fail with a visible blocker if the installed CLI/account cannot generate the required images. [Codex authentication](https://developers.openai.com/codex/auth) describes subscription and API-key sign-in.
+Use Node.js 24+, Blender 4+ with Cycles/glTF, and an installed Codex CLI supporting `--ignore-user-config` and per-tool MCP approval configuration. Sign in using ChatGPT; text input additionally needs native image-generation access. No separate image/LLM API or 3D-generation service is required.
 
 ```sh
 npm ci
@@ -14,99 +12,66 @@ codex login
 codex login status
 ```
 
-Use a **dedicated Blender process**. In one terminal, from this repository:
+Start a **dedicated** Blender process in one terminal:
 
 ```sh
 blender -b --python blender/gen3d_bridge.py -- --serve
 ```
 
-On macOS, use `/Applications/Blender.app/Contents/MacOS/Blender` if `blender` is not on PATH. In a second terminal:
+Start the app in a second terminal:
 
 ```sh
 npm start
 ```
 
-Open **http://127.0.0.1:3333**. Click **New project** (+), enter text or upload an image, then click **Start workflow**. The studio has navigable **Input → Base concept → Multi-view → 3D model** stages; image projects use **Input → 3D model**. Each stage puts its artifact in the main workspace and its decisions alongside it. The stage indicators and **Next step** identify progress, pending human review, warnings and failures.
+Open **http://127.0.0.1:3333**. Create a project with text or an uploaded image and choose **Object from text / image** or **Humanoid from editable base**. For a humanoid, import a complete GLB/packed `.blend` in Asset library, then explicitly authorize the source and editable mesh names in the studio. Click **Run workflow**. Enabled human checkpoints pause for **Accept & continue / Reject** in the studio.
 
-Projects can optionally enable bounded render–compare–revise refinement in **Review & settings** (default Off, 1–5 revision cycles). Each cycle consumes Codex time/usage. Original references, comparison reports, renders and intermediate scenes stay inspectable; AI visual passes do not prove geometric accuracy or quality improvement. See [visual refinement](docs/refinement.md).
+This release uses project schema 3. Old generated state is unsupported. Follow the [scoped clean-start procedure](docs/local-setup.md#start-fresh); no startup operation deletes external assets or Blender installations.
 
-All projects use the same Codex + Blender modeling flow. This release requires a fresh local store; follow the [scoped clean-start procedure](docs/local-setup.md#start-fresh) before using it with an earlier installation.
+## Studio and workflows
 
-Use **Review & settings** for **Pause for review**, **Run consistency check** (On / Off), and **On consistency failure** (Stop / Warn and continue). New-project settings are also available under **Review checkpoints & advanced settings**. Text generates a base concept first; **Accept concept & generate views** explicitly continues an enabled checkpoint. Compare the base/front/side/back/three-quarter images, inspect consistency issues/report, then **Accept views & model**, reject or regenerate. All concept and view candidates remain available in their selectors and thumbnail strips, including uninterrupted automatic runs.
+The same project has **Home / Projects**, **Model studio**, **Workflow editor** and **Asset library** navigation. Light / Dark changes display colors and persists in the browser across navigation/reloads.
 
-In **3D model**, orbit, pan and zoom the GLB, **Fit model**, inspect the rendered preview, approve/reject, request a revision, switch model versions and download GLB or **Blender scene**. **Source concept** and **Source view set** open the exact images used by the selected model. Retry starts a new candidate from the input; revision copies the selected scene and retains its source artifacts. **History** opens shared activity and version history. Browser polling shows MCP updates without a manual refresh, while preserving unsaved edits and explicitly selected older candidates.
+The studio puts an interactive 3D viewer beside contextual design and review controls. Switch to a source/render comparison, select a candidate or saved run, inspect intermediate artifacts, restore an accepted model, or branch from a completed checkpoint. GLB and Blender-scene export require the candidate’s saved approval/preservation conditions. Partial failures retain their artifacts and error messages.
 
-See [local setup, MCP integration and troubleshooting](docs/local-setup.md), [UI redesign validation (Issue #14)](docs/validation-issue14.md), [Issue #12 validation](docs/validation-issue12.md), [Issue #10 validation](docs/validation-issue10.md), [historical Issue #8 validation](docs/validation-issue8.md), and [historical MVP validation](docs/validation.md).
+The workflow editor displays connected executable nodes with saved statuses. Click a node to edit supported settings and typed input connections, add/remove nodes, save the project graph, or duplicate it as a reusable local preset. Graph JSON is also editable. Disconnected required ports, incompatible types, unused nodes, unknown settings and cycles fail validation. Bounded refinement replaces unrestricted cycles.
 
-## Workflow
-
-```text
-Text → Input checkpoint → Base concept → Concept checkpoint
-                                          ↓
-                          Multi-view set → Optional consistency check
-                                          ↓
-                                Multi-view checkpoint ───┐
-Image → Input checkpoint ────────────────────────────────┤
-                                                        ▼
-              Codex + Blender MCP → 3D preview checkpoint → Export
-```
-
-Input, concept, multi-view and preview pauses are configurable in the Web UI. Defaults are input off, concept on, multi-view on, preview on; concept and multi-view settings apply only to text. Disabled checkpoints continue automatically. Enabled checkpoints require an explicit decision in the Web UI; MCP can inspect and request work but cannot accept those human checkpoints. Preview approval unlocks export. Changing a setting does not dismiss an already pending checkpoint.
-
-Text never models directly: Codex first generates a real base concept PNG, then generates separate near-orthographic front, left-side, back and three-quarter views using that exact concept as an image reference. Choose **Humanoid / character** (full-body neutral A-pose) or **Object / prop** (whole object), or let the app infer a profile from the description. When **Run consistency check** is On, a separate Codex session inspects all images for changed parts, proportions, colors, materials and identity. **Stop** blocks inconsistent sets; **Warn and continue** saves the failed report, visibly warns and allows modeling with the same valid images. **Off** skips inspection and records it as skipped. Inspection crashes, malformed reports and unavailable tools still block modeling when the check is On. Missing, invalid or mismatched required images always block modeling. Human multi-view approval remains a separate checkpoint in every mode. The modeling CLI receives the base and every view through `--image`, with original symmetry, dimensions, materials and hidden-part guidance preserved as supplementary text. Image projects use their uploaded image immediately, without concept generation. Optional reference uploads remain a separate human-reviewed supplement and cannot replace the mandatory generated text concept.
-
-Both consistency settings persist locally and are shared by HTTP/Web UI and gen3d MCP. Each new reference set snapshots its effective settings, inspection status, issues/report and outcome; models record their source report and whether modeling continued despite inconsistency. Changes apply to newly generated view sets: regenerate views to use a different policy. Retry and revision preserve their source set’s policy and images. Changing settings never approves a pending human checkpoint.
-
-Concepts, reference sets and models have immutable artifact directories, selection/review state, prompt snapshots and shared history. Reject/regenerate a concept without spending time modeling it. Retry a model from the selected concept and reference set, revise a copy of any completed scene using its original concept and reference set, or edit the input to generate a new design. Every generated image remains saved and visible, including automatic runs, historical sets and partial failed sets. Each view records its role, direction, parent concept and provider; models record the reference set and exact image inputs. Reject/regenerate views before modeling without overwriting earlier images or models. If subscription-backed image generation is unavailable, the text workflow stops and records the blocker; it never substitutes direct-text modeling, a paid API or a synthetic image.
-
-The initial focus is **humanoid / character-like models** and **general objects / props**, prioritizing that loop before broad feature coverage.
-
-## Architecture
+Both presets use the same scheduler:
 
 ```text
-Human ── Web UI ──────────┐
-                         ▼
-AI agents ── gen3d MCP → Local app server → Codex CLI
-                         │                    │
-                         ▼                    ▼
-                   Project/artifact      Blender MCP
-                   store + history            │
-                                              ▼
-                                           Blender
+Input → Concept → Four views → Consistency ──┐
+  └──→ Approved secondary references ────────┤
+  └──→ Complete editable base (humanoid) ────┤
+                                            ↓
+                       Model / Edit base → Bounded refine → Review → Output
 ```
 
-- **Local app server:** owns shared project state, artifacts, workflow and version history, and activity logs. Humans and AI operate the same project; AI changes and generated artifacts should be visible in the Web UI.
-- **Web UI:** lets humans inspect references and 3D results, review candidates, give revision instructions, navigate history, and export.
-- **MCP (Model Context Protocol):** exposes project-level operations to AI agents such as Claude or Codex, including inspecting state, requesting blockouts and renders, refining models, and exporting artifacts.
-- **Blender:** the bundled loopback bridge executes Codex's Python modeling operations in Blender on its main thread. The app exports a self-contained GLB, saves the scene and renders a PNG after modeling. Jobs are serialized across projects to protect the shared scene.
+Image input passes through concept/views without generating substitutes. Text generates the base image and four distinct labeled views. Optional consistency inspection supports Stop, Warn and continue, and Off. Inspection errors and invalid image evidence block modeling. Optional model-library references are rendered as contact sheets and retain their per-source roles/permissions. The [existing refinement loop](docs/refinement.md) retains its 1–5 cycle bound, concrete change evidence, error/usage stops and human review semantics.
 
-The app server, project store and Blender run on your machine. Codex inference uses your authenticated subscription online, including any attached input/approved reference images. The app removes API-key environment variables from its Codex child process and enforces ChatGPT login. It does not reset usage limits, purchase allowance, switch providers, or retry automatically.
+Each run snapshots its graph revision, accepted sources, settings and implementation hashes. Completed nodes persist typed output data, source identities, dependency IDs, artifact hashes and an immutable checkpoint record. To change a later step, save the edited graph and choose **Branch from here** on an earlier valid checkpoint. Its valid ancestors and unchanged parallel preparation paths are reused; downstream nodes execute into new output directories. Changed upstream input/settings/connections, source files, implementation or artifacts block stale reuse. Restart never automatically resumes interrupted jobs or dismisses pending review.
+
+## Complete-base editing
+
+Editable bases have a separate human authorization from reference-only or mesh-reuse assets. The app copies the complete scene, preserving object hierarchy, armature, skin weights, expressions/shape keys, UVs and materials. Only named editable meshes may change; feature exceptions and new objects require explicit authorization. Protected objects and features are compared after editing, and the exported GLB is reopened and checked. Source hashes must stay unchanged. Failed protection checks cannot be accepted as a candidate.
+
+The first slice deliberately supports a conservative, verifiable subset: one modeling scene, triangulated meshes, relative shape keys, skin armatures and basic glTF-compatible Principled materials. Unsupported animations, constraints/drivers, modifiers, materials/extensions or format roundtrip mismatches produce concrete blockers. It does not promise preservation of arbitrary Blender/VRM features. See [workflows and preservation contracts](docs/workflows.md).
+
+## MCP and architecture
+
+The browser and project MCP use one loopback HTTP server/store. MCP can read the catalog, save graphs/presets, run/fork workflows, inspect the same checkpoints/images and request exports. Human review and editable-base authorization remain Web UI operations. See [setup and MCP usage](docs/local-setup.md#ai-facing-mcp).
+
+`src/workflow.js` validates/schedules graphs and persists lineage. `src/workflow-operations.js` connects nodes to existing concept/view generation, inspection, modeling, refinement and exports. `src/base-model.js` and `blender/preservation.py` handle complete-base copying and measured preservation. `src/store.js` owns project persistence; `src/asset-library.js` owns reusable models; `src/mcp.js` proxies the server. `web/` uses locally served Three.js with no CDN/build step.
+
+Files and Blender run locally. Codex inference runs online through your authenticated subscription and receives attached images. Jobs are serialized across projects. Usage limits stop work without reset tickets, allowance purchases, provider/model switches or automatic retries.
 
 ## Development
 
 ```sh
 npm test
 npm run check
-npm run test:browser # Chrome/Chromium; injected fixtures, no Codex allowance
-git diff --check
+npm run test:browser             # real Chrome; injected providers, no allowance
+npm run test:workflow-blender    # real Blender, no Codex
+npm run validate:workflow-live   # opt-in real Codex + Blender; uses allowance
 ```
 
-Tests cover all three consistency modes, inspection errors, settings persistence and shared state, mandatory base/view generation, consistency failures, no-bypass and checkpoint transitions, concept regeneration, shared HTTP/MCP state, image input, reference review gating, revisions, immutable artifacts, concurrency, failures, restart recovery, exports and subscription CLI arguments. Test-only synthetic artifacts do not demonstrate real generation; the live validation record distinguishes those checks from real Codex/Blender/browser runs.
-
-Implementation: `src/concept.js` exposes a small `generate({ prompt, profile, feedback, dir }) → { bytes, ext }` base generator and `generateViews({ prompt, profile, conceptFile, conceptId, feedback, dir, onImage })` view generator interface; views are published separately with `onImage({ view, side, bytes, ext })`. `src/reference-set.js` handles view validation and the independent Codex consistency inspection; `CodexConceptGenerator` is the first implementation. The server/runner constructor accepts a replacement generator without changing modeling. `src/codex.js` owns subscription process handling. `src/store.js` owns disk state, `src/server.js` exposes the local HTTP service, `src/mcp.js` proxies project operations to that service, `src/runner.js` orchestrates Codex and artifact publication, and `src/blender-mcp.js` connects MCP to `blender/gen3d_bridge.py`. `web/` is a plain browser UI with locally served Three.js; no CDN or build step is required.
-
-This repository is managed by ProjectWeave. For contribution and review guidance:
-
-- [Development flow](docs/development-flow.md)
-- [Review guidelines](docs/review-guidelines.md)
-
-Optional [local 3D model references](docs/model-library.md) can be imported once or selected from human-configured folders, then reused across Text or Image projects with per-model inspection/reuse approval.
-
-Every selected model is rendered locally in eight labeled material views before
-modeling, with its contact sheet supplied to Codex vision alongside the required
-input images. Codex records each role's suitability, prefers approved suitable
-meshes as editable bases and leaves other models visual-only with reasons.
-Semantic edits and optional modifiers are encouraged when appropriate; export
-checks reject unusable evaluated meshes and source dependencies. The existing
-[refinement loop](docs/refinement.md) compares role-specific reference sheets as
-well as primary images and retains per-role feedback, renders and reuse provenance.
+Tests distinguish mocked scheduler/browser fixtures from actual generation. The focused live check requires the representative base fixture produced by `test:workflow-blender`. See [Issue #26 validation and evidence](docs/validation-issue26.md), [local model library](docs/model-library.md), [development flow](docs/development-flow.md) and [review guidelines](docs/review-guidelines.md). Historical validation documents describe their release’s UI/schema.

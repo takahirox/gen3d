@@ -1,324 +1,230 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-import { stageNames, studioState, currentConcept, consistencyAllowsModeling } from './studio-state.js';
-
 import { setupLibrary } from './library.js';
-
 const $ = id => document.getElementById(id);
-let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId = null, loaded = '', model = null, lastState = '', loadToken = 0;
-let stage = 'input', stagePinned = false, conceptId = null, viewId = null;
-let status = { busy: false, usageLimited: false };
-function notify(message) {
-  for (const id of ['notice', 'dialog-error']) { $(id).textContent = message; $(id).hidden = !message; }
-}
+let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId, runId, selectedNode = 'input';
+let area = location.hash.slice(1) || 'home', catalog = {}, presets = [], draft, draftProject, dirty = false, status = {}, lastSignature = '';
+const node = (tag, text, className) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (className) e.className = className; return e; };
+function notify(message = '') { $('notice').textContent = message; $('notice').hidden = !message; }
 async function api(route, method = 'GET', input) {
-  const response = await fetch(`/api${route}`, { method, headers: { 'Content-Type': 'application/json' }, body: input ? JSON.stringify(input) : undefined });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error);
-  return data;
+  const response = await fetch('/api' + route, { method, headers: { 'Content-Type': 'application/json' }, body: input ? JSON.stringify(input) : undefined });
+  const result = await response.json(); if (!response.ok) throw new Error(result.error); return result;
 }
 function project() { return projects.find(p => p.id === projectId); }
-function artifact(file) { return `/api/projects/${projectId}/artifacts/${file}`; }
-function button(label, action, disabled = false) { const b = document.createElement('button'); b.textContent = label; b.disabled = disabled; b.onclick = () => safe(action); return b; }
-async function safe(action) { try { notify(''); await action(); await refresh(); } catch (e) { notify(e.message); } }
-async function fileImage(file) {
-  if (!file || file.size > 10_000_000 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPEG or WebP image, at most 10 MB.');
-  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+const route = () => '/projects/' + projectId;
+const artifact = file => `/api/projects/${projectId}/artifacts/${file.split('/').map(encodeURIComponent).join('/')}`;
+async function safe(action) { try { notify(); await action(); await refresh(); } catch (e) { notify(e.message); } }
+function button(text, action, disabled = false) { const b = node('button', text); b.type = 'button'; b.disabled = disabled; b.onclick = () => safe(action); return b; }
+function link(text, file, download = false) { const a = node('a', text, 'button'); a.href = artifact(file) + (download ? '?download=1' : ''); a.target = '_blank'; a.rel = 'noopener'; return a; }
+function figure(file, caption) { const f = node('figure'), a = node('a'), img = node('img'); a.href = artifact(file); a.target = '_blank'; a.rel = 'noopener'; img.src = a.href; img.alt = caption; img.loading = 'lazy'; a.append(img); f.append(a, node('figcaption', caption)); return f; }
+function options(select, items, value) { select.replaceChildren(...items.map(([id, text]) => { const o = node('option', text); o.value = id; return o; })); if (items.some(i => i[0] === value)) select.value = value; }
+function form(id, action) { $(id).oninput = () => { $(id).dataset.dirty = 'true'; }; $(id).onsubmit = event => { event.preventDefault(); safe(async () => { await action(new FormData(event.target)); delete $(id).dataset.dirty; lastSignature = ''; }); }; }
+async function imageData(file) {
+  if (!file || file.size > 10_000_000 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPEG or WebP image, at most 10 MB');
+  return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); });
 }
 
-let renderer, controls;
+// The model viewer is shared by every candidate and workflow preset.
+let renderer, controls, model, loaded = '', loadToken = 0;
 const scene = new THREE.Scene(); scene.background = new THREE.Color('#1c2532');
-const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000); camera.position.set(4, 3, 5);
+const camera = new THREE.PerspectiveCamera(45, 1, .01, 1000); camera.position.set(4, 3, 5);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 2.8));
-for (const [x, y, z, power] of [[5, 8, 5, 3], [-5, 3, -5, 2]]) { const light = new THREE.DirectionalLight(0xffffff, power); light.position.set(x, y, z); scene.add(light); }
+for (const [x,y,z,power] of [[5,8,5,3],[-5,3,-5,2]]) { const light = new THREE.DirectionalLight(0xffffff, power); light.position.set(x,y,z); scene.add(light); }
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  $('viewer').prepend(renderer.domElement);
+  renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace; $('viewer').prepend(renderer.domElement);
   controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.listenToKeyEvents($('viewer'));
-  new ResizeObserver(() => { const { clientWidth: w, clientHeight: h } = $('viewer'); if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }).observe($('viewer'));
-  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
-} catch { $('viewer-message').textContent = 'WebGL is unavailable. Use the rendered preview or download the GLB.'; }
-function dispose(object) { object?.traverse(o => { o.geometry?.dispose(); for (const m of Array.isArray(o.material) ? o.material : [o.material]) { if (!m) continue; for (const value of Object.values(m)) if (value?.isTexture) value.dispose(); m.dispose(); } }); }
+  new ResizeObserver(() => { const { clientWidth: w, clientHeight: h } = $('viewer'); if (!w || !h) return; renderer.setSize(w,h,false); camera.aspect = w/h; camera.updateProjectionMatrix(); }).observe($('viewer'));
+  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene,camera); });
+} catch { $('viewer-message').textContent = 'WebGL is unavailable. Open source / render comparison to inspect your candidate.'; }
+function dispose(o) { o?.traverse(x => { x.geometry?.dispose(); for (const m of Array.isArray(x.material) ? x.material : [x.material]) { if (!m) continue; for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); } }); }
 function fit() {
   if (!model || !controls) return;
-  const bounds = new THREE.Box3().setFromObject(model), center = bounds.getCenter(new THREE.Vector3());
-  const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, .1);
-  const distance = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.max(1, 1 / camera.aspect) * 1.2;
-  camera.position.copy(center).add(new THREE.Vector3(1.4, 1, 1.8).normalize().multiplyScalar(distance));
-  camera.near = radius / 1000; camera.far = radius * 1000; camera.updateProjectionMatrix();
-  controls.target.copy(center); controls.maxDistance = radius * 100; controls.minDistance = radius / 20; controls.update();
+  const bounds = new THREE.Box3().setFromObject(model), center = bounds.getCenter(new THREE.Vector3()), radius = Math.max(bounds.getSize(new THREE.Vector3()).length()/2,.1);
+  camera.position.copy(center).add(new THREE.Vector3(1.4,1,1.8).normalize().multiplyScalar(radius/Math.sin(THREE.MathUtils.degToRad(camera.fov/2))*Math.max(1,1/camera.aspect)*1.2));
+  camera.near=radius/1000; camera.far=radius*1000; camera.updateProjectionMatrix(); controls.target.copy(center); controls.maxDistance=radius*100; controls.minDistance=radius/20; controls.update();
 }
 async function showModel(v) {
-  const file = v?.status === 'ready' ? artifact(v.artifacts.glb) : '';
-  if (file && file === loaded) return;
-  loaded = file; const token = ++loadToken;
+  const file = v?.status === 'ready' ? artifact(v.artifacts.glb) : ''; if (file === loaded) return; loaded = file; const token = ++loadToken;
   if (model) { scene.remove(model); dispose(model); model = null; }
-  if (!renderer) return;
-  $('viewer-message').hidden = false;
-  $('viewer-message').textContent = file ? 'Loading model…' : v?.status === 'running' ? 'Codex is modeling in Blender…' : 'Generate a model to see it here.';
-  if (!file) return;
-  try {
-    const result = await new GLTFLoader().loadAsync(file);
-    if (token !== loadToken) { dispose(result.scene); return; }
-    model = result.scene; scene.add(model); fit(); $('viewer-message').hidden = true;
-  } catch (e) { if (token === loadToken) { loaded = ''; $('viewer-message').textContent = `Unable to load model: ${e.message}`; } }
+  $('viewer-message').hidden = false; $('viewer-message').textContent = file ? 'Loading model…' : 'Run a preset to create a candidate. Intermediate checkpoints appear below.';
+  if (!file || !renderer) return;
+  try { const gltf = await new GLTFLoader().loadAsync(file); if (token !== loadToken) { dispose(gltf.scene); return; } model = gltf.scene; scene.add(model); fit(); $('viewer-message').hidden = true; }
+  catch { if (token === loadToken) $('viewer-message').textContent = 'Could not load the 3D preview. Inspect source / render comparison and saved artifacts.'; }
 }
-function figure(file, caption) {
-  const node = document.createElement('figure'), image = document.createElement('img'), label = document.createElement('figcaption'), link = document.createElement('a');
-  image.src = artifact(file); image.alt = caption; label.textContent = caption;
-  image.onerror = () => { label.textContent = `${caption} · Image unavailable. Open the artifact to inspect it.`; label.classList.add('error'); };
-  link.href = artifact(file); link.target = '_blank'; link.rel = 'noopener'; link.append(image); node.append(link, label); return node;
-}
-function chooseStage(key, pin = true) {
-  stage = key; stagePinned = pin; lastState = ''; render();
-}
-function selectOptions(id, items, selected, label) {
-  const select = $(id), options = items.map(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = label(a); return o; });
-  if (!options.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'No artifacts yet'; options.push(o); }
-  if (select.dataset.options !== JSON.stringify(options.map(o => [o.value, o.textContent]))) {
-    select.dataset.options = JSON.stringify(options.map(o => [o.value, o.textContent])); select.replaceChildren(...options);
+function navigate(next) { area = ['studio','workflow'].includes(next) ? next : 'home'; location.hash = area; lastSignature = ''; render(); window.scrollTo({ top: 0 }); }
+function chooseProject(id) { projectId = id; versionId = runId = undefined; draftProject = null; localStorage.setItem('gen3d-project', id); for (const f of document.querySelectorAll('form')) delete f.dataset.dirty; navigate('studio'); }
+function selectedRun(p) { return p.workflowRuns.find(r => r.id === runId) || p.workflowRuns.at(-1); }
+function selectedVersion(p) { return p.versions.find(v => v.id === versionId) || p.versions.at(-1); }
+function markDirty() { dirty = true; $('graph-warning').textContent = 'Unsaved graph changes. Edited nodes and dependent outputs will recompute; earlier checkpoints stay intact.'; $('graph-json').value = JSON.stringify(draft,null,2); }
+async function saveGraph() { await api(route() + '/workflow','PUT',{ graph: draft }); dirty = false; }
+async function run(input = {}) { if (dirty) await saveGraph(); await api(route() + '/runs','POST', input); runId = undefined; versionId = undefined; }
+function renderFiles(files, compact = false) {
+  const wrap = node('div'), grid = node('div', undefined, 'artifact-grid');
+  for (const f of files) {
+    const file = typeof f === 'string' ? f : f.file;
+    if (/\.(png|jpg|webp)$/.test(file)) grid.append(figure(file, file.split('/').at(-1)));
+    else { const p = node('p'); p.append(link(file.split('/').at(-1), file)); if (!compact && f.sha256) p.append(node('small',' SHA-256: ' + f.sha256)); wrap.append(p); }
   }
-  select.value = selected || ''; select.disabled = !items.length;
+  if (grid.children.length) wrap.prepend(grid); return wrap;
 }
-function placeholder(message) { const node = document.createElement('div'); node.className = 'empty-artifact'; node.textContent = message; return node; }
-function describe(a, type) { return a ? `${type} ${a.number} · ${a.status} · ${a.review}${a.feedback ? ` · ${a.feedback}` : ''}${a.error ? ` — ${a.error}` : ''}` : `No ${type.toLowerCase()} yet.`; }
-function thumbnails(id, items, selected, image, label, select) {
-  $(id).replaceChildren(...items.slice().reverse().map(a => {
-    const b = button(label(a), () => select(a.id)); b.className = a.id === selected ? 'selected' : ''; b.setAttribute('aria-pressed', String(a.id === selected));
-    if (image(a)) { const img = document.createElement('img'); img.src = artifact(image(a)); img.alt = ''; b.prepend(img); }
-    return b;
-  }));
+function checkpointCard(p, r, cp, compact = false) {
+  const card = node('article', undefined, 'checkpoint'); card.append(node('strong', `${cp.nodeId} · ${cp.type}`), node('p', `${r.nodes[cp.nodeId]?.status} · graph revision ${cp.graphRevision}${r.nodes[cp.nodeId]?.reusedFrom ? ' · reused checkpoint' : ''}`, 'muted'));
+  card.append(renderFiles(cp.files, compact));
+  const actions = node('div', undefined, 'actions');
+  actions.append(button('Inspect node', () => { selectedNode = cp.nodeId; runId = r.id; navigate('workflow'); }), button('Branch from here', () => run({ runId: r.id, checkpointId: cp.id }), status.busy || r.nodes[cp.nodeId]?.status !== 'completed'));
+  card.append(actions);
+  if (!compact) { const details = node('details'); details.append(node('summary','Inputs, settings & source identities'), node('pre', JSON.stringify({ fingerprint:cp.fingerprint, dependencyIds:cp.dependencyIds, settings:cp.settings, configuration:cp.configuration, sourceIdentities:cp.sourceIdentities },null,2))); card.append(details); }
+  return card;
+}
+function renderReviews(p) {
+  const pending = node('div');
+  for (const r of p.workflowRuns.filter(r => r.status === 'waiting-review')) for (const [id,s] of Object.entries(r.nodes).filter(([,s]) => s.status === 'waiting-review')) {
+    const cp = r.checkpoints.find(c => c.id === s.checkpointId), card = node('div', undefined, 'checkpoint'); card.append(node('h3', `Human review: ${id}`), renderFiles(cp.files,true));
+    const a = node('div',undefined,'actions');
+    for (const [label,decision] of [['Accept & continue','approved'],['Reject','rejected']]) a.append(button(label, () => api(`${route()}/runs/${r.id}/nodes/${id}/review`, 'POST',{ decision }),status.busy));
+    card.append(a); pending.append(card);
+  }
+  // Lower-level MCP operations use the same human artifact review surface.
+  for (const c of p.concepts.filter(c => c.prompt === p.prompt && c.profile === p.profile && c.status === 'ready' && c.review === 'pending')) {
+    const card = node('div', undefined, 'checkpoint'); card.append(node('h3', 'Human review: concept'), renderFiles(Object.values(c.artifacts), true));
+    for (const [label, decision] of [['Accept & continue', 'approved'], ['Reject', 'rejected']]) card.append(button(label, () => api(`${route()}/concepts/${c.id}/review`, 'POST', { decision }), status.busy));
+    pending.append(card);
+  }
+  for (const s of p.referenceSets.filter(s => s.conceptId === p.selectedConceptId && s.prompt === p.prompt && s.profile === p.profile && s.status === 'ready' && s.review === 'pending')) {
+    const card = node('div', undefined, 'checkpoint'); card.append(node('h3', 'Human review: four views'), node('p', `${s.consistency?.status}: ${(s.consistency?.issues || []).join('; ')}`), renderFiles(s.images.map(i => i.file), true));
+    for (const [label, decision] of [['Accept & continue', 'approved'], ['Reject', 'rejected']]) card.append(button(label, () => api(`${route()}/reference-sets/${s.id}/review`, 'POST', { decision }), status.busy));
+    pending.append(card);
+  }
+  $('pending-reviews').replaceChildren(pending);
+}
+function renderStudio(p) {
+  const v = selectedVersion(p), r = selectedRun(p);
+  options($('versions'), p.versions.length ? p.versions.map(v => [v.id, `#${v.number} · ${v.status} · ${v.review}${v.id === p.acceptedVersionId ? ' · accepted' : ''}`]) : [['','No candidates yet']], v?.id);
+  options($('studio-run'), p.workflowRuns.length ? p.workflowRuns.map(r => [r.id, `${r.createdAt.slice(0,19)} · ${r.status}${r.parentRunId ? ' · branch' : ''}`]) : [['','No saved runs']], r?.id);
+  showModel(v);
+  $('candidate-info').textContent = v ? `Candidate #${v.number}: ${v.review}. ${v.error || v.summary || ''}${v.preservation ? ' Complete scene and GLB preservation verified.' : ''}` : 'Choose a preset, review your input, and run the workflow.';
+  $('source-image').replaceChildren(...(v?.visualInput || p.inputImage ? [figure(v?.visualInput || p.inputImage,'Original design input')] : []));
+  $('render-image').replaceChildren(...(v?.artifacts.render ? [figure(v.artifacts.render,'Candidate render')] : []));
+  const actions = $('candidate-actions'); actions.replaceChildren();
+  if (v) {
+    const candidateRun = p.workflowRuns.find(r => r.id === v.workflowRunId), checkpoint = candidateRun?.checkpoints.find(cp => cp.data?.versionId === v.id && cp.type === 'model');
+    if (v.review === 'approved') actions.append(button('Restore accepted candidate', () => api(route()+'/restore','POST',{versionId:v.id}), status.busy));
+    if (checkpoint) actions.append(button('Branch from this candidate', () => run({runId:candidateRun.id,checkpointId:checkpoint.id}),status.busy));
+    if (!v.workflowRunId && v.status === 'ready') actions.append(button('Accept candidate', () => api(`${route()}/versions/${v.id}/review`, 'POST', {decision:'approved'}), status.busy));
+    if ((v.workflowReviewed || !v.workflowRunId) && v.status === 'ready' && candidateRun?.status !== 'waiting-review') actions.append(button('Reject candidate', () => api(`${route()}/versions/${v.id}/review`,'POST',{decision:'rejected'}),status.busy));
+    actions.append(button('Inspect candidate checkpoint', () => { runId=candidateRun?.id; selectedNode=checkpoint?.nodeId || 'review'; navigate('workflow'); }));
+  }
+  $('exports').replaceChildren(...(v?.review === 'approved' && (v.workflowReviewed || !v.workflowRunId) ? [link('Download GLB',v.artifacts.glb,true),link('Blender scene',v.artifacts.blend,true)] : []));
+  $('studio-checkpoints').replaceChildren(...(r ? r.checkpoints.map(cp => checkpointCard(p,r,cp,true)) : [node('p','Every completed node will appear here with its saved artifacts.')]));
+  if (!r) {
+    const files = [...p.concepts.flatMap(c => Object.values(c.artifacts)), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts)])];
+    if (files.length) $('studio-checkpoints').replaceChildren(renderFiles([...new Set(files)], true));
+  }
+  renderReviews(p);
+  if (!$('edit').dataset.dirty) for (const key of ['name','prompt','profile']) $('edit').elements[key].value = p[key];
+  if (!$('settings').dataset.dirty) {
+    const f=$('settings').elements;
+    for (const key of ['input','concept','multiView','preview']) f[key].checked=p.checkpoints[key];
+    f.consistency.value=String(p.consistencySettings.enabled); f.onFailure.value=p.consistencySettings.onFailure; f.refinement.value=String(p.refinementSettings.enabled); f.maxIterations.value=p.refinementSettings.maxIterations;
+  }
+  $('input-review').replaceChildren(node('p',p.checkpoints.input ? 'Input review: '+p.inputReview : 'Input checkpoint is off'),button('Approve input',()=>api(route()+'/input/review','POST',{decision:'approved'}),status.busy));
+  $('base-info').textContent=p.editableBase ? `Authorized: ${p.editableBase.name} · editable: ${p.editableBase.scope.editableObjects.join(', ')} · source SHA-256 ${p.editableBase.sha256}` : 'No editable base authorized. Humanoid runs will block until one is selected.';
+  $('model-references').replaceChildren(...p.modelReferences.map(ref => { const div=node('div',undefined,'checkpoint'); div.append(node('p',`${ref.name} · ${ref.permission} · ${ref.role || 'general reference'} · ${ref.review}`)); for (const decision of ['approved','rejected']) div.append(button(decision==='approved'?'Approve reference permission':'Reject reference',()=>api(`${route()}/model-references/${ref.assetId}/review`,'POST',{decision}),status.busy)); return div; }));
+  $('references').replaceChildren(...p.references.map(ref => { const div=node('div',undefined,'checkpoint'); div.append(figure(ref.file,`${ref.label} · ${ref.review}`)); for (const decision of ['approved','rejected']) div.append(button(decision,()=>api(`${route()}/references/${ref.id}/review`,'POST',{decision}),status.busy)); return div; }));
+  $('refinement-info').textContent=v?.refinement ? `Refinement: ${v.refinement.status}. ${v.refinement.error || ''}` : 'Refinement is optional and bounded to 1–5 cycles.';
+  $('refinement-review').disabled = v?.status !== 'running' || v?.refinement?.status !== 'running';
+  $('refinement-cycles').replaceChildren(...(v?.refinement?.iterations || []).map(c => { const div=node('div',undefined,'checkpoint');div.append(node('h3',`Cycle ${c.number}: ${c.status}`),node('p',c.error || c.report?.summary || ''),renderFiles(Object.values(c.artifacts),true));return div; }));
+}
+function renderGraph(p) {
+  const r = selectedRun(p);
+  options($('workflow-run'), p.workflowRuns.length ? p.workflowRuns.map(r=>[r.id,`${r.createdAt.slice(0,19)} · ${r.status}`]) : [['','No runs']],r?.id);
+  const positions = {}, levels = {}, counts = {};
+  function level(id, seen = new Set()) {
+    if (levels[id] !== undefined) return levels[id]; if (seen.has(id)) return 0; seen.add(id);
+    const incoming=draft.edges.filter(e=>e.to===id && draft.nodes.some(n=>n.id===e.from));
+    return levels[id]=incoming.length ? 1+Math.max(...incoming.map(e=>level(e.from,new Set(seen)))) : 0;
+  }
+  for (const n of draft.nodes) { const l=level(n.id); positions[n.id]={x:25+l*195,y:40+(counts[l] || 0)*130};counts[l]=(counts[l] || 0)+1; }
+  const width=Math.max(600,...Object.values(positions).map(p=>p.x+185)), height=Math.max(380,...Object.values(positions).map(p=>p.y+140));
+  const surface=node('div',undefined,'graph-surface'); surface.style.width=width+'px';surface.style.height=height+'px';
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('aria-hidden','true');
+  for (const edge of draft.edges) { const a=positions[edge.from],b=positions[edge.to];if(!a||!b)continue;const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',`M${a.x+155},${a.y+40} C${a.x+180},${a.y+40} ${b.x-25},${b.y+40} ${b.x},${b.y+40}`);svg.append(path); }
+  surface.append(svg);
+  for (const n of draft.nodes) {
+    const state = r?.nodes[n.id], b=button('',()=>{selectedNode=n.id;renderNode(p);renderGraphSelection();});b.className='graph-node';b.id='graph-node-'+n.id;b.dataset.status=state?.status || 'draft';b.classList.toggle('selected',n.id===selectedNode);b.style.left=positions[n.id].x+'px';b.style.top=positions[n.id].y+'px';b.append(node('strong',n.id),node('small',`${n.type} → ${catalog[n.type]?.output || '?'}`),node('small',state?.status || 'draft'));surface.append(b);
+  }
+  const scroll=[$('graph').scrollLeft,$('graph').scrollTop];$('graph').replaceChildren(surface);$('graph').scrollLeft=scroll[0];$('graph').scrollTop=scroll[1];
+  $('graph-warning').textContent=dirty?'Unsaved changes invalidate edited nodes and their descendants. Save, then branch from a valid earlier checkpoint.':'Saved graph. Nodes display the selected run’s recorded status; new settings apply to the next run.';
+  if(document.activeElement!==$('graph-json'))$('graph-json').value=JSON.stringify(draft,null,2);
+  renderNode(p);
+}
+function renderGraphSelection(){for(const b of document.querySelectorAll('.graph-node'))b.classList.toggle('selected',b.id==='graph-node-'+selectedNode);}
+function renderNode(p) {
+  const n=draft.nodes.find(n=>n.id===selectedNode), r=selectedRun(p), state=r?.nodes[selectedNode];
+  $('node-form').hidden=!n; $('node-title').textContent=n?`${n.id} · ${n.type}`:'Choose a node';$('node-status').textContent=state?`${state.status}${state.reusedFrom?' · reused from '+state.reusedFrom:''}${state.error?' · '+state.error:''}`:'No saved execution';
+  $('node-artifacts').replaceChildren();if(!n)return;
+  if (!$('node-form').dataset.dirty || $('node-form').dataset.nodeId !== n.id) {
+  if ($('node-form').dataset.nodeId !== n.id) delete $('node-form').dataset.dirty;
+  $('node-form').dataset.nodeId = n.id;
+  const settings=[];
+  for(const [key,rule] of Object.entries(catalog[n.type]?.settings || {})) {
+    const label=node('label',key), input=node(Array.isArray(rule)||rule==='boolean'?'select':rule==='string'?'textarea':'input'); input.name='setting:'+key;
+    if(input.tagName==='SELECT'){options(input,[['','Use project/default setting'],...(Array.isArray(rule)?rule:['true','false']).map(v=>[String(v),String(v)])],n.settings[key]===undefined?'':String(n.settings[key]));}
+    else {input.value=n.settings[key]??'';if(rule==='bound'){input.type='number';input.min=1;input.max=5;}else input.rows=3;}
+    label.append(input);settings.push(label);
+  }
+  $('node-settings').replaceChildren(...settings);
+  $('node-connections').replaceChildren(...Object.entries(catalog[n.type]?.inputs || {}).map(([port,type])=>{const label=node('label',`Input: ${port} (${type})`),select=node('select');select.name='port:'+port;const from=draft.edges.find(e=>e.to===n.id&&e.input===port)?.from || '';options(select,[['',type.endsWith('?')?'Unconnected (optional)':'Choose required dependency'],...draft.nodes.filter(other=>other.id!==n.id&&catalog[other.type]?.output===type.replace('?','')).map(other=>[other.id,other.id])],from);label.append(select);return label;}));
+  }
+  const cp=r?.checkpoints.find(c=>c.id===state?.checkpointId);
+  if(cp)$('node-artifacts').append(checkpointCard(p,r,cp));else { $('node-artifacts').append(node('p','No completed checkpoint for this node. Partial/error artifacts are retained below.')); if(r) $('node-artifacts').append(renderFiles((r.artifacts || []).filter(f=>f.startsWith(`runs/${r.id}/${selectedNode}/`)),true)); }
 }
 function render() {
-  const projectNav = $('projects'), previousScroll = projectNav.scrollLeft;
-  const p = project(), focusedId = document.activeElement?.id;
-  const signature = JSON.stringify([projects, projectId, stage, stagePinned, conceptId, viewId, versionId, status]);
-  if (signature === lastState) return;
-  $('projects').replaceChildren(...projects.map(item => { const b = button(item.name, () => {
-    projectId = item.id; conceptId = viewId = versionId = null; stagePinned = false;
-    localStorage.setItem('gen3d-project', item.id);
-    for (const f of document.querySelectorAll('#workspace form')) { f.reset(); delete f.dataset.dirty; }
-    lastState = ''; render();
-  }); b.id = `project-${item.id}`; b.classList.toggle('selected', item.id === projectId); b.setAttribute('aria-current', item.id === projectId ? 'true' : 'false'); return b; }));
-  $('empty').hidden = !!p; $('workspace').hidden = !p;
-  if (!p) { $('title').textContent = 'Your next idea'; $('project-state').textContent = 'Welcome'; $('download').hidden = $('blend-download').hidden = true; showModel(null); lastState = signature; return; }
-  projectNav.scrollLeft = previousScroll;
-  if (projectNav.dataset.selected !== p.id) {
-    const selected = projectNav.querySelector('.selected');
-    if (projectNav.scrollWidth > projectNav.clientWidth && selected) projectNav.scrollLeft += selected.getBoundingClientRect().left - projectNav.getBoundingClientRect().left;
-    projectNav.dataset.selected = p.id;
-  }
-  const state = studioState(p);
-  if (!stagePinned) stage = state.next.stage;
-  if (p.mode === 'image' && ['concept', 'views'].includes(stage)) stage = 'input';
-  $('title').textContent = p.name;
-  const c = p.concepts.find(c => c.id === conceptId) || p.concepts.at(-1);
-  const set = p.referenceSets.find(s => s.id === viewId) || p.referenceSets.at(-1);
-  const v = p.versions.find(v => v.id === versionId) || p.versions.at(-1);
-  const projectBusy = !!state.running, busy = status.busy || projectBusy;
-  const { pendingInput, pendingConcept, pendingViews, pendingModel: pendingPreview, pendingReference: pendingRefs } = state;
-  const blocked = busy || pendingRefs || pendingInput || pendingConcept || pendingViews || pendingPreview || status.usageLimited;
-  $('project-state').textContent = status.usageLimited ? 'Codex usage limit' : state.running ? `${stageNames[state.running]} running` : state.next.start ? 'Ready to create' : state.next.label;
-  const keys = p.mode === 'image' ? ['input', 'model'] : ['input', 'concept', 'views', 'model'];
-  $('stages').classList.toggle('reduced', p.mode === 'image');
-  $('stages').replaceChildren(...keys.map((key, index) => {
-    const b = button('', () => chooseStage(key)); b.classList.toggle('selected', stage === key); b.id = `nav-${key}`; b.dataset.state = state.states[key]; b.setAttribute('aria-current', stage === key ? 'step' : 'false');
-    const n = document.createElement('span'); n.className = 'stage-number'; n.textContent = state.states[key] === 'Completed' ? '✓' : index + 1;
-    const text = document.createElement('span'), label = document.createElement('span'), statusLabel = document.createElement('span');
-    label.className = 'stage-label'; label.textContent = stageNames[key]; statusLabel.className = 'stage-status'; statusLabel.textContent = state.states[key]; text.append(label, statusLabel); b.append(n, text); return b;
-  }));
-  for (const key of Object.keys(stageNames)) $('stage-' + key).hidden = key !== stage;
-  $('next-description').textContent = status.usageLimited ? 'Codex usage limit reached. Generation is paused; your saved artifacts remain available.' : state.next.message;
-  $('next-action').textContent = state.next.label; $('next-action').disabled = !!blocked && state.next.start;
-  $('next-action').onclick = () => {
-    if (state.next.start) return safe(() => generate('generate'));
-    if (state.next.id) { if (state.next.stage === 'concept') conceptId = state.next.id; if (state.next.stage === 'views') viewId = state.next.id; if (state.next.stage === 'model') versionId = state.next.id; }
-    chooseStage(state.next.stage); $('stage-' + stage).querySelector('button:not(:disabled), input, textarea, select')?.focus();
-  };
-  for (const id of ['generate', 'retry']) $(id).disabled = !!blocked;
-  for (const id of ['approve', 'reject']) $(id).disabled = projectBusy || v?.status !== 'ready';
-  $('revise').querySelector('button').disabled = !!blocked || v?.status !== 'ready';
-  $('concept-retry').querySelector('button').disabled = !!(busy || pendingInput || pendingPreview || pendingRefs || status.usageLimited);
-  $('views-retry').querySelector('button').disabled = !!(busy || pendingInput || pendingConcept || pendingPreview || pendingRefs || status.usageLimited || !p.selectedConceptId);
-  for (const id of ['edit', 'checkpoints', 'consistency', 'refinement', 'reference']) $(id).querySelector('button').disabled = projectBusy;
-  for (const key of ['name', 'prompt', 'profile']) { if (!$('edit').dataset.dirty) $('edit').elements[key].value = p[key]; }
-  $('edit').elements.prompt.required = p.mode === 'text'; $('edit').elements.profile.closest('label').hidden = false;
-  $('input-kind').textContent = p.mode === 'text' ? 'Text → concept → views → model' : 'Image → model';
-  for (const key of ['input', 'concept', 'multiView', 'preview']) if (!$('checkpoints').dataset.dirty) $('checkpoints').elements[key].checked = p.checkpoints[key];
-  for (const cls of ['concept-setting', 'view-setting']) $('checkpoints').querySelector('.' + cls).hidden = p.mode !== 'text';
-  $('consistency').hidden = p.mode !== 'text';
-  for (const key of ['enabled', 'onFailure']) if (!$('consistency').dataset.dirty) $('consistency').elements[key].value = String(p.consistencySettings[key]);
-  syncConsistency($('consistency'));
-  if (!$('refinement').dataset.dirty) {
-    $('refinement').elements.refinementEnabled.value = String(p.refinementSettings?.enabled || false);
-    $('refinement').elements.maxIterations.value = p.refinementSettings?.maxIterations || 2;
-  }
-  $('input-review-state').textContent = `Input review: ${p.inputReview}${pendingInput ? ' · Explicit approval required.' : ''}`;
-  $('input-review').replaceChildren(...(p.checkpoints.input || p.inputCheckpoint || p.inputReview === 'rejected' ? ['approved', 'rejected'].map(decision => button(decision === 'approved' ? 'Accept input' : 'Reject input', () => api(`/projects/${p.id}/input/review`, 'POST', { decision }), projectBusy)) : []));
-  $('input-image').replaceChildren(...(p.inputImage ? [figure(p.inputImage, 'Original image input')] : []));
-  selectOptions('concept-selection', p.concepts, c?.id, c => `Concept ${c.number} · ${c.status} · ${c.review}`);
-  $('concepts').replaceChildren(c?.artifacts.image ? figure(c.artifacts.image, `Concept ${c.number} · ${c.review}`) : placeholder(c?.error || (c?.status === 'running' ? 'Generating your base concept…' : 'Start the workflow to create a base concept.')));
-  const conceptModels = p.versions.filter(v => v.conceptId === c?.id).map(v => `v${v.number}`).join(', ');
-  $('concept-info').textContent = describe(c, 'Concept') + (conceptModels ? ` · Used by ${conceptModels}` : '') + (c && !currentConcept(p, c) ? ' · Earlier input; retained for browsing.' : '');
-  $('concept-info').classList.toggle('error', c?.status === 'failed');
-  $('concept-review').replaceChildren(...(c?.status === 'ready' ? ['approved', 'rejected'].map(decision => button(decision === 'approved' ? 'Accept concept & generate views' : 'Reject concept', async () => {
-    await api(`/projects/${p.id}/concepts/${c.id}/review`, 'POST', { decision }); if (decision === 'approved') followWorkflow();
-  }, !!(busy || pendingInput || decision === 'approved' && (pendingViews || status.usageLimited) || pendingPreview || !currentConcept(p, c)))) : []));
-  thumbnails('concept-thumbnails', p.concepts, c?.id, a => a.artifacts.image, a => `Concept ${a.number} · ${a.review}`, id => { conceptId = id; lastState = ''; render(); });
-  selectOptions('view-selection', p.referenceSets, set?.id, s => `Set ${s.number} · ${s.status} · ${s.review}`);
-  const setNode = document.createElement('section');
-  if (set) {
-    const grid = document.createElement('div'); grid.className = 'image-grid';
-    const base = p.concepts.find(c => c.id === set.conceptId);
-    if (base?.artifacts.image) { const f = figure(base.artifacts.image, `Base · concept ${base.number}`); f.className = 'base-view'; grid.append(f); }
-    grid.append(...set.images.map(image => figure(image.file, image.label))); setNode.append(grid);
-    if (!set.images.length) setNode.append(placeholder(set.status === 'running' ? 'Generating modeling views…' : 'No view images were saved for this attempt.'));
-    const inspection = document.createElement('p'); inspection.className = 'muted';
-    const settings = set.consistencySettings || { enabled: true, onFailure: 'stop' };
-    inspection.textContent = `Consistency: ${set.consistency.status} · ${set.consistency.outcome || (consistencyAllowsModeling(set) ? 'allowed' : 'blocked')} · Check ${settings.enabled ? 'On' : 'Off'}${settings.enabled ? ` · ${settings.onFailure === 'continue' ? 'Warn and continue' : 'Stop'}` : ''}`;
-    setNode.append(inspection);
-    if (set.warning) { const warning = document.createElement('p'); warning.className = 'warning'; warning.setAttribute('role', 'status'); warning.textContent = set.warning; setNode.append(warning); }
-    const report = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = 'Consistency issues & report'; report.append(summary);
-    for (const issue of set.consistency.issues || []) { const line = document.createElement('p'); line.textContent = issue; report.append(line); }
-    if (set.consistency.error) { const line = document.createElement('p'); line.textContent = set.consistency.error; report.append(line); }
-    if (set.consistency.reason) { const line = document.createElement('p'); line.textContent = set.consistency.reason; report.append(line); }
-    if (set.artifacts['consistency.json']) { const link = document.createElement('a'); link.href = artifact(set.artifacts['consistency.json']); link.textContent = 'Open consistency report'; link.target = '_blank'; link.rel = 'noopener'; report.append(link); }
-    setNode.append(report);
-  } else setNode.append(placeholder('Accept a base concept to create front, side, back and three-quarter views.'));
-  $('reference-sets').replaceChildren(setNode);
-  const models = p.versions.filter(v => v.referenceSetId === set?.id).map(v => `v${v.number}`).join(', ');
-  $('view-info').textContent = describe(set, 'View set') + (set ? ` · concept ${p.concepts.find(c => c.id === set.conceptId)?.number ?? '?'}${models ? ` · Used by ${models}` : ''}` : '');
-  $('view-info').classList.toggle('error', set?.status === 'failed' || set?.consistency.outcome === 'blocked');
-  $('view-review').replaceChildren(...(set?.status === 'ready' ? ['approved', 'rejected'].map(decision => button(decision === 'approved' ? 'Accept views & model' : 'Reject view set', async () => {
-    await api(`/projects/${p.id}/reference-sets/${set.id}/review`, 'POST', { decision }); if (decision === 'approved') followWorkflow();
-  }, !!(busy || pendingInput || pendingConcept || pendingPreview || set.conceptId !== p.selectedConceptId || (decision === 'approved' && (!consistencyAllowsModeling(set) || status.usageLimited))))) : []));
-  thumbnails('view-thumbnails', p.referenceSets, set?.id, a => a.images[0]?.file, a => `Set ${a.number} · ${a.consistency.status}`, id => { viewId = id; lastState = ''; render(); });
-  const regenerableSets = p.referenceSets.filter(s => s.conceptId === p.selectedConceptId && s.prompt === p.prompt && s.profile === p.profile).reverse();
-  const target = $('views-retry').elements.referenceSetId, previous = target.value;
-  target.replaceChildren(...regenerableSets.map(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = `Set ${s.number} · concept ${p.concepts.find(c => c.id === s.conceptId)?.number}`; return o; }));
-  if (!regenerableSets.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'Selected base concept'; target.append(o); }
-  if (!$('views-retry').dataset.dirty && regenerableSets.some(s => s.id === set?.id)) target.value = set.id;
-  else if (regenerableSets.some(s => s.id === previous)) target.value = previous;
-  const modelPanel = $('model-references');
-  const modelSignature = JSON.stringify([p.id, p.modelReferences, projectBusy]);
-  if (modelPanel.dataset.state !== modelSignature) {
-    modelPanel.dataset.state = modelSignature;
-    modelPanel.replaceChildren(...p.modelReferences.map(r => {
-      const row = document.createElement('div'); row.className = 'model-reference';
-      const image = document.createElement('img'); image.src = `/api/library/assets/${r.assetId}/preview`; image.loading = 'lazy'; image.alt = ''; image.onerror = () => image.remove();
-      const info = document.createElement('p'); info.textContent = `${r.name} · ${r.origin === 'folder' ? 'External folder' : 'Managed import'} · ${r.role || 'General shape/style'} · ${r.permission === 'reuse-edit' ? 'Allow duplication & editing' : 'Inspect only'} · ${r.review}`;
-      row.append(image, info);
-      for (const decision of ['approved', 'rejected']) row.append(button(decision === 'approved' ? (r.permission === 'reuse-edit' ? 'Approve use & reuse/edit' : 'Approve inspection only') : 'Reject', () => api(`/projects/${p.id}/model-references/${r.assetId}/review`, 'POST', { decision }), projectBusy));
-      row.append(button('Detach', () => api(`/projects/${p.id}/model-references`, 'POST', { models: p.modelReferences.filter(x => x.assetId !== r.assetId).map(({ assetId, role, permission }) => ({ assetId, role, permission })) }), projectBusy));
-      return row;
-    }));
-    if (!p.modelReferences.length) modelPanel.append(placeholder('No 3D references selected. Text or Image generation works without them.'));
-  }
-  $('select-models').disabled = projectBusy;
-  $('reference-count').textContent = `(${p.references.length})`;
-  $('references').replaceChildren(...p.references.map(r => {
-    const node = figure(r.file, `${r.label} · ${r.review}`), actions = document.createElement('div'); actions.className = 'actions';
-    for (const decision of ['approved', 'rejected']) actions.append(button(decision === 'approved' ? 'Approve reference' : 'Reject reference', () => api(`/projects/${p.id}/references/${r.id}/review`, 'POST', { decision }), projectBusy));
-    node.append(actions); return node;
-  }));
-  $('reference-state').textContent = pendingRefs ? 'Review each pending reference before modeling. Rejected images will not be used.' : 'Only approved supplementary references are used alongside required design images.';
-  if (pendingRefs && stage === 'input') $('references').closest('details').open = true;
-  selectOptions('versions', p.versions, v?.id, v => `v${v.number} · ${v.kind} · ${v.status}`);
-  $('version-info').textContent = describe(v, 'Version') + (v ? ` · ${v.kind}${v.sourceVersionId ? ` · revision of v${p.versions.find(source => source.id === v.sourceVersionId)?.number ?? '?'}` : ''}` : '') + (v?.continuedDespiteInconsistency ? ' · WARNING: modeling continued despite failed consistency inspection' : v?.consistency?.status === 'skipped' ? ' · Consistency inspection skipped' : '');
-  if (v?.refinement && v.refinement.status !== 'off') $('version-info').textContent += ` · Refinement: ${v.refinement.status}${v.refinement.error && !v.error ? ' · ' + v.refinement.error : ''}`;
-  $('version-info').classList.toggle('error', v?.status === 'failed');
-  $('model-summary').textContent = v?.summary || 'No modeling summary yet.';
-  const sourceConcept = p.concepts.find(c => c.id === v?.conceptId), sourceSet = p.referenceSets.find(s => s.id === v?.referenceSetId);
-  $('model-sources').replaceChildren(...[
-    ...(sourceConcept ? [button(`Source concept ${sourceConcept.number}`, () => { conceptId = sourceConcept.id; chooseStage('concept'); })] : []),
-    ...(sourceSet ? [button(`Source view set ${sourceSet.number}`, () => { viewId = sourceSet.id; chooseStage('views'); })] : []),
-    ...(v && p.mode === 'image' ? [button('Source input image', () => chooseStage('input'))] : [])
-  ]);
-  for (const r of v?.modelReferences || []) {
-    const info = document.createElement('p'); info.textContent = `3D source: ${r.name} · ${r.role || 'General shape/style'} · ${r.permission} · ${r.origin} · SHA-256 ${r.sha256}`; $('model-sources').append(info);
-  }
-  if (v?.artifacts.modelReferences) { const link = document.createElement('a'); link.href = artifact(v.artifacts.modelReferences); link.textContent = '3D source inspection evidence'; $('model-sources').append(link); }
-  for (const r of v?.modelReferenceVisuals || []) $('model-sources').append(figure(r.sheet, `${r.name} · ${r.role || 'General shape/style'} · ${r.permission} · What Codex saw`));
-  for (const [id, key] of [['download', 'glb'], ['blend-download', 'blend']]) {
-    $(id).hidden = stage !== 'model' || v?.status !== 'ready' || !v?.artifacts[key] || (v.checkpoints?.preview && v.review !== 'approved');
-    if (v?.artifacts[key]) { $(id).href = artifact(v.artifacts[key]) + '?download=1'; $(id).download = key === 'glb' ? 'model.glb' : 'scene.blend'; }
-  }
-  const renderKey = v?.artifacts?.render || '', renderSignature = `${p.id}/${v?.id}/${renderKey}`;
-  if ($('render-image').dataset.file !== renderSignature) { $('render-image').dataset.file = renderSignature; $('render-image').replaceChildren(renderKey ? figure(renderKey, `Rendered view · v${v.number}`) : placeholder('A completed model will include a rendered preview.')); }
-  const refinement = v?.refinement;
-  $('refinement-history').hidden = !refinement || refinement.status === 'off';
-  $('refinement-info').textContent = refinement ? `Refinement: ${refinement.status} · maximum ${refinement.maxIterations} revision cycles. ${refinement.error || ''} ${refinement.stopCriterion || ''}` : '';
-  $('refinement-review').hidden = refinement?.status !== 'running' || v?.status !== 'running';
-  $('refinement-review').disabled = !!refinement?.reviewRequested;
-  $('refinement-cycles').replaceChildren(...(refinement?.iterations || []).map(cycle => {
-    const details = document.createElement('details'), summary = document.createElement('summary');
-    summary.textContent = `${cycle.number === 0 ? 'Initial model' : 'Revision cycle ' + cycle.number} · ${cycle.stage} · ${cycle.status}`; details.append(summary);
-    const provenance = document.createElement('p'); provenance.textContent = `Original inputs: ${cycle.imageInputs.join(', ')}. Source scene: ${cycle.sourceScene || 'initial generation'}. ${cycle.geometryChanged ? 'Mesh change verified; aesthetic improvement is unmeasured.' : ''} ${cycle.materialsChanged ? 'Material change verified.' : ''} ${cycle.cameraChanged ? 'Camera change verified.' : ''} ${cycle.error || ''}`; details.append(provenance);
-    const images = document.createElement('div'); images.className = 'image-grid';
-    images.append(...cycle.imageInputs.map(file => figure(file, 'Original approved reference')), ...cycle.views.filter(view => cycle.artifacts[view + '.png']).map(view => figure(cycle.artifacts[view + '.png'], `Cycle ${cycle.number}: ${view}`))); details.append(images);
-    images.append(...(cycle.modelReferenceVisuals || []).map(r => figure(r.sheet, `${r.name} · role: ${r.role || 'general shape/style'}`)));
-    if (cycle.report) { const pre = document.createElement('pre'); pre.textContent = JSON.stringify(cycle.report, null, 2); details.append(pre); }
-    for (const [name, file] of Object.entries(cycle.artifacts)) { const link = document.createElement('a'), line = document.createElement('p'); link.href = artifact(file); link.textContent = name; link.target = '_blank'; link.rel = 'noopener'; line.append(link); details.append(line); }
-    return details;
-  }));
-  $('history-count').textContent = `(${p.activity.length})`;
-  $('history').replaceChildren(...p.activity.slice().reverse().map(e => {
-    const li = document.createElement('li'), n = p.versions.find(v => v.id === e.versionId)?.number, c = p.concepts.find(c => c.id === e.conceptId)?.number, set = p.referenceSets.find(s => s.id === e.referenceSetId)?.number;
-    li.textContent = `${new Date(e.at).toLocaleString()} · ${e.actor} · ${e.type.replaceAll('_', ' ')}${n ? ` · v${n}` : ''}${c ? ` · concept ${c}` : ''}${set ? ` · view set ${set}` : ''}${e.decision ? ` · ${e.decision}` : ''}${e.message ? ` · ${e.message}` : ''}`; return li;
-  }));
-  showModel(v); if (focusedId && document.activeElement === document.body) $(focusedId)?.focus({ preventScroll: true }); lastState = JSON.stringify([projects, projectId, stage, stagePinned, conceptId, viewId, versionId, status]);
+  const focusedId = document.activeElement?.id;
+  const p=project(), signature=JSON.stringify([projects,projectId,versionId,runId,area,status]);if(signature===lastSignature)return;lastSignature=signature;
+  for(const key of ['home','studio','workflow'])$('nav-'+key).setAttribute('aria-current',String(area===key));
+  $('home').hidden=area!=='home';$('workspace').hidden=area==='home'||!p;$('studio').hidden=area!=='studio';$('workflow-editor').hidden=area!=='workflow';
+  $('projects').replaceChildren(...projects.map(p=>{const b=button(p.name,()=>chooseProject(p.id));b.id='project-'+p.id;b.setAttribute('aria-current',String(p.id===projectId));return b;}));
+  $('project-cards').replaceChildren(...projects.map(p=>{const b=button('',()=>chooseProject(p.id));b.append(node('h2',p.name),node('p',`${p.workflow.name} · ${p.workflowRuns.length} runs`),node('small',p.acceptedVersionId?'Accepted candidate saved':'Ready to explore'));return b;}));
+  if(!p){if(area!=='home'){$('home').hidden=false;}return;}
+  if(draftProject!==p.id){draft=structuredClone(p.workflow);draftProject=p.id;dirty=false;selectedNode='input';}
+  else if(!dirty)draft=structuredClone(p.workflow);
+  const r=p.workflowRuns.at(-1);$('title').textContent=p.name;$('project-state').textContent=status.usageLimited?'Codex usage limit':r?`${r.status}${r.error?' · '+r.error:''}`:'Ready';
+  $('run-workflow').disabled=status.busy||status.usageLimited||p.workflowRuns.some(r=>r.status==='waiting-review')||p.concepts.some(c=>c.prompt===p.prompt&&c.profile===p.profile&&c.status==='ready'&&c.review==='pending')||p.referenceSets.some(s=>s.conceptId===p.selectedConceptId&&s.prompt===p.prompt&&s.status==='ready'&&s.review==='pending');
+  renderStudio(p);if(area==='workflow')renderGraph(p);
+  $('history').replaceChildren(...p.activity.slice(-150).reverse().map(e=>node('li',`${e.at.slice(0,19)} · ${e.type}${e.nodeId?' · '+e.nodeId:''}${e.message?' · '+e.message:''}${e.decision?' · '+e.decision:''}`)));
+  if (focusedId && document.activeElement === document.body) $(focusedId)?.focus({ preventScroll: true });
 }
-function followWorkflow() { conceptId = viewId = versionId = null; stagePinned = false; }
-let refreshing = false;
-async function refresh() {
-  if (refreshing) return;
-  refreshing = true;
-  try { [projects, status] = await Promise.all([api('/projects'), api('/status')]); $('connection').textContent = status.busy ? 'Codex → Blender' : 'Local server connected'; render(); }
-  catch (e) { $('connection').textContent = 'Local server disconnected · retrying'; throw e; }
-  finally { refreshing = false; }
-}
-function form(id, action) { $(id).oninput = () => { $(id).dataset.dirty = 'true'; }; $(id).onsubmit = event => { event.preventDefault(); safe(async () => { await action(new FormData(event.target)); delete $(id).dataset.dirty; lastState = ''; }); }; }
-const create = $('create');
-create.elements.mode.onchange = () => { const image = create.elements.mode.value === 'image'; $('image-label').hidden = !image; create.elements.image.required = image; create.elements.prompt.required = !image; for (const cls of ['concept-setting', 'view-setting', 'consistency-settings']) create.querySelector('.' + cls).hidden = image; syncConsistency(create); };
-form('create', async data => {
-  const mode = data.get('mode'), p = await api('/projects', 'POST', { name: data.get('name'), mode, ...(data.get('profile') !== 'auto' ? { profile: data.get('profile') } : {}), prompt: data.get('prompt'), checkpoints: checkpointData(data), refinementSettings: refinementData(data), consistencySettings: consistencyData(data, create), ...(mode === 'image' ? { image: await fileImage(data.get('image')) } : {}) });
-  projectId = p.id; localStorage.setItem('gen3d-project', p.id); conceptId = viewId = versionId = null; stagePinned = false; lastState = ''; $('create-dialog').close(); create.reset();
-  for (const f of document.querySelectorAll('#workspace form')) { f.reset(); delete f.dataset.dirty; } create.elements.mode.onchange();
-});
-function syncConsistency(form) { form.elements.onFailure.disabled = form.elements.enabled.value === 'false'; }
-function consistencyData(data, form) { return { enabled: data.get('enabled') === 'true', onFailure: form.elements.onFailure.value }; }
-for (const form of [create, $('consistency')]) form.elements.enabled.onchange = () => syncConsistency(form);
-function refinementData(data) { return { enabled: data.get('refinementEnabled') === 'true', maxIterations: Number(data.get('maxIterations')) }; }
-form('refinement', data => api(`/projects/${projectId}`, 'PATCH', { refinementSettings: refinementData(data) }));
-$('refinement-review').onclick = () => safe(() => api(`/projects/${projectId}/versions/${versionId || project()?.versions.at(-1)?.id}/refinement-review`, 'POST', {}));
-form('consistency', data => api(`/projects/${projectId}`, 'PATCH', { consistencySettings: consistencyData(data, $('consistency')) }));
-function checkpointData(data) { return Object.fromEntries(['input', 'concept', 'multiView', 'preview'].map(key => [key, data.has(key)])); }
-form('checkpoints', data => api(`/projects/${projectId}`, 'PATCH', { checkpoints: checkpointData(data) }));
-form('concept-retry', async data => { await api(`/projects/${projectId}/concepts`, 'POST', { feedback: data.get('feedback') }); followWorkflow(); });
-form('views-retry', async data => { await api(`/projects/${projectId}/reference-sets`, 'POST', { ...(data.get('referenceSetId') ? { referenceSetId: data.get('referenceSetId') } : {}), feedback: data.get('feedback') }); followWorkflow(); });
-form('edit', data => api(`/projects/${projectId}`, 'PATCH', { name: data.get('name'), prompt: data.get('prompt'), profile: data.get('profile') }));
-form('reference', async data => { await api(`/projects/${projectId}/references`, 'POST', { label: data.get('label'), image: await fileImage(data.get('image')) }); $('reference').reset(); });
-async function generate(kind, feedback) {
-  const sourceVersionId = versionId || project()?.versions.at(-1)?.id;
-  await api(`/projects/${projectId}/generate`, 'POST', { kind, ...(kind === 'revision' ? { sourceVersionId, feedback } : {}) });
-  followWorkflow();
-}
-form('revise', async data => { await generate('revision', data.get('feedback')); $('revise').reset(); });
-$('generate').onclick = () => safe(() => generate('generate'));
-$('retry').onclick = () => safe(() => generate('retry'));
-for (const [id, decision] of [['approve', 'approved'], ['reject', 'rejected']]) $(id).onclick = () => safe(() => api(`/projects/${projectId}/versions/${versionId || project()?.versions.at(-1)?.id}/review`, 'POST', { decision }));
-$('versions').onchange = () => { versionId = $('versions').value; stagePinned = true; lastState = ''; render(); };
-$('concept-selection').onchange = () => { conceptId = $('concept-selection').value; lastState = ''; render(); };
-$('view-selection').onchange = () => { viewId = $('view-selection').value; lastState = ''; render(); };
-for (const id of ['new-project', 'empty-create']) $(id).onclick = () => $('create-dialog').showModal();
-$('close-create').onclick = () => $('create-dialog').close();
-for (const [buttonId, detailsId] of [['show-settings', 'advanced'], ['show-history', 'activity-details']]) $(buttonId).onclick = () => {
-  const details = $(detailsId); details.open = true; details.scrollIntoView({ block: 'start' }); details.querySelector('summary').focus({ preventScroll: true });
-};
-$('fit').onclick = fit;
-setupLibrary({ api, project, refresh });
-await safe(refresh);
-setInterval(() => refresh().catch(() => {}), 1500);
+let refreshing=false;
+async function refresh(){if(refreshing)return;refreshing=true;try{[projects,status]=await Promise.all([api('/projects'),api('/status')]);$('connection').textContent=status.busy?'Codex → Blender · running':'Local server connected';render();}finally{refreshing=false;}}
+async function loadPresets(){const data=await api('/workflows');catalog=data.catalog;presets=data.presets;options($('preset'),presets.map(p=>[p.id,p.name||p.graph.name]),$('preset').value);options($('add-type'),Object.keys(catalog).map(t=>[t,t]),'refine');}
+async function loadBases(){const data=await api('/library?limit=100');options($('base-asset'),[['','Choose a library model'],...data.assets.filter(a=>!a.error).map(a=>[a.id,a.name])],project()?.editableBase?.assetId);await inspectBase();}
+async function inspectBase(){const id=$('base-asset').value;if(!id){$('base-objects').textContent='Import a GLB / packed .blend through Asset library.';return;}const a=await api('/library/assets/'+id);$('base-objects').textContent=(a.inspection?.objects||[]).map(o=>`${o.name} (${o.type})`).join('\n')||'Source is inspected when authorized.';}
+for(const key of ['home','studio','workflow'])$('nav-'+key).onclick=()=>navigate(key);
+window.addEventListener('hashchange',()=>navigate(location.hash.slice(1)));
+$('theme').value=localStorage.getItem('gen3d-theme')||'dark';document.documentElement.dataset.theme=$('theme').value;
+$('theme').onchange=()=>{document.documentElement.dataset.theme=$('theme').value;localStorage.setItem('gen3d-theme',$('theme').value);};
+for(const id of ['new-project','empty-create'])$(id).onclick=()=>$('create-dialog').showModal();$('close-create').onclick=()=>$('create-dialog').close();
+$('create').elements.mode.onchange=()=>{const image=$('create').elements.mode.value==='image';$('image-label').hidden=!image;$('create').elements.image.required=image;};
+form('create',async data=>{const mode=data.get('mode'),workflowType=data.get('workflowType');const p=await api('/projects','POST',{name:data.get('name'),mode,prompt:data.get('prompt'),workflowType,profile:workflowType==='humanoid'?'character':'object',...(mode==='image'?{image:await imageData(data.get('image'))}:{})});$('create-dialog').close();$('create').reset();projects.push(p);chooseProject(p.id);await loadBases();});
+form('edit',data=>api(route(),'PATCH',{name:data.get('name'),prompt:data.get('prompt'),profile:data.get('profile')}));
+form('settings',data=>api(route(),'PATCH',{checkpoints:Object.fromEntries(['input','concept','multiView','preview'].map(k=>[k,data.has(k)])),consistencySettings:{enabled:data.get('consistency')==='true',onFailure:data.get('onFailure')},refinementSettings:{enabled:data.get('refinement')==='true',maxIterations:Number(data.get('maxIterations'))}}));
+form('reference',async data=>{await api(route()+'/references','POST',{label:data.get('label'),image:await imageData(data.get('image'))});$('reference').reset();});
+form('base-form',data=>api(route()+'/editable-base','POST',{assetId:data.get('assetId'),scope:{editableObjects:data.get('objects').split('\n').map(s=>s.trim()).filter(Boolean),allowChanges:['armature','weights','shapeKeys','uvs','materials'].filter(k=>data.has(k)),allowNewObjects:data.has('allowNewObjects')}}));
+$('reload-base').onclick=()=>safe(loadBases);$('base-asset').onchange=()=>safe(inspectBase);
+$('versions').onchange=()=>{versionId=$('versions').value;lastSignature='';render();};
+for(const id of ['studio-run','workflow-run'])$(id).onchange=()=>{runId=$(id).value;lastSignature='';render();};
+$('run-workflow').onclick=()=>safe(()=>run());$('save-graph').onclick=()=>safe(saveGraph);
+$('load-preset').onclick=()=>{delete $('node-form').dataset.dirty;draft=structuredClone(presets.find(p=>p.id===$('preset').value).graph);markDirty();renderGraph(project());};
+$('save-preset').onclick=()=>safe(async()=>{await api('/workflows/presets','POST',{name:$('preset-name').value,graph:draft});await loadPresets();});
+form('node-form',data=>{const n=draft.nodes.find(n=>n.id===selectedNode),settings={};for(const[key,rule]of Object.entries(catalog[n.type].settings)){const v=data.get('setting:'+key);if(v!==''&&v!==null)settings[key]=rule==='boolean'?v==='true':rule==='bound'?Number(v):v;}n.settings=settings;draft.edges=draft.edges.filter(e=>e.to!==n.id);for(const port of Object.keys(catalog[n.type].inputs)){const from=data.get('port:'+port);if(from)draft.edges.push({from,to:n.id,input:port});}markDirty();renderGraph(project());});
+$('remove-node').onclick=()=>{draft.nodes=draft.nodes.filter(n=>n.id!==selectedNode);draft.edges=draft.edges.filter(e=>e.from!==selectedNode&&e.to!==selectedNode);selectedNode=draft.nodes[0]?.id;markDirty();renderGraph(project());};
+$('add-node').onclick=()=>{const type=$('add-type').value;let id=type,index=2;while(draft.nodes.some(n=>n.id===id))id=type+'_'+index++;draft.nodes.push({id,type,settings:{}});selectedNode=id;markDirty();renderGraph(project());};
+$('apply-json').onclick=()=>safe(()=>{const parsed=JSON.parse($('graph-json').value);if(!Array.isArray(parsed.nodes)||!Array.isArray(parsed.edges))throw new Error('Graph requires nodes and edges');delete $('node-form').dataset.dirty;draft=parsed;markDirty();renderGraph(project());});
+$('fit').onclick=fit;
+for(const type of ['model','compare'])$('view-'+type).onclick=()=>{$('model-view').hidden=type!=='model';$('comparison').hidden=type!=='compare';$('view-model').setAttribute('aria-pressed',String(type==='model'));$('view-compare').setAttribute('aria-pressed',String(type==='compare'));};
+$('refinement-review').onclick=()=>safe(()=>api(`${route()}/versions/${selectedVersion(project()).id}/refinement-review`,'POST',{}));
+setupLibrary({api,project,refresh});
+await safe(async()=>{await loadPresets();await refresh();await loadBases();});
+setInterval(()=>refresh().catch(()=>{$('connection').textContent='Local server disconnected';}),1500);

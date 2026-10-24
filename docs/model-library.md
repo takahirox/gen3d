@@ -195,3 +195,7 @@ renders, decisions, audits and exports and never retries or resets a limit.
 See [Issue #21 evidence](validation-issue21.md) for actual results and limitations.
 See [Issue #24 evidence](validation-issue24.md) for four-GLB visual attachment,
 reuse/adaptation, semantic modifier and role-aware refinement results.
+
+## Complete editable bases
+
+The humanoid preset has a separate **Editable base authorization** in Model studio. Reference-only inspection and `reuse-edit` mesh permission do not grant this authorization. A base node copies the complete scene, including supported skeleton/weights/expressions, and checks the initial GLB roundtrip. Human-scoped editable objects and protected features are verified after editing. See [workflow preservation contracts and supported capabilities](workflows.md#complete-base-preservation). The mesh-only limitations above still apply to supplementary reference reuse.

@@ -1,0 +1,1 @@
+Widened Hair by 15% along local X using vertex edits. Preserved object scale, topology, UVs, materials, rig, weights, expressions, hierarchy, pose, and all other objects. Set the reference camera direction and verified the edit through Blender MCP.

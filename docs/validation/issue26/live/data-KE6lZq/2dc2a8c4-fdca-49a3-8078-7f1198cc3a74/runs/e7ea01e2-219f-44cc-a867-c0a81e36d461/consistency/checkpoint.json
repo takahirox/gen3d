@@ -1,0 +1,56 @@
+{
+  "id": "b88b6745-d4c4-4c73-a999-ad9dc9ab56d7",
+  "runId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+  "nodeId": "consistency",
+  "type": "checkedViews",
+  "graphRevision": 1,
+  "graphHash": "6dd3aca0aaaf0e1c8ce19f55b12abd604a4e1cbcaac237854362dfb40420adf4",
+  "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+  "fingerprint": "9111d6049e3ccf43bc583dfef516623b74d67db6cb2042fb4c13f44b00c35c1d",
+  "settings": {},
+  "configuration": {
+    "enabled": true,
+    "onFailure": "stop"
+  },
+  "dependencyIds": {
+    "views": "6d7d68f2-79e9-418c-aa97-b7266e4bf562"
+  },
+  "sourceIdentities": [],
+  "data": {
+    "visual": {
+      "mode": "image",
+      "prompt": "The app has loaded the COMPLETE base character. Make ONLY Hair mesh coordinates 15 percent wider along local X, matching the wider hair cap in the image. Use vertex coordinate edits, not object scale, and preserve all Hair UVs/materials and all other objects, rig, skin weights, Smile expression and hierarchy. Do not create new parts or alter pose. Keep this bounded: inspect then make the targeted Hair edit and finish. Set the requested reference camera direction without reorienting the character.",
+      "profile": "character",
+      "image": {
+        "file": "input.png",
+        "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0"
+      },
+      "file": "input.png"
+    },
+    "images": [],
+    "setId": "590eb5c8-13b0-492f-9b9c-90725803ab94",
+    "consistency": {
+      "status": "not-applicable",
+      "issues": [],
+      "outcome": "allowed"
+    },
+    "consistencySettings": {
+      "enabled": true,
+      "onFailure": "stop"
+    }
+  },
+  "dataHash": "8528cf97dc5dd8dd7ca35d9ebc4e80e0c038aa93aca621246b122dc4b0d8f851",
+  "files": [
+    {
+      "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/consistency/consistency.json",
+      "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+      "type": "json"
+    },
+    {
+      "file": "input.png",
+      "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+      "type": "png"
+    }
+  ],
+  "createdAt": "2026-10-24T02:56:11.533Z"
+}

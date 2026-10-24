@@ -8,6 +8,7 @@ import { referenceProfile, validateViewSet, consistencySettings, consistencyAllo
 
 import { AppError } from './errors.js';
 export { AppError } from './errors.js';
+import { workflowPreset, fileHash, hash } from './workflow.js';
 import { AssetLibrary } from './asset-library.js';
 export function text(value, name, max = 12000) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new AppError(`${name} must contain 1–${max} characters`);
@@ -70,7 +71,7 @@ export class Store {
       const file = path.join(this.root, entry.name, 'project.json');
       if (!fs.existsSync(file)) continue;
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (project.schemaVersion !== 2) throw new AppError('Unsupported project schema. Start fresh by clearing only the gen3d-managed data store; see docs/local-setup.md#start-fresh.');
+      if (project.schemaVersion !== 3) throw new AppError('Unsupported project schema. Start fresh by clearing only the gen3d-managed data store; see docs/local-setup.md#start-fresh.');
       this.projects.set(project.id, project);
       for (const set of project.referenceSets) {
         if (set.status === 'running') {
@@ -93,6 +94,13 @@ export class Store {
           }
           version.status = 'failed'; version.error = 'Server stopped during generation. Retry to create a new version.';
           this.event(project, 'server', 'generation_interrupted', { versionId: version.id });
+        }
+      }
+      for (const run of project.workflowRuns || []) {
+        if (run.status === 'running') {
+          run.status = 'interrupted'; run.error = 'Server stopped; fork a completed checkpoint to resume explicitly.';
+          for (const node of Object.values(run.nodes)) if (node.status === 'running') node.status = 'interrupted';
+          this.event(project, 'server', 'workflow_interrupted', { runId: run.id });
         }
       }
       this.save(project);
@@ -122,7 +130,7 @@ export class Store {
     const image = input.mode === 'image' ? imageData(input.image) : null;
     const settings = checkpoints(input.checkpoints);
     const profile = referenceProfile(input.profile, prompt);
-    const p = { schemaVersion: 2, id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], modelReferences: [], versions: [], activity: [], updatedAt: '' };
+    const p = { schemaVersion: 3, workflow: { ...workflowPreset(input.workflowType || 'object'), revision: 1 }, workflowRuns: [], acceptedVersionId: null, editableBase: null, id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], modelReferences: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
     if (image) {
       fs.mkdirSync(this.dir(p.id), { recursive: true });
@@ -132,7 +140,7 @@ export class Store {
     this.event(p, actor, 'project_created'); this.save(p); return p;
   }
   idle(p) {
-    if (p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running') || p.referenceSets.some(s => s.status === 'running')) throw new AppError('Wait for the current generation to finish', 409);
+    if (p.workflowRuns?.some(r => r.status === 'running') || p.versions.some(v => v.status === 'running') || p.concepts.some(c => c.status === 'running') || p.referenceSets.some(s => s.status === 'running')) throw new AppError('Wait for the current generation to finish', 409);
   }
   update(id, input, actor) {
     const p = this.get(id); this.idle(p);
@@ -211,7 +219,12 @@ export class Store {
     if (!v || v.status !== 'ready') throw new AppError('Choose a completed version');
     if (!['approved', 'rejected'].includes(decision)) throw new AppError('Choose approved or rejected');
     if (v.checkpoints?.preview && actor !== 'web') throw new AppError('Preview checkpoint requires a decision in the web UI', 403);
-    v.review = decision; this.event(p, actor, 'model_reviewed', { versionId, decision }); this.save(p); return p;
+    if (v.workflowRunId && !v.workflowReviewed) throw new AppError('Review this candidate through its workflow node', 409);
+    if (decision === 'approved' && v.editableBase && (v.preservation?.passed !== true || v.preservation?.roundtrip?.passed !== true)) throw new AppError('Candidate violates protected base features', 409);
+    v.review = decision;
+    if (decision === 'approved') p.acceptedVersionId = v.id;
+    else if (p.acceptedVersionId === v.id) p.acceptedVersionId = null;
+    this.event(p, actor, 'model_reviewed', { versionId, decision }); this.save(p); return p;
   }
   reviewInput(id, decision, actor) {
     const p = this.get(id); this.idle(p);
@@ -248,12 +261,22 @@ export class Store {
   canExport(id, versionId) {
     const p = this.get(id), v = p.versions.find(v => v.id === versionId && v.status === 'ready');
     if (!v) throw new AppError('Choose a completed version');
+    if (v.workflowRunId && (!v.workflowReviewed || v.review !== 'approved')) throw new AppError('Approve the workflow candidate before export', 409);
+    if (v.editableBase && v.preservation?.passed !== true) throw new AppError('Candidate lacks preservation evidence', 409);
+    if (v.workflowRunId) {
+      const run = p.workflowRuns.find(r => r.id === v.workflowRunId);
+      for (const cp of run.checkpoints) {
+        const { record, recordHash, ...saved } = cp;
+        if (hash(saved) !== recordHash || hash(JSON.parse(fs.readFileSync(this.artifact(id, record), 'utf8'))) !== recordHash) throw new AppError('Checkpoint record changed; export blocked', 409);
+        for (const f of cp.files) if (fileHash(this.artifact(id, f.file)) !== f.sha256) throw new AppError('Checkpoint artifact changed; export blocked', 409);
+      }
+    }
     if (v.checkpoints?.preview && v.review !== 'approved') throw new AppError('Approve the 3D preview in the web UI before export', 409);
     return v;
   }
   artifact(id, relative) {
     const p = this.get(id);
-    const files = [p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => [...Object.values(v.artifacts || {}), ...(v.modelReferenceVisuals || []).flatMap(r => [r.sheet, ...r.views.map(view => view.image)]), ...(v.refinement?.iterations || []).flatMap(c => Object.values(c.artifacts || {}))])].filter(Boolean);
+    const files = [...(p.workflowRuns || []).flatMap(r => [...(r.artifacts || []), ...r.checkpoints.flatMap(c => [c.record, ...c.files.map(f => f.file)])]), p.inputImage, ...p.references.map(r => r.file), ...p.concepts.flatMap(c => Object.values(c.artifacts || {})), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts || {})]), ...p.versions.flatMap(v => [...Object.values(v.artifacts || {}), ...(v.modelReferenceVisuals || []).flatMap(r => [r.sheet, ...r.views.map(view => view.image)]), ...(v.refinement?.iterations || []).flatMap(c => Object.values(c.artifacts || {}))])].filter(Boolean);
     if (!files.includes(relative)) throw new AppError('Artifact not found', 404);
     const file = path.resolve(this.dir(id), relative);
     if (!file.startsWith(this.dir(id) + path.sep) || !fs.lstatSync(file).isFile()
