@@ -30,7 +30,7 @@ function setup(t, { mode = 'image', checkpoints = off, inspect, failViews = fals
     inspectReferences: async () => { calls.push('consistency'); return inspect || { consistent: true, issues: [] }; },
     inspectModel: async ({ dir, renders }) => { calls.push('compare'); const acceptable = path.basename(dir) === '1'; return { acceptable, summary: 'Synthetic comparison', revisionTargets: acceptable ? [] : ['geometry'], revisionInstructions: acceptable ? [] : ['Change geometry'], views: renders.map(r => ({ view: r.view, observations: categories.map((category, i) => ({ category, status: !acceptable && i === 0 ? 'discrepancy' : 'acceptable', detail: 'Synthetic scheduler evidence' })) })) }; },
     generate: async (project, v, dir) => { calls.push('model'); for (const file of ['model.glb', 'scene.blend', 'preview.png', 'mcp-audit.jsonl']) fs.copyFileSync(path.join(fixture, 'model-1', file), path.join(dir, file));
-      if (v.refinementSettings.enabled) { fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: (v.refinementCycle ? 'b' : 'a').repeat(64) })); for (const view of ['input', 'front', 'side', 'back', 'three-quarter']) fs.copyFileSync(path.join(fixture,'model-1/preview.png'), path.join(dir,view+'.png')); }
+      if (v.refinementSettings.enabled) { fs.writeFileSync(path.join(dir, 'geometry.json'), JSON.stringify({ sha256: (v.refinementCycle ? 'b' : 'a').repeat(64) })); fs.writeFileSync(path.join(dir, 'cameras.json'), '[]'); for (const view of ['input', 'front', 'side', 'back', 'three-quarter']) fs.copyFileSync(path.join(fixture,'model-1/preview.png'), path.join(dir,view+'.png')); }
     }
   });
   const engine = new WorkflowEngine(store, runner, workflowOperations(store, runner));
@@ -155,9 +155,45 @@ test('bounded refine node runs downstream from immutable model checkpoint and ke
 
 test('enabling refinement downstream reuses the model and its original render evidence', async t => {
   const c=setup(t);const original=await c.run();const cp=original.checkpoints.find(cp=>cp.nodeId==='model');
+  for (const name of ['geometry.json', 'materials.json', 'cameras.json', 'input.png', 'front.png', 'side.png', 'back.png', 'three-quarter.png']) {
+    assert.ok(cp.files.some(f => f.file === cp.data.evidence[name]), name + ' is hashed in the model checkpoint');
+  }
   const graph=structuredClone(c.p.workflow);graph.nodes.find(n=>n.type==='refine').settings={enabled:true,maxIterations:1};c.engine.saveGraph(c.p.id,graph,'web');
   const fork=await c.run({runId:original.id,checkpointId:cp.id});assert.equal(fork.status,'completed',fork.error);assert.equal(fork.nodes.model.reusedFrom,original.id);
   assert.deepEqual(c.calls,['model','compare','model','compare']);
+});
+
+test('changed comparison renders and revision evidence block checkpoint reuse and export', async t => {
+  for (const name of ['input.png', 'front.png', 'side.png', 'back.png', 'three-quarter.png', 'geometry.json', 'materials.json', 'cameras.json']) {
+    await t.test(name, async t => {
+      const c = setup(t), original = await c.run(), cp = original.checkpoints.find(cp => cp.nodeId === 'model');
+      const graph = structuredClone(c.p.workflow);
+      graph.nodes.find(n => n.type === 'refine').settings = { enabled: true, maxIterations: 1 };
+      c.engine.saveGraph(c.p.id, graph, 'web');
+      fs.writeFileSync(c.store.artifact(c.p.id, cp.data.evidence[name]), name.endsWith('.png') ? png : '{"changed":true}');
+      assert.throws(() => c.engine.checkpoint(c.p, original, cp.id), /Checkpoint artifact changed/);
+      assert.throws(() => c.engine.start(c.p.id, { runId: original.id, checkpointId: cp.id }), /Checkpoint artifact changed/);
+      assert.throws(() => c.store.canExport(c.p.id, c.p.versions[0].id), /changed/);
+      assert.equal(c.p.workflowRuns.length, 1);
+      assert.deepEqual(c.calls, ['model']);
+    });
+  }
+});
+
+test('refinement copies only recorded model files, excluding later injected directory contents', async t => {
+  const c = setup(t), original = await c.run(), cp = original.checkpoints.find(cp => cp.nodeId === 'model');
+  const dir = path.dirname(c.store.artifact(c.p.id, cp.data.artifacts.blend));
+  fs.writeFileSync(path.join(dir, 'unrecorded.png'), png);
+  fs.mkdirSync(path.join(dir, 'refinement'));
+  fs.writeFileSync(path.join(dir, 'refinement', 'injected.json'), '{"unrecorded":true}');
+  const graph = structuredClone(c.p.workflow);
+  graph.nodes.find(n => n.type === 'refine').settings = { enabled: true, maxIterations: 1 };
+  c.engine.saveGraph(c.p.id, graph, 'web');
+  const fork = await c.run({ runId: original.id, checkpointId: cp.id });
+  assert.equal(fork.status, 'completed', fork.error);
+  const refinedDir = path.join(c.store.dir(c.p.id), 'runs', fork.id, 'refine');
+  assert.equal(fs.existsSync(path.join(refinedDir, 'unrecorded.png')), false);
+  assert.equal(fs.existsSync(path.join(refinedDir, 'refinement', 'injected.json')), false);
 });
 
 test('a branch from a completed model publishes a separate candidate without changing accepted source', async t => {

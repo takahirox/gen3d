@@ -28,8 +28,21 @@ def material(m, semantic=False):
     shaders = [n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED']
     if len(shaders) != 1:
         raise RuntimeError('Base material needs one glTF-compatible Principled BSDF: ' + m.name)
+    if any(n.mute for n in m.node_tree.nodes):
+        raise RuntimeError('Muted material nodes are unsupported for protected export: ' + m.name)
     shader = shaders[0]
-    result = {k: nums(shader.inputs[k].default_value) if k == 'Base Color' else round(float(shader.inputs[k].default_value), 5) for k in ['Base Color', 'Metallic', 'Roughness', 'Alpha']}
+    # Every accepted Principled input is protected, including emission, coat,
+    # transmission and specular. A format that drops a non-default input fails
+    # the measured roundtrip below rather than claiming to preserve it.
+    result = {'inputs': {s.name: nums(s.default_value) if s.type in {'RGBA', 'VECTOR'} else round(float(s.default_value), 5) for s in shader.inputs}}
+    settings = ['use_backface_culling', 'use_backface_culling_shadow', 'use_backface_culling_lightprobe_volume', 'surface_render_method', 'use_transparent_shadow', 'use_transparency_overlap']
+    if not hasattr(m, 'surface_render_method'):
+        settings += ['blend_method', 'alpha_threshold', 'show_transparent_back']
+    result['settings'] = {name: getattr(m, name) for name in settings if hasattr(m, name)}
+    result['shaderSettings'] = {name: getattr(shader, name) for name in ['distribution', 'subsurface_method'] if hasattr(shader, name)}
+    outputs = [n for n in m.node_tree.nodes if n.type == 'OUTPUT_MATERIAL']
+    if len(outputs) != 1 or not outputs[0].is_active_output or outputs[0].target != 'ALL' or len(outputs[0].inputs['Surface'].links) != 1 or outputs[0].inputs['Surface'].links[0].from_node != shader or any(s.is_linked for s in outputs[0].inputs if s.name != 'Surface'):
+        raise RuntimeError('Protected material requires one direct Principled surface output: ' + m.name)
     for socket in shader.inputs:
         if socket.is_linked and (socket.name not in {'Base Color', 'Alpha'} or any(link.from_node.type != 'TEX_IMAGE' for link in socket.links)):
             raise RuntimeError('Unsupported linked material input for protected export: ' + m.name + '.' + socket.name)
@@ -38,7 +51,7 @@ def material(m, semantic=False):
     result['links'] = {socket.name: sorted([digest(nums(link.from_node.image.pixels[:])), link.from_socket.name] for link in socket.links) for socket in shader.inputs if socket.is_linked}
     if not semantic:
         result['name'] = m.name
-    result['images'] = sorted(digest(nums(n.image.pixels[:])) for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image)
+    result['images'] = sorted(json.dumps({'pixels': digest(nums(n.image.pixels[:])), 'colorSpace': n.image.colorspace_settings.name, 'alphaMode': n.image.alpha_mode, 'interpolation': n.interpolation, 'extension': n.extension, 'projection': n.projection}, sort_keys=True) for n in m.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image)
     return result
 
 

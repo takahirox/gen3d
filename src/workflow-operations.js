@@ -22,7 +22,15 @@ export function workflowOperations(store, runner) {
     const data = imageData(`data:image/${result.ext === 'jpg' ? 'jpeg' : result.ext};base64,${result.bytes.toString('base64')}`);
     const file = path.join(ctx.dir, name + '.' + data.ext); fs.writeFileSync(file, data.bytes); return publish(ctx.p, ctx.run, file);
   }
-  const versionResult = v => ({ data: { versionId: v.id, artifacts: structuredClone(v.artifacts), preservation: structuredClone(v.preservation || null), reviewRequired: !!v.refinement?.reviewRequested }, files: Object.values(v.artifacts) });
+  function versionResult(p, v) {
+    const dir = path.dirname(store.artifact(p.id, v.artifacts.blend));
+    // These files are consumed by comparison and revision validation even when
+    // refinement was Off at modeling time. Bind them to the model checkpoint.
+    const evidence = Object.fromEntries(['geometry.json', 'materials.json', 'cameras.json', 'input.png', 'front.png', 'side.png', 'back.png', 'three-quarter.png']
+      .filter(name => fs.existsSync(path.join(dir, name)))
+      .map(name => [name, relative(p, path.join(dir, name))]));
+    return { data: { versionId: v.id, artifacts: structuredClone(v.artifacts), evidence, preservation: structuredClone(v.preservation || null), reviewRequired: !!v.refinement?.reviewRequested }, files: [...Object.values(v.artifacts), ...Object.values(evidence)] };
+  }
   function newVersion(ctx, source) {
     const { p, run, node, inputs } = ctx, snap = run.snapshot, view = inputs.views;
     const v = source ? { ...structuredClone(source), id: randomUUID(), sourceVersionId: source.id, artifacts: {}, review: 'pending', status: 'running', error: null } : {
@@ -112,22 +120,26 @@ export function workflowOperations(store, runner) {
       await runner.generate(ctx.p, v, ctx.dir); runner.validateModel(ctx.p, v, ctx.dir);
       await validateBaseEdit(store, runner, ctx.p, v, ctx.dir);
       if (v.refinement.status === 'running') v.refinement.status = v.refinement.reviewRequested ? 'review-requested' : 'prepared';
-      v.status = 'ready'; store.save(ctx.p); return versionResult(v);
+      v.status = 'ready'; store.save(ctx.p); return versionResult(ctx.p, v);
     },
     async refine(ctx) {
       const source = ctx.p.versions.find(v => v.id === ctx.inputs.model.versionId);
       if (!source || source.status !== 'ready') throw new Error('Refinement requires a completed model');
-      if (!ctx.context.enabled || source.refinement?.reviewRequested || ctx.inputs.model.reviewRequired) return { data: ctx.inputs.model, files: Object.values(ctx.inputs.model.artifacts) };
+      if (!ctx.context.enabled || source.refinement?.reviewRequested || ctx.inputs.model.reviewRequired) return { data: ctx.inputs.model, files: [...Object.values(ctx.inputs.model.artifacts), ...Object.values(ctx.inputs.model.evidence || {})] };
       const v = newVersion(ctx, source);
-      const initial = path.dirname(store.artifact(ctx.p.id, source.artifacts.blend));
-      fs.cpSync(initial, ctx.dir, { recursive: true, filter: file => path.basename(file) !== 'checkpoint.json' });
+      // The engine verifies these checkpoint files before execution. Never copy
+      // an entire directory: newly injected, unrecorded files are not evidence.
+      for (const file of new Set([...Object.values(ctx.inputs.model.artifacts), ...Object.values(ctx.inputs.model.evidence || {})])) {
+        fs.copyFileSync(store.artifact(ctx.p.id, file), path.join(ctx.dir, path.basename(file)));
+      }
       v.refinementSettings = ctx.context; v.refinement = { status: 'running', maxIterations: ctx.context.maxIterations, iterations: [{ number: 0, status: 'running', stage: 'comparing', views: v.modelingImages.length ? v.modelingImages.map(i => i.view) : ['input'], referenceFingerprint: v.referenceFingerprint, imageInputs: v.imageInputs, artifacts: {}, createdAt: new Date().toISOString() }] };
       runner.validateModel(ctx.p, v, ctx.dir);
       await runner.refine(ctx.p, v, ctx.dir);
       v.status = 'ready'; store.save(ctx.p);
       if (v.refinement.status === 'usage-limit') { const error = new Error(v.refinement.error); error.usageLimited = true; throw error; }
       await validateBaseEdit(store, runner, ctx.p, v, path.dirname(store.artifact(ctx.p.id, v.artifacts.blend)));
-      return { ...versionResult(v), files: [...Object.values(v.artifacts), ...v.refinement.iterations.flatMap(i => Object.values(i.artifacts))] };
+      const result = versionResult(ctx.p, v);
+      return { ...result, files: [...result.files, ...v.refinement.iterations.flatMap(i => Object.values(i.artifacts))] };
     },
     async review(ctx) {
       let v = ctx.p.versions.find(v => v.id === ctx.inputs.model.versionId);

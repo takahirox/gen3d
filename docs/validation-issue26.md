@@ -1,5 +1,25 @@
 # Issue #26 validation
 
+## Review fixes: material protection and checkpoint evidence
+
+The two findings from PR #27 were fixed and checked locally on 2026-10-24:
+
+- Material snapshots now compare every Principled input, shader settings, surface/culling settings and image sampling/color settings. Unsupported output wiring and muted nodes block preservation. The real Blender regression changes every accepted Principled socket individually and reproduces the unauthorized red-emission edit alongside a valid Hair edit. Both scene changes and an export-only emission change fail preservation, preventing acceptance/export evidence from being published.
+- Model checkpoints now persist and hash all comparison renders plus geometry, material and camera evidence, including when refinement is Off. Refinement copies only recorded artifacts/evidence. Replacing any of the five renders or three evidence JSON files blocks checkpoint reuse, forking and export before comparison runs; injected directory contents are excluded. Valid downstream refinement still reuses the original model.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 119 passed, 0 failed, 0 skipped |
+| `npm run check` | Passed |
+| `npm run test:browser` | 11 checks passed, no uncaught exceptions; injected providers/recorded GLBs |
+| `npm run test:workflow-blender` | 57 real Blender checks passed, including all 31 Principled inputs and both emission regressions |
+| `GEN3D_WORKFLOW_ARTIFACT_INPUT=docs/validation/issue26/live npm run test:workflow-artifacts` | Four saved scene/GLB outputs revalidated; original artifact hashes unchanged |
+| `git diff --check` | Passed |
+
+Saved reports: [Blender](validation/issue26/review-fixes/blender-report.json), [browser](validation/issue26/review-fixes/browser-report.json), [saved-output revalidation](validation/issue26/review-fixes/artifact-report.json). An initial expanded Blender test failed because Blender 5 exposes an inert deprecated `blend_method` setter. The final code uses current surface settings when available and legacy settings only on older Blender versions; the final check passed. No checks were skipped or unavailable. No new Codex generation, human approval, allowance change, push or merge was performed for these fixes. The earlier live-generation evidence below remains historical.
+
+## Original implementation validation
+
 Validation was performed locally on 2026-10-24 with Node 24.12.0, Blender 5.1.2, Chrome, and a Codex CLI reporting ChatGPT authentication. No allowance reset, purchase, provider/model switch, push, PR, merge or GitHub comment was used.
 
 ## Results

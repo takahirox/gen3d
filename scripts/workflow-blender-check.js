@@ -111,6 +111,77 @@ for feature in ['weights','shapeKeys','uvs','materials','armature','pose','uv-na
         raise AssertionError('Uncaught protected feature: ' + feature)
     except RuntimeError as error:
         checks.append('blocked ' + feature + ': ' + str(error))
+# Exercise every accepted Principled socket, rather than maintaining another
+# short allowlist that could omit newly supported material inputs.
+with open(out + '/prepared/baseline.json') as f:
+    before=json.load(f)
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+shader = bpy.data.materials['CharacterMaterial'].node_tree.nodes.get('Principled BSDF')
+for socket in shader.inputs:
+    original = socket.default_value[:] if socket.type in {'RGBA', 'VECTOR'} else socket.default_value
+    if socket.type in {'RGBA', 'VECTOR'}:
+        value = list(original)
+        value[0] = 0.25 if value[0] != 0.25 else 0.75
+        socket.default_value = value
+    else:
+        socket.default_value = 0.25 if original != 0.25 else 0.75
+    try:
+        p.compare(before, p.snapshot(), scope)
+        raise AssertionError('Uncaught Principled property: ' + socket.name)
+    except RuntimeError as error:
+        assert 'materials' in str(error), str(error)
+        checks.append('blocked Principled ' + socket.name)
+    finally:
+        socket.default_value = original
+mat = bpy.data.materials['CharacterMaterial']
+for setting in p.material(mat)['settings']:
+    original = getattr(mat, setting)
+    if isinstance(original, bool):
+        value = not original
+    elif isinstance(original, str):
+        value = next(item.identifier for item in mat.bl_rna.properties[setting].enum_items if item.identifier != original)
+    else:
+        value = 0.25 if original != 0.25 else 0.75
+    setattr(mat, setting, value)
+    try:
+        p.compare(before, p.snapshot(), scope)
+        raise AssertionError('Uncaught material setting: ' + setting)
+    except RuntimeError as error:
+        assert 'materials' in str(error), str(error)
+        checks.append('blocked material setting ' + setting)
+    finally:
+        setattr(mat, setting, original)
+for setting in p.material(mat)['shaderSettings']:
+    original = getattr(shader, setting)
+    value = next(item.identifier for item in shader.bl_rna.properties[setting].enum_items if item.identifier != original)
+    setattr(shader, setting, value)
+    try:
+        p.compare(before, p.snapshot(), scope)
+        raise AssertionError('Uncaught shader setting: ' + setting)
+    except RuntimeError as error:
+        assert 'materials' in str(error), str(error)
+        checks.append('blocked shader setting ' + setting)
+    finally:
+        setattr(shader, setting, original)
+# Reproduce the review finding at the actual candidate validation boundary:
+# Hair has a permitted edit, while its shared material emits unauthorized red.
+shader.inputs['Emission Color'].default_value = (1,0,0,1)
+shader.inputs['Emission Strength'].default_value = 1
+bpy.ops.wm.save_as_mainfile(filepath=out + '/emission.blend', compress=False)
+bpy.ops.export_scene.gltf(filepath=out + '/emission.glb', export_format='GLB', export_apply=False, export_animations=False)
+assert any(m.get('emissiveFactor') == [1,0,0] for m in p.preflight_glb(out + '/emission.glb').get('materials', []))
+try:
+    p.validate(out + '/prepared/baseline.json', scope, out + '/emission.blend', out + '/emission.glb', out + '/emission-validation.json')
+    raise AssertionError('Unauthorized emission became valid acceptance/export evidence')
+except RuntimeError as error:
+    assert 'materials' in str(error), str(error)
+    checks.append('blocked unauthorized emission in candidate scene and exported GLB: ' + str(error))
+try:
+    p.validate(out + '/prepared/baseline.json', scope, out + '/edited.blend', out + '/emission.glb', out + '/emission-roundtrip-validation.json')
+    raise AssertionError('Export-only emission change passed roundtrip validation')
+except RuntimeError as error:
+    assert 'materials' in str(error), str(error)
+    checks.append('blocked export-only emission change: ' + str(error))
 p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report})
 `);
 try {
