@@ -106,7 +106,42 @@ def expressions(o, coords, semantic=False):
     return result
 
 
+def check_collection_visibility():
+    # glTF has no collection/view-layer visibility model. Object hide flags
+    # alone miss excluded or hidden ancestors (including ancestors of a rig).
+    # Conservatively reject these configurations instead of flattening them
+    # into apparently unchanged objects or successful scene/GLB evidence.
+    scene = bpy.context.scene
+    model_names = {o.name for o in scene.objects if o.type in {'MESH', 'ARMATURE', 'EMPTY'}}
+
+    def blocked(objects, location, flags):
+        if objects and flags:
+            raise RuntimeError('Unsupported collection/view-layer visibility for protected GLB export: '
+                               + sorted(objects)[0] + ' in ' + location + ' (' + ', '.join(flags)
+                               + '); restore default visibility before base/candidate validation')
+
+    def visit(layer_collection, layer_name, path):
+        collection = layer_collection.collection
+        path = path + [collection.name]
+        objects = model_names.intersection(o.name for o in collection.all_objects)
+        flags = ['collection.' + name for name in ['hide_render', 'hide_viewport'] if getattr(collection, name)]
+        flags += ['layerCollection.' + name for name in ['exclude', 'hide_viewport', 'holdout', 'indirect_only'] if getattr(layer_collection, name)]
+        blocked(objects, 'view layer ' + layer_name + ', collection ' + '/'.join(path), flags)
+        for child in layer_collection.children:
+            visit(child, layer_name, path)
+
+    # Check every layer, not just the active one: a saved scene can render a
+    # different layer, and exclusion must be detected before depsgraph probes.
+    for layer in scene.view_layers:
+        blocked(model_names, 'view layer ' + layer.name, [] if layer.use else ['viewLayer.use=False'])
+        visit(layer.layer_collection, layer.name, [])
+        if layer != bpy.context.view_layer:
+            for o in layer.objects:
+                blocked({o.name} & model_names, 'view layer ' + layer.name, ['object.hidden'] if o.hide_get(view_layer=layer) else [])
+
+
 def snapshot(semantic=False):
+    check_collection_visibility()
     bpy.context.view_layer.update()
     objects = {}
     for o in bpy.context.scene.objects:

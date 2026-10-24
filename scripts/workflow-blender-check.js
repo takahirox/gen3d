@@ -82,6 +82,118 @@ bpy.ops.wm.save_as_mainfile(filepath=out + '/edited.blend', compress=False)
 bpy.ops.export_scene.gltf(filepath=out + '/edited.glb', export_format='GLB', export_apply=False, export_animations=False)
 report = p.validate(out + '/prepared/baseline.json', scope, out + '/edited.blend', out + '/edited.glb', out + '/preservation.json')
 checks = ['complete GLB base import and roundtrip', 'unchanged library source hash', 'complete scene copy', 'rig and weights retained', 'Smile expression retained', 'UV and material retention', 'authorized Hair geometry changed', 'GLB reopened and compared']
+# Collection visibility is inherited independently of object hide flags. Use
+# nested collections to exercise visibility settings on an ancestor.
+def group_body():
+    parent = bpy.data.collections.new('ProtectedParent')
+    child = bpy.data.collections.new('ProtectedChild')
+    bpy.context.scene.collection.children.link(parent)
+    parent.children.link(child)
+    body = bpy.data.objects['Body']
+    for collection in list(body.users_collection):
+        collection.objects.unlink(body)
+    child.objects.link(body)
+    bpy.context.view_layer.update()
+    return parent, child
+
+def body_pixels(file, label):
+    p.open_base(file)
+    scene = bpy.context.scene
+    for o in scene.objects:
+        if o.type == 'MESH' and o.name != 'Body':
+            o.hide_render = True
+    camera = bpy.data.objects.new('VisibilityProbe', bpy.data.cameras.new('VisibilityProbe'))
+    scene.collection.objects.link(camera)
+    camera.location = (0, -4, 0.7)
+    from mathutils import Vector
+    camera.rotation_euler = (Vector((0, 0, 0.7)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
+    camera.data.type = 'ORTHO'
+    camera.data.ortho_scale = 2
+    scene.camera = camera
+    engines = scene.render.bl_rna.properties['engine'].enum_items.keys()
+    scene.render.engine = 'BLENDER_EEVEE_NEXT' if 'BLENDER_EEVEE_NEXT' in engines else 'BLENDER_EEVEE'
+    scene.render.film_transparent = True
+    scene.render.resolution_x = scene.render.resolution_y = 64
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = 'PNG'
+    scene.render.image_settings.color_mode = 'RGBA'
+    scene.render.filepath = out + '/' + label + '.png'
+    bpy.ops.render.render(write_still=True)
+    image = bpy.data.images.load(scene.render.filepath, check_existing=False)
+    count = sum(alpha > 0.01 for alpha in image.pixels[:][3::4])
+    bpy.data.images.remove(image)
+    return count
+
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+group_body()
+nested_blend, nested_glb = out + '/nested.blend', out + '/nested.glb'
+bpy.ops.wm.save_as_mainfile(filepath=nested_blend, compress=False)
+bpy.ops.export_scene.gltf(filepath=nested_glb, export_format='GLB', export_apply=False, export_animations=False)
+p.validate(out + '/prepared/baseline.json', scope, nested_blend, nested_glb, out + '/nested-validation.json')
+visibility_evidence = {'visibleScenePixels':body_pixels(nested_blend, 'visible-body'), 'visibleGlbPixels':body_pixels(nested_glb, 'visible-glb-body'), 'blocked':[]}
+assert visibility_evidence['visibleScenePixels'] > 0 and visibility_evidence['visibleGlbPixels'] > 0
+checks.append('default nested collections preserve visible Body in saved scene and GLB')
+for feature in ['collection.hide_render', 'collection.hide_viewport', 'layerCollection.exclude', 'layerCollection.hide_viewport', 'layerCollection.holdout', 'layerCollection.indirect_only', 'inactive-layer.exclude', 'viewLayer.disabled', 'inactive-object.hidden']:
+    bpy.ops.wm.open_mainfile(filepath=nested_blend, use_scripts=False)
+    parent = bpy.data.collections['ProtectedParent']
+    layer = bpy.context.view_layer
+    if feature.startswith('inactive-'):
+        layer = bpy.context.scene.view_layers.new('OtherLayer')
+    if feature.startswith('collection.'):
+        setattr(parent, feature.split('.')[1], True)
+    elif feature == 'viewLayer.disabled':
+        layer.use = False
+    elif feature == 'inactive-object.hidden':
+        bpy.data.objects['Body'].hide_set(True, view_layer=layer)
+    else:
+        layer_parent = layer.layer_collection.children[parent.name]
+        setattr(layer_parent, feature.split('.')[1], True)
+    blend = out + '/visibility-' + feature + '.blend'
+    glb = out + '/visibility-' + feature + '.glb'
+    evidence = out + '/visibility-' + feature + '-validation.json'
+    bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
+    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=False, export_animations=False)
+    if feature == 'collection.hide_render':
+        # The exact review defect: no object hide flag changes, but Body
+        # disappears from the scene while remaining visible in exported GLB.
+        visibility_evidence['hiddenScenePixels'] = body_pixels(blend, 'hidden-body')
+        visibility_evidence['hiddenGlbPixels'] = body_pixels(glb, 'hidden-glb-body')
+        assert visibility_evidence['hiddenScenePixels'] == 0
+        assert visibility_evidence['hiddenGlbPixels'] > 0
+        bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
+        body = bpy.data.objects['Body']
+        assert not body.hide_render and not body.hide_viewport and not body.hide_get()
+        # Even explicit object visibility permission cannot authorize a format
+        # that cannot retain collection visibility in its scene/GLB evidence.
+        try:
+            p.validate(out + '/prepared/baseline.json', {'editableObjects':['Hair','Body'], 'allowChanges':['visibility']}, blend, glb, evidence)
+            raise AssertionError('Unsupported scene/GLB collection visibility mismatch passed')
+        except RuntimeError as error:
+            assert 'collection/view-layer visibility' in str(error) and 'Body' in str(error), str(error)
+            assert not os.path.exists(evidence)
+            checks.append('blocked scene/GLB collection visibility mismatch even with object visibility permission')
+    if os.path.exists(evidence):
+        os.remove(evidence)
+    try:
+        p.validate(out + '/prepared/baseline.json', scope, blend, glb, evidence)
+        raise AssertionError('Unauthorized collection/view-layer visibility became publication evidence: ' + feature)
+    except RuntimeError as error:
+        assert 'collection/view-layer visibility' in str(error), str(error)
+        assert not os.path.exists(evidence)
+        diagnostic = str(error)
+        checks.append('blocked saved candidate ' + feature + ': ' + diagnostic)
+    directory = out + '/unsupported-visibility-' + feature
+    os.makedirs(directory, exist_ok=True)
+    try:
+        p.prepare(blend, directory, scope)
+        raise AssertionError('Unsupported collection/view-layer base was authorized: ' + feature)
+    except RuntimeError as error:
+        assert 'collection/view-layer visibility' in str(error), str(error)
+        assert not os.path.exists(directory + '/base-validation.json')
+        visibility_evidence['blocked'].append({'feature':feature, 'candidateDiagnostic':diagnostic, 'baseDiagnostic':str(error), 'publicationEvidenceWritten':False})
+        checks.append('blocked unsupported base ' + feature)
+assert hashlib.sha256(open(source, 'rb').read()).hexdigest() == source_hash
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
 # Measure the saved expression through Blender independently of the snapshot.
 def smile_displacement():
     head = bpy.data.objects['HeadMesh']
@@ -484,7 +596,7 @@ try:
 except RuntimeError as error:
     assert 'materials' in str(error), str(error)
     checks.append('blocked export-only emission change: ' + str(error))
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence})
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });
