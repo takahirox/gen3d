@@ -1,5 +1,22 @@
 # Issue #26 validation
 
+## Review fix: protected bone inheritance
+
+The bone inheritance finding from PR #27 was fixed and checked locally on 2026-10-24 with Blender 5.1.2. Both scene and semantic GLB snapshots now record `use_inherit_rotation`, `inherit_scale`, `use_local_location` and `use_relative_parent` for every bone. Unauthorized changes fail candidate preservation; base preparation explicitly rejects roundtrips that discard these settings.
+
+The new real Blender regression first reproduced successful validation with only Hair authorized while Head rotation inheritance was disabled. Under a 60-degree Root rotation, reopened HeadMesh differed by approximately 0.9 Blender units from the original rig. With the fix, all four setting mutations are rejected without writing candidate success evidence, and each unsupported base GLB roundtrip fails clearly. The ordinary Hair edit still passes both scene and GLB validation, and the library source hash stays unchanged.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | Final run: 119 passed, 0 failed, 0 skipped |
+| `npm run check` | Passed |
+| `npm run test:workflow-blender` | 102 real Blender checks passed; no Codex calls |
+| `npm run test:browser` | 11 checks passed, no uncaught exceptions; injected providers/recorded GLBs |
+| `GEN3D_WORKFLOW_ARTIFACT_INPUT=docs/validation/issue26/live npm run test:workflow-artifacts` | Four saved scene/GLB outputs revalidated; original artifact hashes unchanged |
+| `git diff --check` | Passed |
+
+Saved reports: [Blender and bone deformation evidence](validation/issue26/bone-inheritance-fix/blender-report.json), [browser](validation/issue26/bone-inheritance-fix/browser-report.json), [saved-output revalidation](validation/issue26/bone-inheritance-fix/artifact-report.json). The regression failed before the production fix because the unauthorized candidate received success evidence. The first full unit run had `model-reference-visuals.test.js` exit without a diagnostic (112 passed, one module failed); its seven isolated tests and the subsequent full suite passed. No cause is asserted. Final failures/skipped/unavailable checks: none. No new Codex generation or human approval was performed; earlier live-generation evidence remains historical.
+
 ## Review fix: protected expression deformation masks
 
 The expression-mask preservation finding from PR #27 was fixed and checked locally on 2026-10-24. Snapshots now record each expression's vertex-group binding, actual mask weights (distinguishing empty and missing groups), mute state and Blender-evaluated deformation at value 1 relative to value 0. Measurement restores the original expression values. Candidate validation compares protected scene features before export compatibility checks; masked bases block with an explicit object/expression/group diagnostic because this GLB path cannot preserve their mask configuration.

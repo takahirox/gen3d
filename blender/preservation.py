@@ -122,7 +122,10 @@ def snapshot(semantic=False):
         record['visibility'] = {name: getattr(o, name) for name in ['hide_render', 'hide_viewport', 'visible_camera', 'visible_diffuse', 'visible_glossy', 'visible_transmission', 'visible_volume_scatter', 'visible_shadow', 'is_holdout', 'is_shadow_catcher'] if hasattr(o, name)}
         record['visibility']['hidden'] = o.hide_get()
         if o.type == 'ARMATURE':
-            record['armature'] = {b.name: {'parent': b.parent.name if b.parent else None, 'matrix': [nums(row) for row in b.matrix_local], 'deform': b.use_deform} for b in o.data.bones}
+            # Rest matrices and weights do not describe how a child responds to
+            # parent motion. Protect inheritance in both the saved scene and
+            # semantic export evidence, so GLB loss blocks the roundtrip too.
+            record['armature'] = {b.name: {'parent': b.parent.name if b.parent else None, 'matrix': [nums(row) for row in b.matrix_local], 'deform': b.use_deform, 'settings': {name: getattr(b, name) for name in ['use_inherit_rotation', 'inherit_scale', 'use_local_location', 'use_relative_parent']}} for b in o.data.bones}
             for bone in o.pose.bones:
                 if bone.constraints:
                     raise RuntimeError('Protected GLB export does not support bone constraints: ' + bone.name)

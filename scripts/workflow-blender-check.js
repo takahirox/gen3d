@@ -171,6 +171,63 @@ for mask_kind in ['empty', 'partial', 'missing']:
         checks.append('blocked unsupported masked base ' + mask_kind + ': ' + str(error))
 assert hashlib.sha256(open(source, 'rb').read()).hexdigest() == source_hash
 bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+# Bone inheritance changes can leave rest geometry/weights unchanged while
+# breaking deformation under a parent rotation. Measure the review reproduction
+# independently, then reject every recorded inheritance setting at publication.
+def rotated_head_points():
+    root = bpy.data.objects['Rig'].pose.bones['Root']
+    original = root.matrix_basis.copy()
+    try:
+        from mathutils import Matrix
+        root.matrix_basis = Matrix.Rotation(1.0471975512, 4, 'X')
+        bpy.context.view_layer.update()
+        head = bpy.data.objects['HeadMesh'].evaluated_get(bpy.context.evaluated_depsgraph_get())
+        return [(head.matrix_world @ v.co).copy() for v in head.data.vertices]
+    finally:
+        root.matrix_basis = original
+        bpy.context.view_layer.update()
+
+original_head_points = rotated_head_points()
+bone_evidence = []
+for setting, value in [('use_inherit_rotation', False), ('inherit_scale', 'NONE'), ('use_local_location', False), ('use_relative_parent', True)]:
+    bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+    bone = bpy.data.objects['Rig'].data.bones['Head']
+    assert getattr(bone, setting) != value
+    setattr(bone, setting, value)
+    blend = out + '/bone-' + setting + '.blend'
+    glb = out + '/bone-' + setting + '.glb'
+    evidence = out + '/bone-' + setting + '-validation.json'
+    bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
+    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=False, export_animations=False)
+    bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
+    deformation_difference = max((v - original_head_points[i]).length for i, v in enumerate(rotated_head_points()))
+    if setting == 'use_inherit_rotation':
+        assert deformation_difference > 0.1, deformation_difference
+        checks.append('reopened disabled bone rotation inheritance changes HeadMesh under 60 degree Root rotation')
+    if os.path.exists(evidence):
+        os.remove(evidence)
+    try:
+        p.validate(out + '/prepared/baseline.json', scope, blend, glb, evidence)
+        raise AssertionError('Unauthorized bone setting became candidate publication evidence: ' + setting)
+    except RuntimeError as error:
+        assert 'Rig' in str(error) and 'armature' in str(error), str(error)
+        assert not os.path.exists(evidence)
+        checks.append('blocked saved candidate bone setting ' + setting + ': ' + str(error))
+        candidate_error = str(error)
+    # GLB cannot encode these nondefault Blender inheritance semantics. The
+    # measured base roundtrip must reject them, rather than authorize their loss.
+    directory = out + '/unsupported-bone-' + setting
+    os.makedirs(directory, exist_ok=True)
+    try:
+        p.prepare(blend, directory, scope)
+        raise AssertionError('Unsupported bone inheritance base was authorized: ' + setting)
+    except RuntimeError as error:
+        assert 'Unsupported protected base GLB roundtrip' in str(error) and 'Rig' in str(error) and 'armature' in str(error), str(error)
+        assert not os.path.exists(directory + '/base-validation.json')
+        checks.append('blocked unsupported bone inheritance base ' + setting + ': ' + str(error))
+        bone_evidence.append({'setting':setting, 'value':value, 'parentRotationDegrees':60, 'maxHeadMeshDifference':deformation_difference, 'candidateDiagnostic':candidate_error, 'baseDiagnostic':str(error), 'publicationEvidenceWritten':False})
+assert hashlib.sha256(open(source, 'rb').read()).hexdigest() == source_hash
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
 # Exercise the complete recorded binding/visibility settings individually.
 with open(out + '/prepared/baseline.json') as f:
     before=json.load(f)
@@ -384,7 +441,7 @@ try:
 except RuntimeError as error:
     assert 'materials' in str(error), str(error)
     checks.append('blocked export-only emission change: ' + str(error))
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence})
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });
