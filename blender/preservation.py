@@ -66,6 +66,10 @@ def snapshot(semantic=False):
         if o.library or o.constraints or (o.animation_data and (o.animation_data.drivers or o.animation_data.action)):
             raise RuntimeError('Linked data, constraints, drivers and authored animations require explicit conversion before base editing: ' + o.name)
         record = {'type': o.type, 'parent': o.parent.name if o.parent else None, 'transform': [nums(row) for row in o.matrix_local]}
+        # Visibility is part of the protected scene, including viewport hiding
+        # and render/ray flags that glTF may not be able to represent.
+        record['visibility'] = {name: getattr(o, name) for name in ['hide_render', 'hide_viewport', 'visible_camera', 'visible_diffuse', 'visible_glossy', 'visible_transmission', 'visible_volume_scatter', 'visible_shadow', 'is_holdout', 'is_shadow_catcher'] if hasattr(o, name)}
+        record['visibility']['hidden'] = o.hide_get()
         if o.type == 'ARMATURE':
             record['armature'] = {b.name: {'parent': b.parent.name if b.parent else None, 'matrix': [nums(row) for row in b.matrix_local], 'deform': b.use_deform} for b in o.data.bones}
             for bone in o.pose.bones:
@@ -91,7 +95,9 @@ def snapshot(semantic=False):
             record['geometry'] = sorted(set(json.dumps(c) for c in coords)) if semantic else coords
             record['topology'] = sorted(json.dumps(sorted(coords[i] for i in p.vertices)) for p in mesh.polygons) if semantic else [list(p.vertices) for p in mesh.polygons]
             record['weights'] = sorted(set(json.dumps([coords[v.index] if semantic else v.index, sorted([o.vertex_groups[g.group].name, round(g.weight, 5)] for g in v.groups if g.weight > 0)]) for v in mesh.vertices if v.groups))
-            record['armature'] = sorted(m.object.name for m in o.modifiers if m.type == 'ARMATURE' and m.object)
+            # Weights and a target name alone do not establish working skinning.
+            # Preserve stack order, enable flags, binding mode and influence masks.
+            record['armature'] = [{'object': m.object.name if m.object else None, 'settings': {name: getattr(m, name) for name in ['use_vertex_groups', 'use_bone_envelopes', 'use_deform_preserve_volume', 'use_multi_modifier', 'vertex_group', 'invert_vertex_group', 'show_viewport', 'show_render', 'show_in_editmode', 'show_on_cage']}} for m in o.modifiers]
             record['shapeKeys'] = {k.name: {'value': round(k.value, 5), 'relative': k.relative_key.name if k.relative_key != mesh.shape_keys.key_blocks[0] else 'Basis', 'points': sorted(set(json.dumps([coords[i] if semantic else i, nums(o.matrix_world @ v.co if semantic else v.co)]) for i, v in enumerate(k.data)))} for k in mesh.shape_keys.key_blocks[1:]} if mesh.shape_keys else {}
             record['uvs'] = [sorted(json.dumps([coords[mesh.loops[i].vertex_index] if semantic else [i, mesh.loops[i].vertex_index], nums(v.uv)]) for i, v in enumerate(layer.data)) for layer in mesh.uv_layers]
             record['uvs'] = {'layers': record['uvs']}
@@ -207,7 +213,10 @@ def prepare(source, directory, scope):
     write(os.path.join(directory, 'roundtrip-before.json'), semantic_before)
     write(os.path.join(directory, 'roundtrip-after.json'), after)
     # A format roundtrip must preserve every declared feature before any edit.
-    report = compare(semantic_before, after, {'editableObjects': [], 'allowChanges': [], 'allowNewObjects': False}, False)
+    try:
+        report = compare(semantic_before, after, {'editableObjects': [], 'allowChanges': [], 'allowNewObjects': False}, False)
+    except RuntimeError as error:
+        raise RuntimeError('Unsupported protected base GLB roundtrip: ' + str(error)) from error
     report['kind'] = 'base-glb-roundtrip'
     write(os.path.join(directory, 'base-validation.json'), report)
     bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
@@ -223,7 +232,10 @@ def validate(baseline_file, scope, blend, glb, report_file):
     open_base(glb)
     roundtrip = snapshot(True)
     # The export itself has no permission to change additional features.
-    export_report = compare(semantic_final, roundtrip, {'editableObjects': [], 'allowChanges': [], 'allowNewObjects': False}, False)
+    try:
+        export_report = compare(semantic_final, roundtrip, {'editableObjects': [], 'allowChanges': [], 'allowNewObjects': False}, False)
+    except RuntimeError as error:
+        raise RuntimeError('Protected candidate GLB roundtrip mismatch: ' + str(error)) from error
     report['roundtrip'] = export_report
     report['kind'] = 'edited-scene-and-glb-preservation'
     write(report_file, report)

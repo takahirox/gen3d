@@ -82,6 +82,119 @@ bpy.ops.wm.save_as_mainfile(filepath=out + '/edited.blend', compress=False)
 bpy.ops.export_scene.gltf(filepath=out + '/edited.glb', export_format='GLB', export_apply=False, export_animations=False)
 report = p.validate(out + '/prepared/baseline.json', scope, out + '/edited.blend', out + '/edited.glb', out + '/preservation.json')
 checks = ['complete GLB base import and roundtrip', 'unchanged library source hash', 'complete scene copy', 'rig and weights retained', 'Smile expression retained', 'UV and material retention', 'authorized Hair geometry changed', 'GLB reopened and compared']
+# Exercise the complete recorded binding/visibility settings individually.
+with open(out + '/prepared/baseline.json') as f:
+    before=json.load(f)
+body = bpy.data.objects['Body']
+modifier = body.modifiers[0]
+for setting in before['objects']['Body']['armature'][0]['settings']:
+    original = getattr(modifier, setting)
+    setattr(modifier, setting, not original if isinstance(original, bool) else 'Root')
+    try:
+        p.compare(before, p.snapshot(), scope)
+        raise AssertionError('Uncaught skin binding setting: ' + setting)
+    except RuntimeError as error:
+        assert 'Body' in str(error) and 'armature' in str(error), str(error)
+        checks.append('blocked skin binding setting ' + setting)
+    finally:
+        setattr(modifier, setting, original)
+for setting in before['objects']['Body']['visibility']:
+    original = body.hide_get() if setting == 'hidden' else getattr(body, setting)
+    if setting == 'hidden':
+        body.hide_set(not original)
+    else:
+        setattr(body, setting, not original)
+    try:
+        p.compare(before, p.snapshot(), scope)
+        raise AssertionError('Uncaught visibility setting: ' + setting)
+    except RuntimeError as error:
+        assert 'Body' in str(error) and 'visibility' in str(error), str(error)
+        checks.append('blocked visibility setting ' + setting)
+    finally:
+        if setting == 'hidden':
+            body.hide_set(original)
+        else:
+            setattr(body, setting, original)
+
+def root_motion():
+    body = bpy.data.objects['Body']
+    root = bpy.data.objects['Rig'].pose.bones['Root']
+    def position():
+        bpy.context.view_layer.update()
+        evaluated = body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        return (evaluated.matrix_world @ evaluated.data.vertices[0].co).copy()
+    original = root.location.copy()
+    start = position()
+    root.location.x += 0.25
+    delta = position() - start
+    root.location = original
+    bpy.context.view_layer.update()
+    return delta.x
+
+# Reproduce both review defects on saved scenes with a valid Hair edit.
+# No failed validation may produce the evidence used to publish a candidate.
+assert abs(root_motion() - 0.25) < 0.00001
+checks.append('authorized Hair candidate still deforms Body by 0.25 with Root')
+for feature in ['disabled-skin', 'hidden-torso']:
+    bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+    if feature == 'disabled-skin':
+        bpy.data.objects['Body'].modifiers[0].use_vertex_groups = False
+        expected = 'armature'
+    else:
+        bpy.data.objects['Body'].hide_render = True
+        expected = 'visibility'
+    blend = out + '/' + feature + '.blend'
+    glb = out + '/' + feature + '.glb'
+    evidence = out + '/' + feature + '-validation.json'
+    bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
+    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=False, export_animations=False)
+    bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
+    if feature == 'disabled-skin':
+        assert abs(root_motion()) < 0.00001
+        checks.append('reopened disabled-skin scene moves Body by zero with Root')
+    else:
+        assert bpy.data.objects['Body'].hide_render
+    if os.path.exists(evidence):
+        os.remove(evidence)
+    try:
+        p.validate(out + '/prepared/baseline.json', scope, blend, glb, evidence)
+        raise AssertionError('Unauthorized ' + feature + ' became candidate publication evidence')
+    except RuntimeError as error:
+        assert 'Body' in str(error) and expected in str(error), str(error)
+        assert not os.path.exists(evidence)
+        checks.append('blocked candidate ' + feature + ': ' + str(error))
+    # glTF export normalizes use_vertex_groups back to enabled on import.
+    # Also test an export-only loss of the skin binding itself.
+    if feature == 'disabled-skin':
+        bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+        bpy.data.objects['Body'].modifiers[0].object = None
+        unbound_glb = out + '/unbound-export.glb'
+        bpy.ops.export_scene.gltf(filepath=unbound_glb, export_format='GLB', export_apply=False, export_animations=False)
+        try:
+            p.validate(out + '/prepared/baseline.json', scope, out + '/edited.blend', unbound_glb, out + '/skin-roundtrip-validation.json')
+            raise AssertionError('Export-only skin change passed GLB validation')
+        except RuntimeError as error:
+            assert 'GLB roundtrip mismatch' in str(error) and 'Body' in str(error), str(error)
+            checks.append('blocked export-only skin binding change: ' + str(error))
+
+# These Blender features cannot survive this GLB path. Fail base preparation
+# explicitly instead of silently normalizing them into an approved baseline.
+for feature in ['preserve-volume', 'render-visibility']:
+    bpy.ops.wm.open_mainfile(filepath=out + '/prepared/base.blend', use_scripts=False)
+    if feature == 'preserve-volume':
+        bpy.data.objects['Body'].modifiers[0].use_deform_preserve_volume = True
+    else:
+        bpy.data.objects['Body'].hide_render = True
+    source_file = out + '/' + feature + '-base.blend'
+    bpy.ops.wm.save_as_mainfile(filepath=source_file, compress=False)
+    directory = out + '/unsupported-' + feature
+    os.makedirs(directory, exist_ok=True)
+    try:
+        p.prepare(source_file, directory, scope)
+        raise AssertionError('Unsupported ' + feature + ' base roundtrip passed')
+    except RuntimeError as error:
+        assert 'Unsupported protected base GLB roundtrip' in str(error) and 'Body' in str(error), str(error)
+        checks.append('blocked unsupported base ' + feature + ': ' + str(error))
 for feature in ['weights','shapeKeys','uvs','materials','armature','pose','uv-name','protected-object']:
     bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
     if feature == 'weights':

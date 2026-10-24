@@ -1,5 +1,23 @@
 # Issue #26 validation
 
+## Review fixes: functional skin bindings and protected visibility
+
+The two remaining preservation findings from PR #27 were fixed and checked locally on 2026-10-24:
+
+- Armature evidence now records modifier order, targets, vertex-group/envelope binding, influence masks, preserve-volume/multiple-modifier modes and enable/display flags. The real Blender regression reopens a saved candidate with only Hair authorized, proves that disabling Body's vertex-group binding stops Root from deforming Body, and verifies that candidate validation rejects it without writing publication evidence. The authorized Hair edit still passes scene/GLB validation and Body follows a 0.25 Root translation. An export-only lost skin binding is also rejected.
+- Object evidence now protects render/viewport hiding, per-object view-layer hiding, ray visibility, holdout and shadow-catcher flags. Changing protected Body's `hide_render` alongside a valid Hair edit fails candidate validation without producing publication evidence. Every recorded binding and visibility setting is tested individually. Base preparation explicitly blocks GLB roundtrips that lose preserve-volume skinning or render visibility, naming the affected object and feature.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 119 passed, 0 failed, 0 skipped |
+| `npm run check` | Passed |
+| `npm run test:workflow-blender` | 85 real Blender checks passed; no Codex calls |
+| `npm run test:browser` | 11 checks passed, no uncaught exceptions; injected providers/recorded GLBs |
+| `GEN3D_WORKFLOW_ARTIFACT_INPUT=docs/validation/issue26/live npm run test:workflow-artifacts` | Four saved scene/GLB outputs revalidated; original artifact hashes unchanged |
+| `git diff --check` | Passed |
+
+Saved reports: [Blender](validation/issue26/skin-visibility-fixes/blender-report.json), [browser](validation/issue26/skin-visibility-fixes/browser-report.json), [saved-output revalidation](validation/issue26/skin-visibility-fixes/artifact-report.json). The initial unit run lacked dependencies; `npm ci` resolved that setup failure. A later concurrent run had the existing `model-reference-visuals.test.js` module exit without a diagnostic; its isolated seven tests and the final standalone full suite passed. An initial export-only regression incorrectly expected disabling vertex groups to survive GLB export; Blender normalizes that flag on import. The final test separately verifies rejection of the disabled binding in the saved scene and an export-only missing binding. Final failures/skipped/unavailable checks: none. No new Codex generation, human approval, allowance change, push or merge was performed. Earlier live-generation records below remain historical.
+
 ## Review fixes: material protection and checkpoint evidence
 
 The two findings from PR #27 were fixed and checked locally on 2026-10-24:
