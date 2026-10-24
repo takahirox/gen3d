@@ -1,5 +1,22 @@
 # Issue #26 validation
 
+## Review fix: protected expression deformation masks
+
+The expression-mask preservation finding from PR #27 was fixed and checked locally on 2026-10-24. Snapshots now record each expression's vertex-group binding, actual mask weights (distinguishing empty and missing groups), mute state and Blender-evaluated deformation at value 1 relative to value 0. Measurement restores the original expression values. Candidate validation compares protected scene features before export compatibility checks; masked bases block with an explicit object/expression/group diagnostic because this GLB path cannot preserve their mask configuration.
+
+The real Blender regression saves/reopens the complete rigged fixture with only Hair authorized and an empty `ExpressionMask` assigned to protected `HeadMesh.Smile`. Raw morph coordinates and skin weights stay unchanged, while measured Smile displacement falls from approximately 0.05 to zero. Validation rejects the saved scene/export without writing success evidence. Partial-weight and missing-group bindings are also rejected; unsupported masked bases fail preparation. The ordinary Hair edit retains its expression and passes scene/GLB checks.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 119 passed, 0 failed, 0 skipped |
+| `npm run check` | Passed |
+| `npm run test:workflow-blender` | 93 real Blender checks passed; no Codex calls |
+| `npm run test:browser` | 11 checks passed, no uncaught exceptions; injected providers/recorded GLBs |
+| `GEN3D_WORKFLOW_ARTIFACT_INPUT=docs/validation/issue26/live npm run test:workflow-artifacts` | Four saved scene/GLB outputs revalidated; original artifact hashes unchanged |
+| `git diff --check` | Passed |
+
+Saved reports: [Blender and measured expression evidence](validation/issue26/expression-mask-fix/blender-report.json), [browser](validation/issue26/expression-mask-fix/browser-report.json), [saved-output revalidation](validation/issue26/expression-mask-fix/artifact-report.json). Dependencies were installed with `npm ci`. The initial new regression failed because it held a Blender object reference across reopening a file; reacquiring the object fixed the harness. Final failures/skipped/unavailable checks: none. No new Codex generation, human approval, allowance change, push or merge was performed. Earlier live-generation records below remain historical.
+
 ## Review fixes: functional skin bindings and protected visibility
 
 The two remaining preservation findings from PR #27 were fixed and checked locally on 2026-10-24:

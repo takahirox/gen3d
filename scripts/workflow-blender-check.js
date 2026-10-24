@@ -82,6 +82,95 @@ bpy.ops.wm.save_as_mainfile(filepath=out + '/edited.blend', compress=False)
 bpy.ops.export_scene.gltf(filepath=out + '/edited.glb', export_format='GLB', export_apply=False, export_animations=False)
 report = p.validate(out + '/prepared/baseline.json', scope, out + '/edited.blend', out + '/edited.glb', out + '/preservation.json')
 checks = ['complete GLB base import and roundtrip', 'unchanged library source hash', 'complete scene copy', 'rig and weights retained', 'Smile expression retained', 'UV and material retention', 'authorized Hair geometry changed', 'GLB reopened and compared']
+# Measure the saved expression through Blender independently of the snapshot.
+def smile_displacement():
+    head = bpy.data.objects['HeadMesh']
+    key = head.data.shape_keys.key_blocks['Smile']
+    original = key.value
+    def points():
+        bpy.context.view_layer.update()
+        evaluated = head.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        return [v.co.copy() for v in evaluated.data.vertices]
+    try:
+        key.value = 0
+        neutral = points()
+        key.value = 1
+        return max((v - neutral[i]).length for i, v in enumerate(points()))
+    finally:
+        key.value = original
+        bpy.context.view_layer.update()
+
+with open(out + '/prepared/baseline.json') as f:
+    expression_baseline = json.load(f)
+original_key = expression_baseline['objects']['HeadMesh']['shapeKeys']['Smile']
+assert original_key['mask'] == {'vertexGroup':'', 'weights':None}
+assert abs(max(abs(json.loads(row)[1][2]) for row in original_key['deformation']) - 0.05) < 0.00001
+expression_evidence = {'authorizedDisplacement':smile_displacement(), 'masks':[]}
+assert abs(expression_evidence['authorizedDisplacement'] - 0.05) < 0.00001
+checks.append('reopened authorized Hair candidate retains measured 0.05 Smile deformation')
+# Snapshot probes must restore the caller's current expression value.
+smile = bpy.data.objects['HeadMesh'].data.shape_keys.key_blocks['Smile']
+smile.value = 0.4
+assert abs(p.snapshot()['objects']['HeadMesh']['shapeKeys']['Smile']['value'] - 0.4) < 0.00001
+assert abs(smile.value - 0.4) < 0.00001
+checks.append('expression measurement restores current shape-key values')
+
+# Exact review reproduction: an empty group adds no per-vertex weights, but
+# binding Smile to it disables the protected expression in the saved scene.
+# Also measure a partial mask and a dangling mask reference, none of which can
+# retain its Blender configuration through the protected GLB export path.
+for mask_kind in ['empty', 'partial', 'missing']:
+    bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+    head = bpy.data.objects['HeadMesh']
+    smile = head.data.shape_keys.key_blocks['Smile']
+    if mask_kind != 'missing':
+        group = head.vertex_groups.new(name='ExpressionMask')
+        if mask_kind == 'partial':
+            group.add(list(range(len(head.data.vertices))), 0.5, 'REPLACE')
+    smile.vertex_group = 'ExpressionMask'
+    blend = out + '/expression-' + mask_kind + '.blend'
+    glb = out + '/expression-' + mask_kind + '.glb'
+    evidence = out + '/expression-' + mask_kind + '-validation.json'
+    bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
+    bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=False, export_animations=False)
+    bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
+    head = bpy.data.objects['HeadMesh']
+    displacement = smile_displacement()
+    current = p.snapshot()['objects']['HeadMesh']['shapeKeys']['Smile']
+    measured = max(sum(v*v for v in json.loads(row)[1])**0.5 for row in current['deformation'])
+    expected = {'empty':0, 'partial':0.025, 'missing':0.05}[mask_kind]
+    assert abs(displacement - expected) < 0.00001, (mask_kind, displacement)
+    assert abs(measured - displacement) < 0.00001, (mask_kind, measured, displacement)
+    assert current['points'] == original_key['points']
+    assert current['mask']['vertexGroup'] == 'ExpressionMask'
+    if mask_kind == 'empty':
+        assert current['mask']['weights'] == [0] * len(head.data.vertices)
+        assert p.snapshot()['objects']['HeadMesh']['weights'] == expression_baseline['objects']['HeadMesh']['weights']
+    elif mask_kind == 'missing':
+        assert current['mask']['weights'] is None
+    else:
+        assert current['mask']['weights'] == [0.5] * len(head.data.vertices)
+    if os.path.exists(evidence):
+        os.remove(evidence)
+    try:
+        p.validate(out + '/prepared/baseline.json', scope, blend, glb, evidence)
+        raise AssertionError('Unauthorized expression mask became candidate publication evidence')
+    except RuntimeError as error:
+        assert 'HeadMesh' in str(error) and 'shapeKeys' in str(error), str(error)
+        assert not os.path.exists(evidence)
+        checks.append('blocked saved candidate expression mask ' + mask_kind + ': ' + str(error))
+        expression_evidence['masks'].append({'kind':mask_kind, 'displacement':displacement, 'snapshotDeformation':measured, 'diagnostic':str(error), 'publicationEvidenceWritten':False})
+    directory = out + '/unsupported-expression-' + mask_kind
+    os.makedirs(directory, exist_ok=True)
+    try:
+        p.prepare(blend, directory, scope)
+        raise AssertionError('Unsupported masked expression base was authorized')
+    except RuntimeError as error:
+        assert 'Unsupported expression vertex-group mask' in str(error) and 'HeadMesh.Smile' in str(error) and 'ExpressionMask' in str(error), str(error)
+        assert not os.path.exists(directory + '/base-validation.json')
+        checks.append('blocked unsupported masked base ' + mask_kind + ': ' + str(error))
+assert hashlib.sha256(open(source, 'rb').read()).hexdigest() == source_hash
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
 # Exercise the complete recorded binding/visibility settings individually.
 with open(out + '/prepared/baseline.json') as f:
     before=json.load(f)
@@ -295,7 +384,7 @@ try:
 except RuntimeError as error:
     assert 'materials' in str(error), str(error)
     checks.append('blocked export-only emission change: ' + str(error))
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report})
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });

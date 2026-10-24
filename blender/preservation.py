@@ -55,6 +55,57 @@ def material(m, semantic=False):
     return result
 
 
+def expressions(o, coords, semantic=False):
+    keys = o.data.shape_keys
+    if not keys:
+        return {}
+    blocks = list(keys.key_blocks[1:])
+    # glTF morph targets cannot retain Blender's vertex-group mask binding.
+    # Do not silently bake or discard an approved expression configuration.
+    for k in blocks:
+        if semantic and k.vertex_group:
+            raise RuntimeError('Unsupported expression vertex-group mask for protected GLB export: ' + o.name + '.' + k.name + ' (' + k.vertex_group + '); explicitly convert to an unmasked expression before authorizing this base')
+
+    def evaluated_points():
+        bpy.context.view_layer.update()
+        evaluated = o.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        mesh = evaluated.to_mesh()
+        try:
+            if len(mesh.vertices) != len(coords):
+                raise RuntimeError('Unsupported evaluated expression topology: ' + o.name)
+            return [(evaluated.matrix_world @ v.co if semantic else v.co).copy() for v in mesh.vertices]
+        finally:
+            evaluated.to_mesh_clear()
+
+    values = [k.value for k in blocks]
+    result = {}
+    try:
+        for k in blocks:
+            k.value = 0
+        neutral = evaluated_points()
+        for index, k in enumerate(blocks):
+            k.value = 1
+            deformed = evaluated_points()
+            k.value = 0
+            group = o.vertex_groups.get(k.vertex_group)
+            weights = [round(next((g.weight for g in v.groups if g.group == group.index), 0.0), 5) for v in o.data.vertices] if group else None
+            result[k.name] = {
+                'value': round(values[index], 5),
+                'mute': k.mute,
+                'relative': k.relative_key.name if k.relative_key != keys.key_blocks[0] else 'Basis',
+                'mask': {'vertexGroup': k.vertex_group, 'weights': weights},
+                'points': sorted(set(json.dumps([coords[i] if semantic else i, nums(o.matrix_world @ v.co if semantic else v.co)]) for i, v in enumerate(k.data))),
+                # Measure the working expression, including masking/muting and
+                # skinning, rather than inferring it from raw key coordinates.
+                'deformation': sorted(set(json.dumps([coords[i] if semantic else i, nums(v - neutral[i])]) for i, v in enumerate(deformed)))
+            }
+    finally:
+        for k, value in zip(blocks, values):
+            k.value = value
+        bpy.context.view_layer.update()
+    return result
+
+
 def snapshot(semantic=False):
     bpy.context.view_layer.update()
     objects = {}
@@ -98,7 +149,7 @@ def snapshot(semantic=False):
             # Weights and a target name alone do not establish working skinning.
             # Preserve stack order, enable flags, binding mode and influence masks.
             record['armature'] = [{'object': m.object.name if m.object else None, 'settings': {name: getattr(m, name) for name in ['use_vertex_groups', 'use_bone_envelopes', 'use_deform_preserve_volume', 'use_multi_modifier', 'vertex_group', 'invert_vertex_group', 'show_viewport', 'show_render', 'show_in_editmode', 'show_on_cage']}} for m in o.modifiers]
-            record['shapeKeys'] = {k.name: {'value': round(k.value, 5), 'relative': k.relative_key.name if k.relative_key != mesh.shape_keys.key_blocks[0] else 'Basis', 'points': sorted(set(json.dumps([coords[i] if semantic else i, nums(o.matrix_world @ v.co if semantic else v.co)]) for i, v in enumerate(k.data)))} for k in mesh.shape_keys.key_blocks[1:]} if mesh.shape_keys else {}
+            record['shapeKeys'] = expressions(o, coords, semantic)
             record['uvs'] = [sorted(json.dumps([coords[mesh.loops[i].vertex_index] if semantic else [i, mesh.loops[i].vertex_index], nums(v.uv)]) for i, v in enumerate(layer.data)) for layer in mesh.uv_layers]
             record['uvs'] = {'layers': record['uvs']}
             if not semantic:
@@ -227,8 +278,8 @@ def validate(baseline_file, scope, blend, glb, report_file):
         baseline = json.load(f)
     bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
     final = snapshot()
-    semantic_final = snapshot(True)
     report = compare(baseline, final, scope)
+    semantic_final = snapshot(True)
     open_base(glb)
     roundtrip = snapshot(True)
     # The export itself has no permission to change additional features.
