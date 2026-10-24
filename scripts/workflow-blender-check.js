@@ -281,6 +281,49 @@ def root_motion():
 # No failed validation may produce the evidence used to publish a candidate.
 assert abs(root_motion() - 0.25) < 0.00001
 checks.append('authorized Hair candidate still deforms Body by 0.25 with Root')
+# Evaluation mode can disable the complete rig without changing any bone,
+# modifier or weight. Check saved scenes and measured GLB compatibility.
+armature_evidence = {}
+for label, file in [('source', source), ('authorizedScene', out + '/edited.blend'), ('authorizedGlb', out + '/edited.glb')]:
+    p.open_base(file)
+    armature_evidence[label] = {'posePosition':bpy.data.objects['Rig'].data.pose_position, 'bodyRootTranslation':root_motion()}
+    assert armature_evidence[label]['posePosition'] == 'POSE'
+    assert abs(armature_evidence[label]['bodyRootTranslation'] - 0.25) < 0.00001
+checks.append('source and reopened authorized Hair scene/GLB retain POSE mode and 0.25 Body deformation')
+bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
+bpy.data.objects['Rig'].data.pose_position = 'REST'
+blend = out + '/rest-mode.blend'
+glb = out + '/rest-mode.glb'
+evidence = out + '/rest-mode-validation.json'
+bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
+bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_apply=False, export_animations=False)
+bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
+armature_evidence['unauthorizedScene'] = {'posePosition':bpy.data.objects['Rig'].data.pose_position, 'bodyRootTranslation':root_motion()}
+assert armature_evidence['unauthorizedScene']['posePosition'] == 'REST'
+assert abs(armature_evidence['unauthorizedScene']['bodyRootTranslation']) < 0.00001
+checks.append('reopened REST-mode candidate moves Body by zero with Root')
+if os.path.exists(evidence):
+    os.remove(evidence)
+try:
+    p.validate(out + '/prepared/baseline.json', scope, blend, glb, evidence)
+    raise AssertionError('Unauthorized REST evaluation mode became candidate publication evidence')
+except RuntimeError as error:
+    assert 'Rig' in str(error) and 'posePosition' in str(error), str(error)
+    assert not os.path.exists(evidence)
+    armature_evidence['candidateDiagnostic'] = str(error)
+    armature_evidence['publicationEvidenceWritten'] = False
+    checks.append('blocked saved REST-mode candidate: ' + str(error))
+directory = out + '/unsupported-rest-mode'
+os.makedirs(directory, exist_ok=True)
+try:
+    p.prepare(blend, directory, scope)
+    raise AssertionError('Unsupported REST evaluation mode base roundtrip passed')
+except RuntimeError as error:
+    assert 'Unsupported protected base GLB roundtrip' in str(error) and 'Rig' in str(error) and 'posePosition' in str(error), str(error)
+    assert not os.path.exists(directory + '/base-validation.json')
+    armature_evidence['baseDiagnostic'] = str(error)
+    checks.append('blocked unsupported REST-mode base: ' + str(error))
+assert hashlib.sha256(open(source, 'rb').read()).hexdigest() == source_hash
 for feature in ['disabled-skin', 'hidden-torso']:
     bpy.ops.wm.open_mainfile(filepath=out + '/edited.blend', use_scripts=False)
     if feature == 'disabled-skin':
@@ -441,7 +484,7 @@ try:
 except RuntimeError as error:
     assert 'materials' in str(error), str(error)
     checks.append('blocked export-only emission change: ' + str(error))
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence})
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });

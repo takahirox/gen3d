@@ -122,6 +122,10 @@ def snapshot(semantic=False):
         record['visibility'] = {name: getattr(o, name) for name in ['hide_render', 'hide_viewport', 'visible_camera', 'visible_diffuse', 'visible_glossy', 'visible_transmission', 'visible_volume_scatter', 'visible_shadow', 'is_holdout', 'is_shadow_catcher'] if hasattr(o, name)}
         record['visibility']['hidden'] = o.hide_get()
         if o.type == 'ARMATURE':
+            # REST disables skin deformation even when every bone, pose and
+            # weight is unchanged. Protect the evaluation mode in both scene
+            # and semantic export evidence; glTF may normalize it to POSE.
+            record['posePosition'] = o.data.pose_position
             # Rest matrices and weights do not describe how a child responds to
             # parent motion. Protect inheritance in both the saved scene and
             # semantic export evidence, so GLB loss blocks the roundtrip too.

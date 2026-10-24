@@ -1,5 +1,22 @@
 # Issue #26 validation
 
+## Review fix: protected armature evaluation mode
+
+The armature evaluation finding from PR #27 was fixed and checked locally on 2026-10-24 with Blender 5.1.2. Scene and semantic GLB snapshots now record `Armature.pose_position` as `posePosition`. Unauthorized POSE/REST changes fail candidate preservation, and base preparation explicitly rejects GLB roundtrips that normalize the evaluation mode.
+
+The new real Blender regression reproduced successful validation before the fix with only Hair authorized and `Rig.data.pose_position = 'REST'`. After reopening, a 0.25 Root translation moved Body by zero. The original scene and ordinary Hair edit (both saved scene and GLB) move Body by 0.25. With the fix, the saved REST-mode candidate is rejected without writing success evidence, the unsupported REST-mode base roundtrip is blocked, and the authorized Hair edit still passes scene/GLB validation. The library source hash stays unchanged.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | Final run: 119 passed, 0 failed, 0 skipped |
+| `npm run check` | Passed |
+| `npm run test:workflow-blender` | 106 real Blender checks passed; no Codex calls |
+| `npm run test:browser` | 11 checks passed, no uncaught exceptions; injected providers/recorded GLBs |
+| `GEN3D_WORKFLOW_ARTIFACT_INPUT=docs/validation/issue26/live npm run test:workflow-artifacts` | Four saved scene/GLB outputs revalidated; original artifact hashes unchanged |
+| `git diff --check` | Passed |
+
+Saved reports: [Blender and measured rig response](validation/issue26/armature-evaluation-fix/blender-report.json), [browser](validation/issue26/armature-evaluation-fix/browser-report.json), [saved-output revalidation](validation/issue26/armature-evaluation-fix/artifact-report.json). Dependencies were installed with `npm ci`. The regression failed before the production fix because the unauthorized candidate received success evidence. The first full unit run had `asset-library.test.js` exit without a diagnostic (117 passed, one module failed); its nine isolated tests and the subsequent full suite passed. No cause is asserted. Final failures/skipped/unavailable checks: none. No new Codex generation or human approval was performed; earlier live-generation evidence remains historical.
+
 ## Review fix: protected bone inheritance
 
 The bone inheritance finding from PR #27 was fixed and checked locally on 2026-10-24 with Blender 5.1.2. Both scene and semantic GLB snapshots now record `use_inherit_rotation`, `inherit_scale`, `use_local_location` and `use_relative_parent` for every bone. Unauthorized changes fail candidate preservation; base preparation explicitly rejects roundtrips that discard these settings.
