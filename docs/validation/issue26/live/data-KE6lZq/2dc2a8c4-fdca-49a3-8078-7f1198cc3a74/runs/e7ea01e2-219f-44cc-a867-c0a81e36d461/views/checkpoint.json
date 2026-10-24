@@ -1,0 +1,41 @@
+{
+  "id": "6d7d68f2-79e9-418c-aa97-b7266e4bf562",
+  "runId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+  "nodeId": "views",
+  "type": "views",
+  "graphRevision": 1,
+  "graphHash": "6dd3aca0aaaf0e1c8ce19f55b12abd604a4e1cbcaac237854362dfb40420adf4",
+  "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+  "fingerprint": "aaeb3dffc678a6579f69b85bb156c78d88422c90eafd0f87b1ca812ce5884f9b",
+  "settings": {},
+  "configuration": {
+    "review": false
+  },
+  "dependencyIds": {
+    "visual": "796a367d-229a-4fe4-a7fa-92271eda666c"
+  },
+  "sourceIdentities": [],
+  "data": {
+    "visual": {
+      "mode": "image",
+      "prompt": "The app has loaded the COMPLETE base character. Make ONLY Hair mesh coordinates 15 percent wider along local X, matching the wider hair cap in the image. Use vertex coordinate edits, not object scale, and preserve all Hair UVs/materials and all other objects, rig, skin weights, Smile expression and hierarchy. Do not create new parts or alter pose. Keep this bounded: inspect then make the targeted Hair edit and finish. Set the requested reference camera direction without reorienting the character.",
+      "profile": "character",
+      "image": {
+        "file": "input.png",
+        "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0"
+      },
+      "file": "input.png"
+    },
+    "images": [],
+    "setId": "590eb5c8-13b0-492f-9b9c-90725803ab94"
+  },
+  "dataHash": "6be47af906fe990e13af8e3db8feaf3d532ffa261593b4f4f9c372876ddda033",
+  "files": [
+    {
+      "file": "input.png",
+      "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+      "type": "png"
+    }
+  ],
+  "createdAt": "2026-10-24T02:56:11.528Z"
+}

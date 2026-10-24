@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
+import { validateBaseEdit } from './base-model.js';
 import { runProcess, subscriptionEnv } from './codex.js';
 export { runProcess, subscriptionEnv } from './codex.js';
 import { CodexConceptGenerator } from './concept.js';
@@ -43,7 +44,7 @@ export function taskPrompt(project, version) {
       : 'The set passed a separate Codex consistency inspection. If you discover a contradiction, stop and report it before modeling; do not silently discard views or redesign the base.';
   return `You are creating a real 3D model in a dedicated Blender scene using ONLY gen3d_blender MCP for modeling.
 First call get_scene_info. Work in small steps through the available Blender MCP tools.
-${version.kind === 'revision' ? (version.refinementCycle ? 'The app has loaded source.blend into Blender. Revise the existing scene according to the required changes in feedback; preserve the subject.' : 'The app has loaded source.blend into Blender. Revise the existing geometry according to feedback; preserve the subject.') : version.modelReferences?.some(r => r.permission === 'reuse-edit') ? 'The app has cleared the deliverable scene. Prefer suitable approved existing mesh/parts as starting geometry, then adapt them to the requested subject. Construct new geometry when no authorized reference is suitable; record a concrete reason for each unused source.' : 'The app has cleared the scene. Create mesh geometry from scratch for the requested subject.'}
+${version.editableBase ? `The app has loaded a COMPLETE independent editable base scene (source.blend). Edit this scene; preserve its object hierarchy, armature/skin weights, expressions/shape keys, UVs and materials. Do not clear or rebuild it. Human-authorized edit scope: ${JSON.stringify(version.editableBase.scope)}. Only the named editable mesh objects may change. Other original objects and every feature without an explicit exception are protected. Added objects require allowNewObjects. A post-edit and GLB roundtrip check will reject violations. Maintain triangle topology unless explicitly needed and authorized; GLB triangulation must not change protected data.` : version.kind === 'revision' ? (version.refinementCycle ? 'The app has loaded source.blend into Blender. Revise the existing scene according to the required changes in feedback; preserve the subject.' : 'The app has loaded source.blend into Blender. Revise the existing geometry according to feedback; preserve the subject.') : version.modelReferences?.some(r => r.permission === 'reuse-edit') ? 'The app has cleared the deliverable scene. Prefer suitable approved existing mesh/parts as starting geometry, then adapt them to the requested subject. Construct new geometry when no authorized reference is suitable; record a concrete reason for each unused source.' : 'The app has cleared the scene. Create mesh geometry from scratch for the requested subject.'}
 ${version.referenceSetId ? `The first attached image is the agreed base concept. The next images are ALL required modeling views: ${version.modelingImages.map(i => i.label).join(', ')}. Inspect and model from all of them, preserving identity, parts, proportions, colors, materials and asymmetry. ${inspection} Reference set: ${version.referenceSetId}.` : 'The first attached image is the uploaded visual design input. Analyze and model its silhouette, shapes and colors.'}
 ${version.refinementSettings?.enabled ? `Refinement is enabled. Orient ALL subjects upright +Z, front -Y, left +X. ${version.referenceSetId ? "Set bpy.context.scene['gen3d_reference_camera_directions'] to a dictionary mapping EVERY required view (front, side, back, three-quarter) to a 3-number direction FROM subject center TOWARD a camera. Inspect each original view and match its visible facing direction and elevation, including the labeled side. With the generator's left-side convention (front points to image right), a matching camera is [-1,0,0] for a subject facing -Y; do not mirror the subject to correct camera alignment. Front is normally [0,-1,0], back [0,1,0]; inspect the three-quarter image to choose its sign/elevation rather than assuming it. Preserve/update these camera choices during revisions. Missing view directions are errors." : "Set bpy.context.scene['gen3d_reference_camera_direction'] to a 3-number vector FROM the model center TOWARD a camera matching the uploaded input image's visible viewpoint (e.g. front [0,-1,0], left [1,0,0], three-quarter [1,-1,0.35]). Inspect the image to choose it, preserve/update it during revisions; do not assume unseen views. The app uses orthographic framing and saves the camera directions."} Save optional per-view framing corrections in bpy.context.scene['gen3d_reference_camera_framing'], mapping view labels (or input for an upload) to dictionaries with center (three finite world coordinates) and orthoScale (positive finite number). These overrides survive export and subsequent revisions; omit an entry to use bounds-based framing. ${version.refinementCycle ? 'This is an automated refinement cycle, revising source.blend in the SAME scene lineage. Make concrete changes of EVERY required type listed in the revision instructions (geometry, materials and/or camera); mesh changes are required only for geometry corrections. For material-only or camera-only corrections preserve geometry. Do not merely repeat prompts or rename objects. Preserve the original approved image inputs, design and exports.' : ''}`.trim() : ''}
 After the primary concept/views and supplementary approved images, the final ${(version.modelReferences || []).length} attachments are 3D reference contact sheets, one for EVERY selected asset in snapshot order. Each sheet identifies its assetId, role and eight labeled views. Labels are camera directions in source coordinates, NOT assumed semantic front/up. Infer subject orientation from all views. See model-references.json for exact view/camera/image mapping. Visually inspect every sheet before modeling; metadata alone is insufficient.
@@ -60,7 +61,7 @@ Concept generation and review were performed before this job. Do not model from 
 Do not change models/providers, buy allowance, or retry automatically after a usage limit. Report a failure honestly.
 Return a short description of the finished geometry.
 
-Project input type: ${project.mode}
+Project input type: ${version.workflowMode || project.mode}
 Original project prompt (snapshot):
 ${version.prompt}
 
@@ -69,7 +70,7 @@ ${version.feedback || 'Build the subject described by the project input.'}
 `;
 }
 
-export function exportCode(dir, { refinementSettings, modelingImages = [], modelReferences = [] } = {}) {
+export function exportCode(dir, { refinementSettings, modelingImages = [], modelReferences = [], editableBase } = {}) {
   return `import bpy, math, json, hashlib
 from mathutils import Vector
 import sys
@@ -143,7 +144,8 @@ for o in meshes:
     o.select_set(True)
 bpy.context.view_layer.objects.active = meshes[0]
 bpy.ops.wm.save_as_mainfile(filepath=out + '/scene.blend', compress=False)
-bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', use_selection=True, export_apply=True)
+${editableBase ? `# Export the complete modeling scene, including skeletons and morphs.
+bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', export_apply=False, export_animations=False)` : `bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', use_selection=True, export_apply=True)`}
 bpy.ops.render.render(write_still=True)
 ${refinementSettings?.enabled ? `camera.data.type = 'ORTHO'
 default_scale = max(hi.z - lo.z, hi.x - lo.x, hi.y - lo.y) * 1.3
@@ -263,6 +265,7 @@ export class Runner {
     this.pending = null;
   }
   guard(p, { concepts = false, referenceSets = false } = {}) {
+    if (p.workflowRuns?.some(r => ['running', 'waiting-review'].includes(r.status))) throw new AppError('Resolve the active workflow run/review before using the legacy pipeline', 409);
     if (this.usageLimited) throw new AppError('Codex usage limit reached. Restart only after allowance is available; gen3d will not reset or buy allowance.', 409);
     if (this.active) throw new AppError('Codex is generating another version. Wait for it to finish.', 409);
     this.store.idle(p);
@@ -278,7 +281,9 @@ export class Runner {
     }
   }
   start(id, input, actor) {
-    const p = this.store.get(id); this.guard(p);
+    const p = this.store.get(id);
+    if (p.workflow?.nodes.some(n => n.type === 'edit')) throw new AppError('Use run_workflow for a complete editable-base workflow; the lower-level object pipeline cannot edit this base', 409);
+    this.guard(p);
     const kind = input.kind || 'generate';
     if (!['generate', 'retry', 'revision'].includes(kind)) throw new AppError('Choose generate, retry or revision');
     const source = input.sourceVersionId ? p.versions.find(v => v.id === input.sourceVersionId && v.status === 'ready') : null;
@@ -416,6 +421,7 @@ export class Runner {
     }
   }
   modelingInputs(p, v) {
+    if (v.workflowRunId) return [...v.imageInputs];
     return [v.visualInput, ...v.modelingImages.map(i => i.file), ...p.references.filter(r => v.referenceIds.includes(r.id)).map(r => r.file)].filter(Boolean);
   }
   regenerateReferenceSet(id, input, actor) {
@@ -638,6 +644,7 @@ export class Runner {
   }
   async realGenerate(p, v, dir) {
     // Defend the final Blender boundary as well as the workflow entry point.
+    if (!v.workflowRunId) {
     const concept = p.concepts.find(c => c.id === v.conceptId && c.status === 'ready' && c.review === 'approved');
     if ((p.mode === 'text' && (!concept || v.visualInput !== concept.artifacts.image))
       || (p.mode === 'image' && v.visualInput !== p.inputImage) || !v.visualInput) throw new Error('A reviewed visual input image is required before Blender modeling');
@@ -649,6 +656,7 @@ export class Runner {
       if (JSON.stringify(v.modelingImages) !== JSON.stringify(set.images)) throw new Error('Modeling images do not match the required reference set');
       if (JSON.stringify(v.consistencySettings) !== JSON.stringify(set.consistencySettings)
         || JSON.stringify(v.consistency) !== JSON.stringify(set.consistency)) throw new Error('Modeling consistency policy/report changed after the job snapshot');
+    }
     }
     const inputs = this.modelingInputs(p, v);
     if (JSON.stringify(inputs) !== JSON.stringify(v.imageInputs)) throw new Error('Modeling image inputs changed after the job snapshot');
@@ -741,6 +749,7 @@ with open(${JSON.stringify(path.join(dir, 'reference-load.json'))}, 'w') as file
     }
     this.store.library?.jobFiles(v.modelReferences || []);
     await this.blender('execute_code', { code: exportCode(dir, v) }, { port: Number(this.env.GEN3D_BLENDER_PORT || 9877) });
+    await validateBaseEdit(this.store, this, p, v, dir);
     if (refs.length) {
       const manifestFile = path.join(dir, 'model-references.json');
       const evidence = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));

@@ -1,0 +1,50 @@
+{
+  "issue": 26,
+  "verifiedAt": "2026-10-24T03:03:35.265440+00:00",
+  "tests": {
+    "passed": 109,
+    "failed": 0,
+    "skipped": 0
+  },
+  "syntax": "passed",
+  "browser": {
+    "status": "passed",
+    "checks": 11,
+    "codexUsed": false,
+    "realBlender": false
+  },
+  "blenderPreservation": {
+    "status": "passed",
+    "checks": 16,
+    "codexUsed": false
+  },
+  "live": {
+    "status": "passed",
+    "runs": 4,
+    "realBlender": true,
+    "codexUsed": true,
+    "textImageGeneration": false,
+    "enabledRefinement": false
+  },
+  "artifactRecheck": {
+    "status": "passed",
+    "cases": 4,
+    "sourceArtifactsUnchanged": true,
+    "codexUsed": false
+  },
+  "liveBrowser": {
+    "status": "passed",
+    "projects": 2,
+    "orbit": "passed",
+    "pan": "passed",
+    "zoom": "passed",
+    "exceptions": []
+  },
+  "earlierFailure": "A full-suite attempt while browser checks ran concurrently had model-reference-visuals.test.js exit without a diagnostic. Its isolated module check and final standalone npm test passed. No cause is asserted.",
+  "unavailable": [],
+  "notPerformed": [
+    "Live text concept/four-view image generation in this trial",
+    "Live enabled refinement in this trial",
+    "Broad character-quality or human aesthetic evaluation"
+  ]
+}

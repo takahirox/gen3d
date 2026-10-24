@@ -1,0 +1,1896 @@
+{
+  "schemaVersion": 3,
+  "workflow": {
+    "schemaVersion": 1,
+    "name": "Object from text / image",
+    "nodes": [
+      {
+        "id": "input",
+        "type": "input",
+        "settings": {}
+      },
+      {
+        "id": "concept",
+        "type": "concept",
+        "settings": {}
+      },
+      {
+        "id": "views",
+        "type": "views",
+        "settings": {}
+      },
+      {
+        "id": "consistency",
+        "type": "consistency",
+        "settings": {}
+      },
+      {
+        "id": "references",
+        "type": "references",
+        "settings": {}
+      },
+      {
+        "id": "model",
+        "type": "model",
+        "settings": {}
+      },
+      {
+        "id": "refine",
+        "type": "refine",
+        "settings": {}
+      },
+      {
+        "id": "review",
+        "type": "review",
+        "settings": {}
+      },
+      {
+        "id": "output",
+        "type": "output",
+        "settings": {}
+      }
+    ],
+    "edges": [
+      {
+        "from": "input",
+        "to": "concept",
+        "input": "design"
+      },
+      {
+        "from": "concept",
+        "to": "views",
+        "input": "visual"
+      },
+      {
+        "from": "views",
+        "to": "consistency",
+        "input": "views"
+      },
+      {
+        "from": "input",
+        "to": "references",
+        "input": "design"
+      },
+      {
+        "from": "consistency",
+        "to": "model",
+        "input": "views"
+      },
+      {
+        "from": "references",
+        "to": "model",
+        "input": "references"
+      },
+      {
+        "from": "model",
+        "to": "refine",
+        "input": "model"
+      },
+      {
+        "from": "refine",
+        "to": "review",
+        "input": "model"
+      },
+      {
+        "from": "review",
+        "to": "output",
+        "input": "model"
+      }
+    ],
+    "revision": 1
+  },
+  "workflowRuns": [
+    {
+      "id": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "graph": {
+        "schemaVersion": 1,
+        "name": "Object from text / image",
+        "nodes": [
+          {
+            "id": "input",
+            "type": "input",
+            "settings": {}
+          },
+          {
+            "id": "concept",
+            "type": "concept",
+            "settings": {}
+          },
+          {
+            "id": "views",
+            "type": "views",
+            "settings": {}
+          },
+          {
+            "id": "consistency",
+            "type": "consistency",
+            "settings": {}
+          },
+          {
+            "id": "references",
+            "type": "references",
+            "settings": {}
+          },
+          {
+            "id": "model",
+            "type": "model",
+            "settings": {}
+          },
+          {
+            "id": "refine",
+            "type": "refine",
+            "settings": {}
+          },
+          {
+            "id": "review",
+            "type": "review",
+            "settings": {}
+          },
+          {
+            "id": "output",
+            "type": "output",
+            "settings": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "input",
+            "to": "concept",
+            "input": "design"
+          },
+          {
+            "from": "concept",
+            "to": "views",
+            "input": "visual"
+          },
+          {
+            "from": "views",
+            "to": "consistency",
+            "input": "views"
+          },
+          {
+            "from": "input",
+            "to": "references",
+            "input": "design"
+          },
+          {
+            "from": "consistency",
+            "to": "model",
+            "input": "views"
+          },
+          {
+            "from": "references",
+            "to": "model",
+            "input": "references"
+          },
+          {
+            "from": "model",
+            "to": "refine",
+            "input": "model"
+          },
+          {
+            "from": "refine",
+            "to": "review",
+            "input": "model"
+          },
+          {
+            "from": "review",
+            "to": "output",
+            "input": "model"
+          }
+        ],
+        "revision": 1
+      },
+      "graphRevision": 1,
+      "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+      "snapshot": {
+        "mode": "image",
+        "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+        "profile": "object",
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "inputReview": "pending",
+        "consistencySettings": {
+          "enabled": true,
+          "onFailure": "stop"
+        },
+        "refinementSettings": {
+          "enabled": false,
+          "maxIterations": 2
+        },
+        "image": {
+          "file": "input.png",
+          "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+        },
+        "images": [],
+        "models": [],
+        "base": null
+      },
+      "implementationSources": {
+        "src/workflow.js": "3f4acd4f3d1248dacac7fbbf8ab3db2d761f8bea21df9ca36e7653a6965dbc95",
+        "src/workflow-operations.js": "a14c16abca25bb581942bcc86b70c417a011107c01eef5a8ba1584b3dab89c6b",
+        "src/runner.js": "745069e6421b87953faf7a13ba58a02d3d67a1ac6e7599716da0918d34a7742c",
+        "src/store.js": "ba9618ca827d3818b255ab751b6f33f56fd3e6afabc6d95c3c47dc82cdb5466e",
+        "src/concept.js": "6783fdd89af8f76de792ac266fab4b56461f104fee2f39f22443b7d8fb5985a5",
+        "src/reference-set.js": "6f6257363c8c7f94d17e2850cc40af97ee01fcfdd918da7d858b286ba2e7802d",
+        "src/refinement.js": "f3d47aef9bc36d76eaf2be6bb00e6f2058ad55bc91876bf3213d535ef65088cb",
+        "src/model-reference-visuals.js": "9c0a3d4be52583c8e4732c9b6de076e959cd37d7f1740ea68bba1d9fe49b2770",
+        "src/base-model.js": "0f606fb9d90b10c3c6154568ebdd66da228d2e1dfa634b7935007360e96be44d",
+        "src/codex.js": "050189fe37c44995340bda37219e02389fa70f550e37cb7c7f5e695715d0ec94",
+        "blender/preservation.py": "258d8dfd73c448303ddeb0e0c5659e9e1b0cdf25bbbc92330587e79ef67cbdbf",
+        "blender/reference_runtime.py": "f17efeea3950a753464f18510d02cfc605e31c205bbf9a518b2b5cc678fda691",
+        "blender/gen3d_bridge.py": "3afb5e7936f90726b4d19c6e115620919829438855b3ccc2e44779e19e538dfc"
+      },
+      "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+      "status": "completed",
+      "nodes": {
+        "input": {
+          "status": "completed",
+          "fingerprint": "a9fc38b67b8b5a6a397950910eb45435d638237d3c89609f52629e898914b6d5",
+          "checkpointId": "c4479470-a333-4483-aa94-59149fbdfcea"
+        },
+        "concept": {
+          "status": "completed",
+          "fingerprint": "aa52173f76a5e0ba49d3062f338110d2f4a9d799fe0764e8c2b321a09c3c010c",
+          "checkpointId": "7f768406-7a82-49d8-b5c1-4fed5793d5e4"
+        },
+        "views": {
+          "status": "completed",
+          "fingerprint": "b943d5ec5f4448463fcd77ca0d7e39ee57b7bddae327b408081926c1a172c883",
+          "checkpointId": "6a03b418-f5b3-47d1-98a1-1611c3219c48"
+        },
+        "consistency": {
+          "status": "completed",
+          "fingerprint": "2162d71360506f9609c54176d235201a60e0595170d6fd848fe14088a3f1dc5d",
+          "checkpointId": "75726168-7ee7-4c25-bffe-df7c3e1be115"
+        },
+        "references": {
+          "status": "completed",
+          "fingerprint": "f24de5f2eedbe15b36c085366f4118d55e793562cbe3be5df6e36e8ff1ddec99",
+          "checkpointId": "870c26c2-8793-44be-966c-b5d06890278d"
+        },
+        "model": {
+          "status": "completed",
+          "fingerprint": "0c58ed527faf1a5c431b810580e872e0d258f329567b322dbc26f5dfb59673db",
+          "checkpointId": "7d8e0d9b-821b-4c9a-b141-70406929a27e"
+        },
+        "refine": {
+          "status": "completed",
+          "fingerprint": "d2e09875406a9fb922f8b70da135ece49715ff31f7279c16017b04bbbbbc9fc7",
+          "checkpointId": "a4539fbb-3cd7-4a7c-8b6b-b23e668f8014"
+        },
+        "review": {
+          "status": "completed",
+          "fingerprint": "d3b07034fc095cd277e55bc3cd6a51e06ff85d958c1145783585089fe5ae08e0",
+          "checkpointId": "e750ea1b-f1d6-4b2e-b2dd-faded56be319"
+        },
+        "output": {
+          "status": "completed",
+          "fingerprint": "17ebfbbbe9c4ddc0c0e713d66cd00d8651cc7627a43224fb3a7d87300c060f18",
+          "checkpointId": "e0196435-22e0-46ce-a464-494ce54e1df5"
+        }
+      },
+      "checkpoints": [
+        {
+          "id": "c4479470-a333-4483-aa94-59149fbdfcea",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "input",
+          "type": "design",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "a9fc38b67b8b5a6a397950910eb45435d638237d3c89609f52629e898914b6d5",
+          "settings": {},
+          "configuration": {
+            "mode": "image",
+            "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+            "profile": "object",
+            "image": {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            },
+            "review": false
+          },
+          "dependencyIds": {},
+          "sourceIdentities": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            }
+          ],
+          "data": {
+            "mode": "image",
+            "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+            "profile": "object",
+            "image": {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            }
+          },
+          "dataHash": "e0f7f496cf31819da9f9a0028e04a11ffa441e1ac1059e687f89fd906f3a0fc7",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.936Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/input/checkpoint.json",
+          "recordHash": "b94de8ddca70569122c046b5891d5282b82c3ab69e0e6203f7d35e5b33cf4b15"
+        },
+        {
+          "id": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "concept",
+          "type": "visual",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "aa52173f76a5e0ba49d3062f338110d2f4a9d799fe0764e8c2b321a09c3c010c",
+          "settings": {},
+          "configuration": {
+            "review": false
+          },
+          "dependencyIds": {
+            "design": "c4479470-a333-4483-aa94-59149fbdfcea"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "mode": "image",
+            "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+            "profile": "object",
+            "image": {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            },
+            "file": "input.png"
+          },
+          "dataHash": "2787d9eb54c87c6b76210c896843ebe829e5bbe7a1935d57dbf752d4d7784b8f",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.943Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/concept/checkpoint.json",
+          "recordHash": "8013c1a5e7c6a51946b4b32fcc0ec8fb8a88035e2b9a021a5a7b8d0bce8b6121"
+        },
+        {
+          "id": "6a03b418-f5b3-47d1-98a1-1611c3219c48",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "views",
+          "type": "views",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "b943d5ec5f4448463fcd77ca0d7e39ee57b7bddae327b408081926c1a172c883",
+          "settings": {},
+          "configuration": {
+            "review": false
+          },
+          "dependencyIds": {
+            "visual": "7f768406-7a82-49d8-b5c1-4fed5793d5e4"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "visual": {
+              "mode": "image",
+              "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+              "profile": "object",
+              "image": {
+                "file": "input.png",
+                "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+              },
+              "file": "input.png"
+            },
+            "images": [],
+            "setId": "70a72959-1bdf-4fec-a8d4-99669721b5f8"
+          },
+          "dataHash": "82c2d8e478e41bdf2adf40573faed271233ad52d6a18a1cafbe235db875d2b1d",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.951Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/views/checkpoint.json",
+          "recordHash": "679d2cc7a72f8c9d588fc93acd05f4b65d03cde49fda1ae2d0eadc9bc5b15a76"
+        },
+        {
+          "id": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "consistency",
+          "type": "checkedViews",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "2162d71360506f9609c54176d235201a60e0595170d6fd848fe14088a3f1dc5d",
+          "settings": {},
+          "configuration": {
+            "enabled": true,
+            "onFailure": "stop"
+          },
+          "dependencyIds": {
+            "views": "6a03b418-f5b3-47d1-98a1-1611c3219c48"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "visual": {
+              "mode": "image",
+              "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+              "profile": "object",
+              "image": {
+                "file": "input.png",
+                "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+              },
+              "file": "input.png"
+            },
+            "images": [],
+            "setId": "70a72959-1bdf-4fec-a8d4-99669721b5f8",
+            "consistency": {
+              "status": "not-applicable",
+              "issues": [],
+              "outcome": "allowed"
+            },
+            "consistencySettings": {
+              "enabled": true,
+              "onFailure": "stop"
+            }
+          },
+          "dataHash": "c0f346f2b6e7842e5dbeb5ffdd720944fce29c81fa03f13edd1c7c611bd0fd30",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/consistency.json",
+              "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+              "type": "json"
+            },
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.963Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/checkpoint.json",
+          "recordHash": "50165efdbe7a5802eb6515b1a2160a77adb0808ef29645b476b2172d07276211"
+        },
+        {
+          "id": "870c26c2-8793-44be-966c-b5d06890278d",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "references",
+          "type": "references",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "f24de5f2eedbe15b36c085366f4118d55e793562cbe3be5df6e36e8ff1ddec99",
+          "settings": {},
+          "configuration": {
+            "images": [],
+            "models": []
+          },
+          "dependencyIds": {
+            "design": "c4479470-a333-4483-aa94-59149fbdfcea"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "models": [],
+            "images": [],
+            "visuals": []
+          },
+          "dataHash": "17cd7a88210d7aaf979d5651c7b2a52c701a422036d786cc2de2b8ffd3847b34",
+          "files": [],
+          "createdAt": "2026-10-24T02:55:24.970Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/references/checkpoint.json",
+          "recordHash": "41bd3c255bd384beae668fd34310a1eda3faa12871e8440d9fbc9847c2b59a1c"
+        },
+        {
+          "id": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "model",
+          "type": "model",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "0c58ed527faf1a5c431b810580e872e0d258f329567b322dbc26f5dfb59673db",
+          "settings": {},
+          "configuration": {},
+          "dependencyIds": {
+            "views": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+            "references": "870c26c2-8793-44be-966c-b5d06890278d"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null
+          },
+          "dataHash": "7035814a9624d7957895f66c8802fd8458b80664f8ecf1ce845216f8010224b8",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.480Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/checkpoint.json",
+          "recordHash": "ab1027796213926712e3d656eef92eec1e11e928a7306eacee331e618fbad6c0"
+        },
+        {
+          "id": "a4539fbb-3cd7-4a7c-8b6b-b23e668f8014",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "refine",
+          "type": "model",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "d2e09875406a9fb922f8b70da135ece49715ff31f7279c16017b04bbbbbc9fc7",
+          "settings": {},
+          "configuration": {
+            "enabled": false,
+            "maxIterations": 2
+          },
+          "dependencyIds": {
+            "model": "7d8e0d9b-821b-4c9a-b141-70406929a27e"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null
+          },
+          "dataHash": "7035814a9624d7957895f66c8802fd8458b80664f8ecf1ce845216f8010224b8",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.505Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/refine/checkpoint.json",
+          "recordHash": "e2d2e24a93de2429bab1c90f4394a363e9daaac9c67a74afbdd1084c6928438f"
+        },
+        {
+          "id": "e750ea1b-f1d6-4b2e-b2dd-faded56be319",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "review",
+          "type": "reviewedModel",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "d3b07034fc095cd277e55bc3cd6a51e06ff85d958c1145783585089fe5ae08e0",
+          "settings": {},
+          "configuration": {
+            "review": false
+          },
+          "dependencyIds": {
+            "model": "a4539fbb-3cd7-4a7c-8b6b-b23e668f8014"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null
+          },
+          "dataHash": "7035814a9624d7957895f66c8802fd8458b80664f8ecf1ce845216f8010224b8",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.525Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/review/checkpoint.json",
+          "recordHash": "ddb82d583a68a6a17842192dbc181a36c7910ad1f704dec1ccf43de51ed8962b"
+        },
+        {
+          "id": "e0196435-22e0-46ce-a464-494ce54e1df5",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "output",
+          "type": "exports",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "17ebfbbbe9c4ddc0c0e713d66cd00d8651cc7627a43224fb3a7d87300c060f18",
+          "settings": {},
+          "configuration": {},
+          "dependencyIds": {
+            "model": "e750ea1b-f1d6-4b2e-b2dd-faded56be319"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null,
+            "validation": {
+              "metrics": {
+                "meshes": 17
+              },
+              "preservation": null,
+              "checkedAt": "2026-10-24T02:56:10.545Z",
+              "glbSha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "blendSha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60"
+            }
+          },
+          "dataHash": "4774307287da792ebd2de1a996ce61ac195bf4ae8ecdf0d2a7af6f74d2b62d0a",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/output/validation.json",
+              "sha256": "2381ee807c8a612724717fb7ed88c9b140b48bd65ba5f963f8bd4b2b1d883c7b",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.554Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/output/checkpoint.json",
+          "recordHash": "cabbfd724105fb43f6f82f6c8a84e39378552f0ef3d28b03b83847720628fc6b"
+        }
+      ],
+      "decisions": [],
+      "parentRunId": null,
+      "parentCheckpointId": null,
+      "createdAt": "2026-10-24T02:55:24.932Z",
+      "artifacts": [
+        "input.png",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/consistency.json",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/output/validation.json"
+      ],
+      "finishedAt": "2026-10-24T02:56:10.555Z"
+    },
+    {
+      "id": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "graph": {
+        "schemaVersion": 1,
+        "name": "Object from text / image",
+        "nodes": [
+          {
+            "id": "input",
+            "type": "input",
+            "settings": {}
+          },
+          {
+            "id": "concept",
+            "type": "concept",
+            "settings": {}
+          },
+          {
+            "id": "views",
+            "type": "views",
+            "settings": {}
+          },
+          {
+            "id": "consistency",
+            "type": "consistency",
+            "settings": {}
+          },
+          {
+            "id": "references",
+            "type": "references",
+            "settings": {}
+          },
+          {
+            "id": "model",
+            "type": "model",
+            "settings": {}
+          },
+          {
+            "id": "refine",
+            "type": "refine",
+            "settings": {}
+          },
+          {
+            "id": "review",
+            "type": "review",
+            "settings": {}
+          },
+          {
+            "id": "output",
+            "type": "output",
+            "settings": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "input",
+            "to": "concept",
+            "input": "design"
+          },
+          {
+            "from": "concept",
+            "to": "views",
+            "input": "visual"
+          },
+          {
+            "from": "views",
+            "to": "consistency",
+            "input": "views"
+          },
+          {
+            "from": "input",
+            "to": "references",
+            "input": "design"
+          },
+          {
+            "from": "consistency",
+            "to": "model",
+            "input": "views"
+          },
+          {
+            "from": "references",
+            "to": "model",
+            "input": "references"
+          },
+          {
+            "from": "model",
+            "to": "refine",
+            "input": "model"
+          },
+          {
+            "from": "refine",
+            "to": "review",
+            "input": "model"
+          },
+          {
+            "from": "review",
+            "to": "output",
+            "input": "model"
+          }
+        ],
+        "revision": 1
+      },
+      "graphRevision": 1,
+      "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+      "snapshot": {
+        "mode": "image",
+        "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+        "profile": "object",
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "inputReview": "pending",
+        "consistencySettings": {
+          "enabled": true,
+          "onFailure": "stop"
+        },
+        "refinementSettings": {
+          "enabled": false,
+          "maxIterations": 2
+        },
+        "image": {
+          "file": "input.png",
+          "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+        },
+        "images": [],
+        "models": [],
+        "base": null
+      },
+      "implementationSources": {
+        "src/workflow.js": "3f4acd4f3d1248dacac7fbbf8ab3db2d761f8bea21df9ca36e7653a6965dbc95",
+        "src/workflow-operations.js": "a14c16abca25bb581942bcc86b70c417a011107c01eef5a8ba1584b3dab89c6b",
+        "src/runner.js": "745069e6421b87953faf7a13ba58a02d3d67a1ac6e7599716da0918d34a7742c",
+        "src/store.js": "ba9618ca827d3818b255ab751b6f33f56fd3e6afabc6d95c3c47dc82cdb5466e",
+        "src/concept.js": "6783fdd89af8f76de792ac266fab4b56461f104fee2f39f22443b7d8fb5985a5",
+        "src/reference-set.js": "6f6257363c8c7f94d17e2850cc40af97ee01fcfdd918da7d858b286ba2e7802d",
+        "src/refinement.js": "f3d47aef9bc36d76eaf2be6bb00e6f2058ad55bc91876bf3213d535ef65088cb",
+        "src/model-reference-visuals.js": "9c0a3d4be52583c8e4732c9b6de076e959cd37d7f1740ea68bba1d9fe49b2770",
+        "src/base-model.js": "0f606fb9d90b10c3c6154568ebdd66da228d2e1dfa634b7935007360e96be44d",
+        "src/codex.js": "050189fe37c44995340bda37219e02389fa70f550e37cb7c7f5e695715d0ec94",
+        "blender/preservation.py": "258d8dfd73c448303ddeb0e0c5659e9e1b0cdf25bbbc92330587e79ef67cbdbf",
+        "blender/reference_runtime.py": "f17efeea3950a753464f18510d02cfc605e31c205bbf9a518b2b5cc678fda691",
+        "blender/gen3d_bridge.py": "3afb5e7936f90726b4d19c6e115620919829438855b3ccc2e44779e19e538dfc"
+      },
+      "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+      "status": "completed",
+      "nodes": {
+        "input": {
+          "status": "completed",
+          "checkpointId": "c4479470-a333-4483-aa94-59149fbdfcea",
+          "fingerprint": "a9fc38b67b8b5a6a397950910eb45435d638237d3c89609f52629e898914b6d5",
+          "reusedFrom": "54f7f0d8-4704-443a-91cb-f19db53d3dae"
+        },
+        "concept": {
+          "status": "completed",
+          "checkpointId": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+          "fingerprint": "aa52173f76a5e0ba49d3062f338110d2f4a9d799fe0764e8c2b321a09c3c010c",
+          "reusedFrom": "54f7f0d8-4704-443a-91cb-f19db53d3dae"
+        },
+        "views": {
+          "status": "completed",
+          "checkpointId": "6a03b418-f5b3-47d1-98a1-1611c3219c48",
+          "fingerprint": "b943d5ec5f4448463fcd77ca0d7e39ee57b7bddae327b408081926c1a172c883",
+          "reusedFrom": "54f7f0d8-4704-443a-91cb-f19db53d3dae"
+        },
+        "consistency": {
+          "status": "completed",
+          "checkpointId": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+          "fingerprint": "2162d71360506f9609c54176d235201a60e0595170d6fd848fe14088a3f1dc5d",
+          "reusedFrom": "54f7f0d8-4704-443a-91cb-f19db53d3dae"
+        },
+        "references": {
+          "status": "completed",
+          "checkpointId": "870c26c2-8793-44be-966c-b5d06890278d",
+          "fingerprint": "f24de5f2eedbe15b36c085366f4118d55e793562cbe3be5df6e36e8ff1ddec99",
+          "reusedFrom": "54f7f0d8-4704-443a-91cb-f19db53d3dae"
+        },
+        "model": {
+          "status": "completed",
+          "checkpointId": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+          "fingerprint": "0c58ed527faf1a5c431b810580e872e0d258f329567b322dbc26f5dfb59673db",
+          "reusedFrom": "54f7f0d8-4704-443a-91cb-f19db53d3dae"
+        },
+        "refine": {
+          "status": "completed",
+          "fingerprint": "d2e09875406a9fb922f8b70da135ece49715ff31f7279c16017b04bbbbbc9fc7",
+          "checkpointId": "31c1281d-51ae-4a32-8970-745066eac2e0"
+        },
+        "review": {
+          "status": "completed",
+          "fingerprint": "d3b07034fc095cd277e55bc3cd6a51e06ff85d958c1145783585089fe5ae08e0",
+          "checkpointId": "8b898244-ccfe-424a-ae1a-d553ebaefe94"
+        },
+        "output": {
+          "status": "completed",
+          "fingerprint": "17ebfbbbe9c4ddc0c0e713d66cd00d8651cc7627a43224fb3a7d87300c060f18",
+          "checkpointId": "97ca3699-5933-4400-a896-e9dcccfcd720"
+        }
+      },
+      "checkpoints": [
+        {
+          "id": "c4479470-a333-4483-aa94-59149fbdfcea",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "input",
+          "type": "design",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "a9fc38b67b8b5a6a397950910eb45435d638237d3c89609f52629e898914b6d5",
+          "settings": {},
+          "configuration": {
+            "mode": "image",
+            "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+            "profile": "object",
+            "image": {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            },
+            "review": false
+          },
+          "dependencyIds": {},
+          "sourceIdentities": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            }
+          ],
+          "data": {
+            "mode": "image",
+            "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+            "profile": "object",
+            "image": {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            }
+          },
+          "dataHash": "e0f7f496cf31819da9f9a0028e04a11ffa441e1ac1059e687f89fd906f3a0fc7",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.936Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/input/checkpoint.json",
+          "recordHash": "b94de8ddca70569122c046b5891d5282b82c3ab69e0e6203f7d35e5b33cf4b15"
+        },
+        {
+          "id": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "concept",
+          "type": "visual",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "aa52173f76a5e0ba49d3062f338110d2f4a9d799fe0764e8c2b321a09c3c010c",
+          "settings": {},
+          "configuration": {
+            "review": false
+          },
+          "dependencyIds": {
+            "design": "c4479470-a333-4483-aa94-59149fbdfcea"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "mode": "image",
+            "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+            "profile": "object",
+            "image": {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+            },
+            "file": "input.png"
+          },
+          "dataHash": "2787d9eb54c87c6b76210c896843ebe829e5bbe7a1935d57dbf752d4d7784b8f",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.943Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/concept/checkpoint.json",
+          "recordHash": "8013c1a5e7c6a51946b4b32fcc0ec8fb8a88035e2b9a021a5a7b8d0bce8b6121"
+        },
+        {
+          "id": "6a03b418-f5b3-47d1-98a1-1611c3219c48",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "views",
+          "type": "views",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "b943d5ec5f4448463fcd77ca0d7e39ee57b7bddae327b408081926c1a172c883",
+          "settings": {},
+          "configuration": {
+            "review": false
+          },
+          "dependencyIds": {
+            "visual": "7f768406-7a82-49d8-b5c1-4fed5793d5e4"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "visual": {
+              "mode": "image",
+              "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+              "profile": "object",
+              "image": {
+                "file": "input.png",
+                "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+              },
+              "file": "input.png"
+            },
+            "images": [],
+            "setId": "70a72959-1bdf-4fec-a8d4-99669721b5f8"
+          },
+          "dataHash": "82c2d8e478e41bdf2adf40573faed271233ad52d6a18a1cafbe235db875d2b1d",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.951Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/views/checkpoint.json",
+          "recordHash": "679d2cc7a72f8c9d588fc93acd05f4b65d03cde49fda1ae2d0eadc9bc5b15a76"
+        },
+        {
+          "id": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "consistency",
+          "type": "checkedViews",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "2162d71360506f9609c54176d235201a60e0595170d6fd848fe14088a3f1dc5d",
+          "settings": {},
+          "configuration": {
+            "enabled": true,
+            "onFailure": "stop"
+          },
+          "dependencyIds": {
+            "views": "6a03b418-f5b3-47d1-98a1-1611c3219c48"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "visual": {
+              "mode": "image",
+              "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+              "profile": "object",
+              "image": {
+                "file": "input.png",
+                "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+              },
+              "file": "input.png"
+            },
+            "images": [],
+            "setId": "70a72959-1bdf-4fec-a8d4-99669721b5f8",
+            "consistency": {
+              "status": "not-applicable",
+              "issues": [],
+              "outcome": "allowed"
+            },
+            "consistencySettings": {
+              "enabled": true,
+              "onFailure": "stop"
+            }
+          },
+          "dataHash": "c0f346f2b6e7842e5dbeb5ffdd720944fce29c81fa03f13edd1c7c611bd0fd30",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/consistency.json",
+              "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+              "type": "json"
+            },
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ],
+          "createdAt": "2026-10-24T02:55:24.963Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/checkpoint.json",
+          "recordHash": "50165efdbe7a5802eb6515b1a2160a77adb0808ef29645b476b2172d07276211"
+        },
+        {
+          "id": "870c26c2-8793-44be-966c-b5d06890278d",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "references",
+          "type": "references",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "f24de5f2eedbe15b36c085366f4118d55e793562cbe3be5df6e36e8ff1ddec99",
+          "settings": {},
+          "configuration": {
+            "images": [],
+            "models": []
+          },
+          "dependencyIds": {
+            "design": "c4479470-a333-4483-aa94-59149fbdfcea"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "models": [],
+            "images": [],
+            "visuals": []
+          },
+          "dataHash": "17cd7a88210d7aaf979d5651c7b2a52c701a422036d786cc2de2b8ffd3847b34",
+          "files": [],
+          "createdAt": "2026-10-24T02:55:24.970Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/references/checkpoint.json",
+          "recordHash": "41bd3c255bd384beae668fd34310a1eda3faa12871e8440d9fbc9847c2b59a1c"
+        },
+        {
+          "id": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+          "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+          "nodeId": "model",
+          "type": "model",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "0c58ed527faf1a5c431b810580e872e0d258f329567b322dbc26f5dfb59673db",
+          "settings": {},
+          "configuration": {},
+          "dependencyIds": {
+            "views": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+            "references": "870c26c2-8793-44be-966c-b5d06890278d"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null
+          },
+          "dataHash": "7035814a9624d7957895f66c8802fd8458b80664f8ecf1ce845216f8010224b8",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.480Z",
+          "record": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/checkpoint.json",
+          "recordHash": "ab1027796213926712e3d656eef92eec1e11e928a7306eacee331e618fbad6c0"
+        },
+        {
+          "id": "31c1281d-51ae-4a32-8970-745066eac2e0",
+          "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+          "nodeId": "refine",
+          "type": "model",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "d2e09875406a9fb922f8b70da135ece49715ff31f7279c16017b04bbbbbc9fc7",
+          "settings": {},
+          "configuration": {
+            "enabled": false,
+            "maxIterations": 2
+          },
+          "dependencyIds": {
+            "model": "7d8e0d9b-821b-4c9a-b141-70406929a27e"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null
+          },
+          "dataHash": "7035814a9624d7957895f66c8802fd8458b80664f8ecf1ce845216f8010224b8",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.610Z",
+          "record": "runs/cfb2b24f-eda3-44b9-9372-f80af6bdf02d/refine/checkpoint.json",
+          "recordHash": "1231cb10cde5442b0d05558d0ee5842e752b76124e2e56d74e7cf1c8601d8c9b"
+        },
+        {
+          "id": "8b898244-ccfe-424a-ae1a-d553ebaefe94",
+          "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+          "nodeId": "review",
+          "type": "reviewedModel",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "d3b07034fc095cd277e55bc3cd6a51e06ff85d958c1145783585089fe5ae08e0",
+          "settings": {},
+          "configuration": {
+            "review": false
+          },
+          "dependencyIds": {
+            "model": "31c1281d-51ae-4a32-8970-745066eac2e0"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "7b06f562-3fd4-4127-9805-6b0a6ffca8b1",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null
+          },
+          "dataHash": "973a91e3b4b7dca58ee52ea1366369622106598a4481074d9d9e1e911508db6d",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.628Z",
+          "record": "runs/cfb2b24f-eda3-44b9-9372-f80af6bdf02d/review/checkpoint.json",
+          "recordHash": "902bb1b4d7e0d9f4637db62a481c4734241b9564ac8bd748142a23735d503d3d"
+        },
+        {
+          "id": "97ca3699-5933-4400-a896-e9dcccfcd720",
+          "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+          "nodeId": "output",
+          "type": "exports",
+          "graphRevision": 1,
+          "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+          "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+          "fingerprint": "17ebfbbbe9c4ddc0c0e713d66cd00d8651cc7627a43224fb3a7d87300c060f18",
+          "settings": {},
+          "configuration": {},
+          "dependencyIds": {
+            "model": "8b898244-ccfe-424a-ae1a-d553ebaefe94"
+          },
+          "sourceIdentities": [],
+          "data": {
+            "versionId": "7b06f562-3fd4-4127-9805-6b0a6ffca8b1",
+            "artifacts": {
+              "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+            },
+            "preservation": null,
+            "validation": {
+              "metrics": {
+                "meshes": 17
+              },
+              "preservation": null,
+              "checkedAt": "2026-10-24T02:56:10.646Z",
+              "glbSha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "blendSha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60"
+            }
+          },
+          "dataHash": "984b8e0f446cf0431501376c0e433c135e89c849f0d89d8875297dfc23124029",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            },
+            {
+              "file": "runs/cfb2b24f-eda3-44b9-9372-f80af6bdf02d/output/validation.json",
+              "sha256": "c2e37a0841f2188716df401c190a17b993299e556e48ee72a85f5f25249f0725",
+              "type": "json"
+            }
+          ],
+          "createdAt": "2026-10-24T02:56:10.656Z",
+          "record": "runs/cfb2b24f-eda3-44b9-9372-f80af6bdf02d/output/checkpoint.json",
+          "recordHash": "9eb495d5b3702bf41ddb7a82a6d5dc4f958fab9f1899cc50944d14b558aea743"
+        }
+      ],
+      "decisions": [],
+      "parentRunId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "parentCheckpointId": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+      "createdAt": "2026-10-24T02:56:10.565Z",
+      "artifacts": [
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+        "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+        "runs/cfb2b24f-eda3-44b9-9372-f80af6bdf02d/output/validation.json"
+      ],
+      "finishedAt": "2026-10-24T02:56:10.657Z"
+    }
+  ],
+  "acceptedVersionId": "7b06f562-3fd4-4127-9805-6b0a6ffca8b1",
+  "editableBase": null,
+  "id": "0ea17dcd-951e-4027-8a8d-f017bbafde58",
+  "name": "Live object graph",
+  "mode": "image",
+  "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+  "profile": "object",
+  "inputImage": "input.png",
+  "checkpoints": {
+    "input": false,
+    "concept": false,
+    "multiView": false,
+    "preview": false
+  },
+  "consistencySettings": {
+    "enabled": true,
+    "onFailure": "stop"
+  },
+  "refinementSettings": {
+    "enabled": false,
+    "maxIterations": 2
+  },
+  "inputReview": "pending",
+  "inputCheckpoint": false,
+  "concepts": [],
+  "selectedConceptId": null,
+  "referenceSets": [],
+  "selectedReferenceSetId": null,
+  "references": [],
+  "modelReferences": [],
+  "versions": [
+    {
+      "id": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "kind": "generate",
+      "sourceVersionId": null,
+      "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+      "profile": "object",
+      "feedback": "",
+      "status": "ready",
+      "review": "approved",
+      "artifacts": {
+        "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+        "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+        "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+        "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+        "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+        "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+      },
+      "createdAt": "2026-10-24T02:55:24.978Z",
+      "visualInput": "input.png",
+      "conceptId": null,
+      "referenceSetId": null,
+      "modelingImages": [],
+      "referenceIds": [],
+      "imageInputs": [
+        "input.png"
+      ],
+      "modelReferences": [],
+      "modelReferenceVisuals": [],
+      "consistency": {
+        "status": "not-applicable",
+        "issues": [],
+        "outcome": "allowed"
+      },
+      "consistencySettings": {
+        "enabled": true,
+        "onFailure": "stop"
+      },
+      "editableBase": null,
+      "workflowRunId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "workflowNodeId": "model",
+      "workflowMode": "image",
+      "workflowReviewed": true,
+      "number": 1,
+      "checkpoints": {
+        "input": false,
+        "concept": false,
+        "multiView": false,
+        "preview": false
+      },
+      "refinementSettings": {
+        "enabled": true,
+        "maxIterations": 2
+      },
+      "referenceFingerprint": "0298129ca06a46074ce4bfd2aaad57e62a76091c0e5be32d3b3cfd687c87b9bd",
+      "refinement": {
+        "status": "off",
+        "maxIterations": 2,
+        "iterations": []
+      },
+      "summary": "Created the cabinet with teal panels, two inset doors, orange round knobs, four tapered orange feet, and softened edges. Verified 17 mesh objects with materials and set the reference viewing direction to match the image.",
+      "metrics": {
+        "meshes": 17
+      }
+    },
+    {
+      "id": "7b06f562-3fd4-4127-9805-6b0a6ffca8b1",
+      "kind": "generate",
+      "sourceVersionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+      "profile": "object",
+      "feedback": "",
+      "status": "ready",
+      "review": "approved",
+      "artifacts": {
+        "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+        "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+        "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+        "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+        "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+        "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+      },
+      "createdAt": "2026-10-24T02:55:24.978Z",
+      "visualInput": "input.png",
+      "conceptId": null,
+      "referenceSetId": null,
+      "modelingImages": [],
+      "referenceIds": [],
+      "imageInputs": [
+        "input.png"
+      ],
+      "modelReferences": [],
+      "modelReferenceVisuals": [],
+      "consistency": {
+        "status": "not-applicable",
+        "issues": [],
+        "outcome": "allowed"
+      },
+      "consistencySettings": {
+        "enabled": true,
+        "onFailure": "stop"
+      },
+      "editableBase": null,
+      "workflowRunId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "workflowNodeId": "review",
+      "workflowMode": "image",
+      "workflowReviewed": true,
+      "number": 2,
+      "checkpoints": {
+        "input": false,
+        "concept": false,
+        "multiView": false,
+        "preview": false
+      },
+      "refinementSettings": {
+        "enabled": true,
+        "maxIterations": 2
+      },
+      "referenceFingerprint": "0298129ca06a46074ce4bfd2aaad57e62a76091c0e5be32d3b3cfd687c87b9bd",
+      "refinement": {
+        "status": "off",
+        "maxIterations": 2,
+        "iterations": []
+      },
+      "summary": "Created the cabinet with teal panels, two inset doors, orange round knobs, four tapered orange feet, and softened edges. Verified 17 mesh objects with materials and set the reference viewing direction to match the image.",
+      "metrics": {
+        "meshes": 17
+      }
+    }
+  ],
+  "activity": [
+    {
+      "id": "c0ac7d22-0fbc-4d0e-9b1d-587ad5bff59d",
+      "at": "2026-10-24T02:55:24.929Z",
+      "actor": "web",
+      "type": "project_created"
+    },
+    {
+      "id": "a1ed819f-510d-4ed5-9959-2dd0796c0071",
+      "at": "2026-10-24T02:55:24.932Z",
+      "actor": "web",
+      "type": "workflow_started",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "parentRunId": null,
+      "parentCheckpointId": null
+    },
+    {
+      "id": "d0c6d552-8626-42e8-98c4-013d8d613f9d",
+      "at": "2026-10-24T02:55:24.937Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "input",
+      "checkpointId": "c4479470-a333-4483-aa94-59149fbdfcea",
+      "status": "completed"
+    },
+    {
+      "id": "4a6367f8-ac29-4e7a-97f1-b4069ef799da",
+      "at": "2026-10-24T02:55:24.943Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "concept",
+      "checkpointId": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+      "status": "completed"
+    },
+    {
+      "id": "9ca797fa-0a2d-49e1-8154-44848fa13a08",
+      "at": "2026-10-24T02:55:24.951Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "views",
+      "checkpointId": "6a03b418-f5b3-47d1-98a1-1611c3219c48",
+      "status": "completed"
+    },
+    {
+      "id": "25cdbb46-25dc-4a92-bb22-014cd630943b",
+      "at": "2026-10-24T02:55:24.963Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "consistency",
+      "checkpointId": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+      "status": "completed"
+    },
+    {
+      "id": "3196e5e9-9604-450d-a385-33ffc8f6c267",
+      "at": "2026-10-24T02:55:24.970Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "references",
+      "checkpointId": "870c26c2-8793-44be-966c-b5d06890278d",
+      "status": "completed"
+    },
+    {
+      "id": "5027c3c5-5383-41b0-9104-c4280986de32",
+      "at": "2026-10-24T02:55:32.161Z",
+      "actor": "codex",
+      "type": "modeling_update",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f"
+    },
+    {
+      "id": "a195eaac-2252-4153-835d-f2b3da208c8a",
+      "at": "2026-10-24T02:55:34.803Z",
+      "actor": "codex",
+      "type": "blender_operation",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "tool": "get_scene_info"
+    },
+    {
+      "id": "3d781dfa-8e29-4d9f-9add-6acc98716bf1",
+      "at": "2026-10-24T02:55:40.235Z",
+      "actor": "codex",
+      "type": "modeling_update",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f"
+    },
+    {
+      "id": "9789ebbe-fdd6-4306-a70c-1a27b7ea3c2a",
+      "at": "2026-10-24T02:55:59.548Z",
+      "actor": "codex",
+      "type": "blender_operation",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "tool": "execute_blender_code"
+    },
+    {
+      "id": "858eef31-1831-4f29-9e2a-43be00f3e436",
+      "at": "2026-10-24T02:56:05.146Z",
+      "actor": "codex",
+      "type": "blender_operation",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "tool": "get_scene_info"
+    },
+    {
+      "id": "fee48150-1337-43a1-90b5-986847c0a8ec",
+      "at": "2026-10-24T02:56:05.149Z",
+      "actor": "codex",
+      "type": "blender_operation",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "tool": "execute_blender_code"
+    },
+    {
+      "id": "3cf48af8-05c3-4550-be54-7afd6237a369",
+      "at": "2026-10-24T02:56:08.642Z",
+      "actor": "codex",
+      "type": "modeling_update",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f"
+    },
+    {
+      "id": "a938431a-68a1-4ddf-bad5-279903713e96",
+      "at": "2026-10-24T02:56:10.480Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "model",
+      "checkpointId": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+      "status": "completed"
+    },
+    {
+      "id": "b12c99ad-9133-487a-b022-bc19714060f8",
+      "at": "2026-10-24T02:56:10.505Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "refine",
+      "checkpointId": "a4539fbb-3cd7-4a7c-8b6b-b23e668f8014",
+      "status": "completed"
+    },
+    {
+      "id": "386b7be2-5a4d-4ad2-911b-ff4142f25fbd",
+      "at": "2026-10-24T02:56:10.515Z",
+      "actor": "system",
+      "type": "model_reviewed",
+      "versionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+      "decision": "approved"
+    },
+    {
+      "id": "abf45410-1fab-4f48-824d-9425c086db7e",
+      "at": "2026-10-24T02:56:10.525Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "review",
+      "checkpointId": "e750ea1b-f1d6-4b2e-b2dd-faded56be319",
+      "status": "completed"
+    },
+    {
+      "id": "8286e685-3f4d-41ba-ba5e-96559755892f",
+      "at": "2026-10-24T02:56:10.554Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "nodeId": "output",
+      "checkpointId": "e0196435-22e0-46ce-a464-494ce54e1df5",
+      "status": "completed"
+    },
+    {
+      "id": "27fe161c-8526-44cd-b5f4-7c54bcaee844",
+      "at": "2026-10-24T02:56:10.587Z",
+      "actor": "web",
+      "type": "workflow_started",
+      "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "parentRunId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "parentCheckpointId": "7d8e0d9b-821b-4c9a-b141-70406929a27e"
+    },
+    {
+      "id": "0a0376b9-3397-4766-a83c-0b30ab1f06c5",
+      "at": "2026-10-24T02:56:10.610Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "nodeId": "refine",
+      "checkpointId": "31c1281d-51ae-4a32-8970-745066eac2e0",
+      "status": "completed"
+    },
+    {
+      "id": "0d57d718-7d1b-43d1-a690-7ba2cec79fd7",
+      "at": "2026-10-24T02:56:10.618Z",
+      "actor": "system",
+      "type": "model_reviewed",
+      "versionId": "7b06f562-3fd4-4127-9805-6b0a6ffca8b1",
+      "decision": "approved"
+    },
+    {
+      "id": "49828e0a-5c77-4236-8da4-dc953bb05cc8",
+      "at": "2026-10-24T02:56:10.628Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "nodeId": "review",
+      "checkpointId": "8b898244-ccfe-424a-ae1a-d553ebaefe94",
+      "status": "completed"
+    },
+    {
+      "id": "b37dc525-3517-486d-8f6f-08936a647599",
+      "at": "2026-10-24T02:56:10.656Z",
+      "actor": "workflow",
+      "type": "node_checkpoint_saved",
+      "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "nodeId": "output",
+      "checkpointId": "97ca3699-5933-4400-a896-e9dcccfcd720",
+      "status": "completed"
+    }
+  ],
+  "updatedAt": "2026-10-24T02:56:10.656Z"
+}

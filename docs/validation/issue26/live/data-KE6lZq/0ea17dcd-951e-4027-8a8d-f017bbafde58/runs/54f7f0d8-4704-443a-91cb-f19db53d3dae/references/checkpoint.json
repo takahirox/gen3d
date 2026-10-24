@@ -1,0 +1,27 @@
+{
+  "id": "870c26c2-8793-44be-966c-b5d06890278d",
+  "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+  "nodeId": "references",
+  "type": "references",
+  "graphRevision": 1,
+  "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+  "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+  "fingerprint": "f24de5f2eedbe15b36c085366f4118d55e793562cbe3be5df6e36e8ff1ddec99",
+  "settings": {},
+  "configuration": {
+    "images": [],
+    "models": []
+  },
+  "dependencyIds": {
+    "design": "c4479470-a333-4483-aa94-59149fbdfcea"
+  },
+  "sourceIdentities": [],
+  "data": {
+    "models": [],
+    "images": [],
+    "visuals": []
+  },
+  "dataHash": "17cd7a88210d7aaf979d5651c7b2a52c701a422036d786cc2de2b8ffd3847b34",
+  "files": [],
+  "createdAt": "2026-10-24T02:55:24.970Z"
+}

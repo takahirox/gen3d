@@ -1,0 +1,37 @@
+{
+  "id": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+  "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+  "nodeId": "concept",
+  "type": "visual",
+  "graphRevision": 1,
+  "graphHash": "c00423d48f313ec07b4fb486006904bdba74e832a8aacebeff2f8d4be6bfffd7",
+  "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+  "fingerprint": "aa52173f76a5e0ba49d3062f338110d2f4a9d799fe0764e8c2b321a09c3c010c",
+  "settings": {},
+  "configuration": {
+    "review": false
+  },
+  "dependencyIds": {
+    "design": "c4479470-a333-4483-aa94-59149fbdfcea"
+  },
+  "sourceIdentities": [],
+  "data": {
+    "mode": "image",
+    "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+    "profile": "object",
+    "image": {
+      "file": "input.png",
+      "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6"
+    },
+    "file": "input.png"
+  },
+  "dataHash": "2787d9eb54c87c6b76210c896843ebe829e5bbe7a1935d57dbf752d4d7784b8f",
+  "files": [
+    {
+      "file": "input.png",
+      "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+      "type": "png"
+    }
+  ],
+  "createdAt": "2026-10-24T02:55:24.943Z"
+}

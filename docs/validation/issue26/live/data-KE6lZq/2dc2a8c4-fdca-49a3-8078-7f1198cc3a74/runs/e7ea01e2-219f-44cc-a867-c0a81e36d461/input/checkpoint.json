@@ -1,0 +1,46 @@
+{
+  "id": "310d7b77-1511-4126-8e45-c38b845d7faa",
+  "runId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+  "nodeId": "input",
+  "type": "design",
+  "graphRevision": 1,
+  "graphHash": "6dd3aca0aaaf0e1c8ce19f55b12abd604a4e1cbcaac237854362dfb40420adf4",
+  "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+  "fingerprint": "da3e119ad719f745e0efd9338095396a328e604c7bea41dd4aed0a85c87422cc",
+  "settings": {},
+  "configuration": {
+    "mode": "image",
+    "prompt": "The app has loaded the COMPLETE base character. Make ONLY Hair mesh coordinates 15 percent wider along local X, matching the wider hair cap in the image. Use vertex coordinate edits, not object scale, and preserve all Hair UVs/materials and all other objects, rig, skin weights, Smile expression and hierarchy. Do not create new parts or alter pose. Keep this bounded: inspect then make the targeted Hair edit and finish. Set the requested reference camera direction without reorienting the character.",
+    "profile": "character",
+    "image": {
+      "file": "input.png",
+      "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0"
+    },
+    "review": false
+  },
+  "dependencyIds": {},
+  "sourceIdentities": [
+    {
+      "file": "input.png",
+      "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0"
+    }
+  ],
+  "data": {
+    "mode": "image",
+    "prompt": "The app has loaded the COMPLETE base character. Make ONLY Hair mesh coordinates 15 percent wider along local X, matching the wider hair cap in the image. Use vertex coordinate edits, not object scale, and preserve all Hair UVs/materials and all other objects, rig, skin weights, Smile expression and hierarchy. Do not create new parts or alter pose. Keep this bounded: inspect then make the targeted Hair edit and finish. Set the requested reference camera direction without reorienting the character.",
+    "profile": "character",
+    "image": {
+      "file": "input.png",
+      "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0"
+    }
+  },
+  "dataHash": "ca1bfbd7570c6947901c59f7b382dfcc72d7f641487802d403b01a04c935d32a",
+  "files": [
+    {
+      "file": "input.png",
+      "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+      "type": "png"
+    }
+  ],
+  "createdAt": "2026-10-24T02:56:11.522Z"
+}

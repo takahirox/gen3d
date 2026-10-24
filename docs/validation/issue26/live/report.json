@@ -1,0 +1,1437 @@
+{
+  "realBlender": true,
+  "codexUsed": true,
+  "dataDirectory": "data-KE6lZq",
+  "checks": [
+    "real object preset generated GLB, scene and preview",
+    "object fork reused model checkpoint, published a separate candidate and kept original run/candidate intact",
+    "real Codex edited copied complete base with rig/weights/Smile/UV/material protection and reopened GLB",
+    "humanoid fork reused unchanged complete-base checkpoint and executed altered downstream edit without overwriting original candidate/source"
+  ],
+  "runs": [
+    {
+      "projectId": "0ea17dcd-951e-4027-8a8d-f017bbafde58",
+      "runId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "status": "completed",
+      "graphRevision": 1,
+      "parentRunId": null,
+      "parentCheckpointId": null,
+      "reusedNodes": [],
+      "checkpoints": [
+        {
+          "id": "c4479470-a333-4483-aa94-59149fbdfcea",
+          "nodeId": "input",
+          "type": "design",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+          "nodeId": "concept",
+          "type": "visual",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "6a03b418-f5b3-47d1-98a1-1611c3219c48",
+          "nodeId": "views",
+          "type": "views",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+          "nodeId": "consistency",
+          "type": "checkedViews",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/consistency.json",
+              "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+              "type": "json"
+            },
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "870c26c2-8793-44be-966c-b5d06890278d",
+          "nodeId": "references",
+          "type": "references",
+          "files": []
+        },
+        {
+          "id": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+          "nodeId": "model",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "a4539fbb-3cd7-4a7c-8b6b-b23e668f8014",
+          "nodeId": "refine",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "e750ea1b-f1d6-4b2e-b2dd-faded56be319",
+          "nodeId": "review",
+          "type": "reviewedModel",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "e0196435-22e0-46ce-a464-494ce54e1df5",
+          "nodeId": "output",
+          "type": "exports",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/output/validation.json",
+              "sha256": "2381ee807c8a612724717fb7ed88c9b140b48bd65ba5f963f8bd4b2b1d883c7b",
+              "type": "json"
+            }
+          ]
+        }
+      ],
+      "candidate": {
+        "id": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+        "kind": "generate",
+        "sourceVersionId": null,
+        "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+        "profile": "object",
+        "feedback": "",
+        "status": "ready",
+        "review": "approved",
+        "artifacts": {
+          "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+          "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+          "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+          "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+          "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+          "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+        },
+        "createdAt": "2026-10-24T02:55:24.978Z",
+        "visualInput": "input.png",
+        "conceptId": null,
+        "referenceSetId": null,
+        "modelingImages": [],
+        "referenceIds": [],
+        "imageInputs": [
+          "input.png"
+        ],
+        "modelReferences": [],
+        "modelReferenceVisuals": [],
+        "consistency": {
+          "status": "not-applicable",
+          "issues": [],
+          "outcome": "allowed"
+        },
+        "consistencySettings": {
+          "enabled": true,
+          "onFailure": "stop"
+        },
+        "editableBase": null,
+        "workflowRunId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+        "workflowNodeId": "model",
+        "workflowMode": "image",
+        "workflowReviewed": true,
+        "number": 1,
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "refinementSettings": {
+          "enabled": true,
+          "maxIterations": 2
+        },
+        "referenceFingerprint": "0298129ca06a46074ce4bfd2aaad57e62a76091c0e5be32d3b3cfd687c87b9bd",
+        "refinement": {
+          "status": "off",
+          "maxIterations": 2,
+          "iterations": []
+        },
+        "summary": "Created the cabinet with teal panels, two inset doors, orange round knobs, four tapered orange feet, and softened edges. Verified 17 mesh objects with materials and set the reference viewing direction to match the image.",
+        "metrics": {
+          "meshes": 17
+        }
+      },
+      "activity": 4
+    },
+    {
+      "projectId": "0ea17dcd-951e-4027-8a8d-f017bbafde58",
+      "runId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+      "status": "completed",
+      "graphRevision": 1,
+      "parentRunId": "54f7f0d8-4704-443a-91cb-f19db53d3dae",
+      "parentCheckpointId": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+      "reusedNodes": [
+        "input",
+        "concept",
+        "views",
+        "consistency",
+        "references",
+        "model"
+      ],
+      "checkpoints": [
+        {
+          "id": "c4479470-a333-4483-aa94-59149fbdfcea",
+          "nodeId": "input",
+          "type": "design",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "7f768406-7a82-49d8-b5c1-4fed5793d5e4",
+          "nodeId": "concept",
+          "type": "visual",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "6a03b418-f5b3-47d1-98a1-1611c3219c48",
+          "nodeId": "views",
+          "type": "views",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "75726168-7ee7-4c25-bffe-df7c3e1be115",
+          "nodeId": "consistency",
+          "type": "checkedViews",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/consistency/consistency.json",
+              "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+              "type": "json"
+            },
+            {
+              "file": "input.png",
+              "sha256": "f58f1719ac8335b0884f71739bec9b599c8b68a89d7a89b17f12fca96c555de6",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "870c26c2-8793-44be-966c-b5d06890278d",
+          "nodeId": "references",
+          "type": "references",
+          "files": []
+        },
+        {
+          "id": "7d8e0d9b-821b-4c9a-b141-70406929a27e",
+          "nodeId": "model",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "31c1281d-51ae-4a32-8970-745066eac2e0",
+          "nodeId": "refine",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "8b898244-ccfe-424a-ae1a-d553ebaefe94",
+          "nodeId": "review",
+          "type": "reviewedModel",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "97ca3699-5933-4400-a896-e9dcccfcd720",
+          "nodeId": "output",
+          "type": "exports",
+          "files": [
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+              "sha256": "4e7c677c7e8899193cdd14fb003a46b9550e37de9ac0906d416b38a0dee1504c",
+              "type": "glb"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+              "sha256": "2dee4584b18ec84a5c921c184d63ab69540f7935412521f50d34afb59ad27d60",
+              "type": "blend"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+              "sha256": "9a57afad1b26b6d2bcccc8c769e79c1c8c52ebb9e2f754ab11bc41062b17a37b",
+              "type": "png"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+              "sha256": "f11b0f951d91305520025ed0263938a43863b85c42fb11571105ec0fda8ffb19",
+              "type": "md"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+              "sha256": "321dee6686a48927bfb237bb851721a7cfa7359ee2e14a0715db30d7735fdc88",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json",
+              "sha256": "5f6a5a5632624cf3e01c8c8a763f0d29447b35733d4a6060fe1d7a9dc17c1555",
+              "type": "json"
+            },
+            {
+              "file": "runs/cfb2b24f-eda3-44b9-9372-f80af6bdf02d/output/validation.json",
+              "sha256": "c2e37a0841f2188716df401c190a17b993299e556e48ee72a85f5f25249f0725",
+              "type": "json"
+            }
+          ]
+        }
+      ],
+      "candidate": {
+        "id": "7b06f562-3fd4-4127-9805-6b0a6ffca8b1",
+        "kind": "generate",
+        "sourceVersionId": "f4f60c27-d55d-427f-bb83-b34b1798552f",
+        "prompt": "Build the small stylized teal cabinet with orange knobs and feet shown in the image. Use a small useful mesh model with materials. Keep this validation bounded and finish through Blender MCP.",
+        "profile": "object",
+        "feedback": "",
+        "status": "ready",
+        "review": "approved",
+        "artifacts": {
+          "glb": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/model.glb",
+          "blend": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/scene.blend",
+          "render": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/preview.png",
+          "task": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/TASK.md",
+          "audit": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/mcp-audit.jsonl",
+          "visionInputs": "runs/54f7f0d8-4704-443a-91cb-f19db53d3dae/model/vision-inputs.json"
+        },
+        "createdAt": "2026-10-24T02:55:24.978Z",
+        "visualInput": "input.png",
+        "conceptId": null,
+        "referenceSetId": null,
+        "modelingImages": [],
+        "referenceIds": [],
+        "imageInputs": [
+          "input.png"
+        ],
+        "modelReferences": [],
+        "modelReferenceVisuals": [],
+        "consistency": {
+          "status": "not-applicable",
+          "issues": [],
+          "outcome": "allowed"
+        },
+        "consistencySettings": {
+          "enabled": true,
+          "onFailure": "stop"
+        },
+        "editableBase": null,
+        "workflowRunId": "cfb2b24f-eda3-44b9-9372-f80af6bdf02d",
+        "workflowNodeId": "review",
+        "workflowMode": "image",
+        "workflowReviewed": true,
+        "number": 2,
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "refinementSettings": {
+          "enabled": true,
+          "maxIterations": 2
+        },
+        "referenceFingerprint": "0298129ca06a46074ce4bfd2aaad57e62a76091c0e5be32d3b3cfd687c87b9bd",
+        "refinement": {
+          "status": "off",
+          "maxIterations": 2,
+          "iterations": []
+        },
+        "summary": "Created the cabinet with teal panels, two inset doors, orange round knobs, four tapered orange feet, and softened edges. Verified 17 mesh objects with materials and set the reference viewing direction to match the image.",
+        "metrics": {
+          "meshes": 17
+        }
+      },
+      "activity": 4
+    },
+    {
+      "projectId": "2dc2a8c4-fdca-49a3-8078-7f1198cc3a74",
+      "runId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+      "status": "completed",
+      "graphRevision": 1,
+      "parentRunId": null,
+      "parentCheckpointId": null,
+      "reusedNodes": [],
+      "checkpoints": [
+        {
+          "id": "310d7b77-1511-4126-8e45-c38b845d7faa",
+          "nodeId": "input",
+          "type": "design",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "796a367d-229a-4fe4-a7fa-92271eda666c",
+          "nodeId": "concept",
+          "type": "visual",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "6d7d68f2-79e9-418c-aa97-b7266e4bf562",
+          "nodeId": "views",
+          "type": "views",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "b88b6745-d4c4-4c73-a999-ad9dc9ab56d7",
+          "nodeId": "consistency",
+          "type": "checkedViews",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/consistency/consistency.json",
+              "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+              "type": "json"
+            },
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "1432d9a6-3fd2-4679-bbcd-cc875fd14b8d",
+          "nodeId": "references",
+          "type": "references",
+          "files": []
+        },
+        {
+          "id": "0a43e1c8-555c-4e4d-b437-a150b1749906",
+          "nodeId": "base",
+          "type": "base",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.blend",
+              "sha256": "b11419fbc014c17487b4f59516f8d246cf8939ad974ff985f04bf0b56dea902c",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/baseline.json",
+              "sha256": "622679aa3f857feaa9b0f18f0873f9bc744fc90a1002947b3f5a95295f516bad",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base-validation.json",
+              "sha256": "469c97a4b5af83ee425753458d2955e0c57d0a887d6becddc43db09e5d1a3aad",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/source.blend",
+              "sha256": "58be75aa70d22f094e7d74915fef096bd0b1f1998a5ac30f87c5315190347ead",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.glb",
+              "sha256": "f4921e51997c975b61873f61ebe027a8dd7515e792a83bca8cb9f69ed1305e4c",
+              "type": "glb"
+            }
+          ]
+        },
+        {
+          "id": "51867f04-ed01-4b0f-8819-5f798454352e",
+          "nodeId": "edit",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/model.glb",
+              "sha256": "6a4a9f072ef810959443c4b3a53f86f84d2c92dc1c6e4fac419e9a4776e36e44",
+              "type": "glb"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/scene.blend",
+              "sha256": "0333257554682df5e57ea41fb3ca2d8aea35c4ebb7664c39b74197a5001a86da",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preview.png",
+              "sha256": "50b445969fa480959238a293c5d07fa1f0c9001335d1ca1f6926dff6d467725a",
+              "type": "png"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/TASK.md",
+              "sha256": "d032c8b6aca00f2034f6138ee1a44b278a727de35b534eedfc595b1b50ccc409",
+              "type": "md"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/mcp-audit.jsonl",
+              "sha256": "33ea4c2d8ae1be12b528737d3227da5948271942a574e58c3bdf0558419f679c",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preservation.json",
+              "sha256": "911f63e19a4a4ac60f0a147707545b17623e331963c795ff4094305fdb0b89f8",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "7be85437-196b-4148-bc3c-f6c591f35845",
+          "nodeId": "refine",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/model.glb",
+              "sha256": "6a4a9f072ef810959443c4b3a53f86f84d2c92dc1c6e4fac419e9a4776e36e44",
+              "type": "glb"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/scene.blend",
+              "sha256": "0333257554682df5e57ea41fb3ca2d8aea35c4ebb7664c39b74197a5001a86da",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preview.png",
+              "sha256": "50b445969fa480959238a293c5d07fa1f0c9001335d1ca1f6926dff6d467725a",
+              "type": "png"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/TASK.md",
+              "sha256": "d032c8b6aca00f2034f6138ee1a44b278a727de35b534eedfc595b1b50ccc409",
+              "type": "md"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/mcp-audit.jsonl",
+              "sha256": "33ea4c2d8ae1be12b528737d3227da5948271942a574e58c3bdf0558419f679c",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preservation.json",
+              "sha256": "911f63e19a4a4ac60f0a147707545b17623e331963c795ff4094305fdb0b89f8",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "4f36d476-2956-4e07-a294-57f4d6292ed3",
+          "nodeId": "review",
+          "type": "reviewedModel",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/model.glb",
+              "sha256": "6a4a9f072ef810959443c4b3a53f86f84d2c92dc1c6e4fac419e9a4776e36e44",
+              "type": "glb"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/scene.blend",
+              "sha256": "0333257554682df5e57ea41fb3ca2d8aea35c4ebb7664c39b74197a5001a86da",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preview.png",
+              "sha256": "50b445969fa480959238a293c5d07fa1f0c9001335d1ca1f6926dff6d467725a",
+              "type": "png"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/TASK.md",
+              "sha256": "d032c8b6aca00f2034f6138ee1a44b278a727de35b534eedfc595b1b50ccc409",
+              "type": "md"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/mcp-audit.jsonl",
+              "sha256": "33ea4c2d8ae1be12b528737d3227da5948271942a574e58c3bdf0558419f679c",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preservation.json",
+              "sha256": "911f63e19a4a4ac60f0a147707545b17623e331963c795ff4094305fdb0b89f8",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "a1671876-d252-4a1f-a8c7-2969e4cb7043",
+          "nodeId": "output",
+          "type": "exports",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/model.glb",
+              "sha256": "6a4a9f072ef810959443c4b3a53f86f84d2c92dc1c6e4fac419e9a4776e36e44",
+              "type": "glb"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/scene.blend",
+              "sha256": "0333257554682df5e57ea41fb3ca2d8aea35c4ebb7664c39b74197a5001a86da",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preview.png",
+              "sha256": "50b445969fa480959238a293c5d07fa1f0c9001335d1ca1f6926dff6d467725a",
+              "type": "png"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/TASK.md",
+              "sha256": "d032c8b6aca00f2034f6138ee1a44b278a727de35b534eedfc595b1b50ccc409",
+              "type": "md"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/mcp-audit.jsonl",
+              "sha256": "33ea4c2d8ae1be12b528737d3227da5948271942a574e58c3bdf0558419f679c",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preservation.json",
+              "sha256": "911f63e19a4a4ac60f0a147707545b17623e331963c795ff4094305fdb0b89f8",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/output/validation.json",
+              "sha256": "c7a921baeecd7198a1fa145ab3f7afceac33356c88c6a1d74a18a9348cdcb252",
+              "type": "json"
+            }
+          ]
+        }
+      ],
+      "candidate": {
+        "id": "2b8f216e-4d87-45e1-89de-b72bd06fc42d",
+        "kind": "revision",
+        "sourceVersionId": null,
+        "prompt": "The app has loaded the COMPLETE base character. Make ONLY Hair mesh coordinates 15 percent wider along local X, matching the wider hair cap in the image. Use vertex coordinate edits, not object scale, and preserve all Hair UVs/materials and all other objects, rig, skin weights, Smile expression and hierarchy. Do not create new parts or alter pose. Keep this bounded: inspect then make the targeted Hair edit and finish. Set the requested reference camera direction without reorienting the character.",
+        "profile": "character",
+        "feedback": "",
+        "status": "ready",
+        "review": "approved",
+        "artifacts": {
+          "glb": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/model.glb",
+          "blend": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/scene.blend",
+          "render": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preview.png",
+          "task": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/TASK.md",
+          "audit": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/mcp-audit.jsonl",
+          "visionInputs": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/vision-inputs.json",
+          "preservation": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/edit/preservation.json"
+        },
+        "createdAt": "2026-10-24T02:56:11.681Z",
+        "visualInput": "input.png",
+        "conceptId": null,
+        "referenceSetId": null,
+        "modelingImages": [],
+        "referenceIds": [],
+        "imageInputs": [
+          "input.png"
+        ],
+        "modelReferences": [],
+        "modelReferenceVisuals": [],
+        "consistency": {
+          "status": "not-applicable",
+          "issues": [],
+          "outcome": "allowed"
+        },
+        "consistencySettings": {
+          "enabled": true,
+          "onFailure": "stop"
+        },
+        "editableBase": {
+          "assetId": "fdd250ce-3904-467c-bae2-acb112e7cc1d",
+          "name": "character.blend",
+          "sha256": "58be75aa70d22f094e7d74915fef096bd0b1f1998a5ac30f87c5315190347ead",
+          "format": "blend",
+          "scope": {
+            "editableObjects": [
+              "Hair"
+            ],
+            "allowChanges": [],
+            "allowNewObjects": false
+          },
+          "review": "approved",
+          "authorizedAt": "2026-10-24T02:56:11.518Z",
+          "blend": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.blend",
+          "baseline": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/baseline.json",
+          "validation": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base-validation.json",
+          "source": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/source.blend",
+          "glb": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.glb"
+        },
+        "workflowRunId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+        "workflowNodeId": "edit",
+        "workflowMode": "image",
+        "workflowReviewed": true,
+        "number": 1,
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "refinementSettings": {
+          "enabled": true,
+          "maxIterations": 2
+        },
+        "referenceFingerprint": "d29f2beaf4d43b25a81475c3ae52a5c10c7d20be22d8d5074d52e5bc8502098d",
+        "refinement": {
+          "status": "off",
+          "maxIterations": 2,
+          "iterations": []
+        },
+        "preservation": {
+          "passed": true,
+          "changed": [
+            {
+              "object": "Hair",
+              "features": [
+                "topology",
+                "geometry"
+              ]
+            }
+          ],
+          "unchangedObjects": [
+            "Rig",
+            "Body",
+            "HeadMesh",
+            "ArmMesh.L",
+            "ArmMesh.R",
+            "LegMesh.L",
+            "LegMesh.R"
+          ],
+          "addedObjects": [],
+          "beforeHash": "3354f6c1226d3312932244f5ce489723e2c7d8242a7021e55aeae1a99c184989",
+          "afterHash": "f7fb54ad41b08deadb2235d4f3f70c04977a5cef4b89245a38492ccd56be5c36",
+          "scope": {
+            "editableObjects": [
+              "Hair"
+            ],
+            "allowChanges": [],
+            "allowNewObjects": false
+          },
+          "roundtrip": {
+            "passed": true,
+            "changed": [],
+            "unchangedObjects": [
+              "Rig",
+              "Body",
+              "HeadMesh",
+              "Hair",
+              "ArmMesh.L",
+              "ArmMesh.R",
+              "LegMesh.L",
+              "LegMesh.R"
+            ],
+            "addedObjects": [],
+            "beforeHash": "264970293e6265ed6c511439dee2fc04c3dc673d02a293ed47ada4b88b79247e",
+            "afterHash": "264970293e6265ed6c511439dee2fc04c3dc673d02a293ed47ada4b88b79247e",
+            "scope": {
+              "editableObjects": [],
+              "allowChanges": [],
+              "allowNewObjects": false
+            }
+          },
+          "kind": "edited-scene-and-glb-preservation"
+        },
+        "summary": "Widened Hair by 15% along local X using vertex edits. Preserved object scale, topology, UVs, materials, rig, weights, expressions, hierarchy, pose, and all other objects. Set the reference camera direction and verified the edit through Blender MCP.",
+        "metrics": {
+          "meshes": 7
+        }
+      },
+      "activity": 4
+    },
+    {
+      "projectId": "2dc2a8c4-fdca-49a3-8078-7f1198cc3a74",
+      "runId": "84898582-c9f2-4897-8fe5-64ad460b7724",
+      "status": "completed",
+      "graphRevision": 2,
+      "parentRunId": "e7ea01e2-219f-44cc-a867-c0a81e36d461",
+      "parentCheckpointId": "0a43e1c8-555c-4e4d-b437-a150b1749906",
+      "reusedNodes": [
+        "input",
+        "concept",
+        "views",
+        "consistency",
+        "references",
+        "base"
+      ],
+      "checkpoints": [
+        {
+          "id": "310d7b77-1511-4126-8e45-c38b845d7faa",
+          "nodeId": "input",
+          "type": "design",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "0a43e1c8-555c-4e4d-b437-a150b1749906",
+          "nodeId": "base",
+          "type": "base",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.blend",
+              "sha256": "b11419fbc014c17487b4f59516f8d246cf8939ad974ff985f04bf0b56dea902c",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/baseline.json",
+              "sha256": "622679aa3f857feaa9b0f18f0873f9bc744fc90a1002947b3f5a95295f516bad",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base-validation.json",
+              "sha256": "469c97a4b5af83ee425753458d2955e0c57d0a887d6becddc43db09e5d1a3aad",
+              "type": "json"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/source.blend",
+              "sha256": "58be75aa70d22f094e7d74915fef096bd0b1f1998a5ac30f87c5315190347ead",
+              "type": "blend"
+            },
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.glb",
+              "sha256": "f4921e51997c975b61873f61ebe027a8dd7515e792a83bca8cb9f69ed1305e4c",
+              "type": "glb"
+            }
+          ]
+        },
+        {
+          "id": "796a367d-229a-4fe4-a7fa-92271eda666c",
+          "nodeId": "concept",
+          "type": "visual",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "6d7d68f2-79e9-418c-aa97-b7266e4bf562",
+          "nodeId": "views",
+          "type": "views",
+          "files": [
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "b88b6745-d4c4-4c73-a999-ad9dc9ab56d7",
+          "nodeId": "consistency",
+          "type": "checkedViews",
+          "files": [
+            {
+              "file": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/consistency/consistency.json",
+              "sha256": "d634c21f3f3d1581b3679cccc63fd674168050b72a80fb945e93e2f124854a51",
+              "type": "json"
+            },
+            {
+              "file": "input.png",
+              "sha256": "0f4a6aa3f20f6e2d82a7e5ca5bb8881b367b5664b3b744730bf82ddf523e0ec0",
+              "type": "png"
+            }
+          ]
+        },
+        {
+          "id": "1432d9a6-3fd2-4679-bbcd-cc875fd14b8d",
+          "nodeId": "references",
+          "type": "references",
+          "files": []
+        },
+        {
+          "id": "3e930212-ee90-4f26-b417-a21dee442565",
+          "nodeId": "edit",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+              "sha256": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73",
+              "type": "glb"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+              "sha256": "a118f2ca3f3b5d4bb15a3f60e35167cf18a96564b5565751c5e7de727587dd10",
+              "type": "blend"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+              "sha256": "56fe28ed05416adfc1bc9e29bfcd23750fe00be2bb341ddffe6d4a4b42c370cc",
+              "type": "png"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+              "sha256": "082418ad0f214a665434ba0a9b742b3e068b6aa70802667cbeb62058b9a6acbd",
+              "type": "md"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+              "sha256": "21840595c68e7ae1e7633913d0266a4690ff71bc858dbe4a76c3321932989de0",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json",
+              "sha256": "411190d41c93111a01feb7674fe2638545dc31dcd263515bfa8ba61009f6b5c7",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "2737e25f-35c7-4aec-adf6-298fce0ab09f",
+          "nodeId": "refine",
+          "type": "model",
+          "files": [
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+              "sha256": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73",
+              "type": "glb"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+              "sha256": "a118f2ca3f3b5d4bb15a3f60e35167cf18a96564b5565751c5e7de727587dd10",
+              "type": "blend"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+              "sha256": "56fe28ed05416adfc1bc9e29bfcd23750fe00be2bb341ddffe6d4a4b42c370cc",
+              "type": "png"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+              "sha256": "082418ad0f214a665434ba0a9b742b3e068b6aa70802667cbeb62058b9a6acbd",
+              "type": "md"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+              "sha256": "21840595c68e7ae1e7633913d0266a4690ff71bc858dbe4a76c3321932989de0",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json",
+              "sha256": "411190d41c93111a01feb7674fe2638545dc31dcd263515bfa8ba61009f6b5c7",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "ba743b6c-7ed6-4b61-b82a-08e6626fffa6",
+          "nodeId": "review",
+          "type": "reviewedModel",
+          "files": [
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+              "sha256": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73",
+              "type": "glb"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+              "sha256": "a118f2ca3f3b5d4bb15a3f60e35167cf18a96564b5565751c5e7de727587dd10",
+              "type": "blend"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+              "sha256": "56fe28ed05416adfc1bc9e29bfcd23750fe00be2bb341ddffe6d4a4b42c370cc",
+              "type": "png"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+              "sha256": "082418ad0f214a665434ba0a9b742b3e068b6aa70802667cbeb62058b9a6acbd",
+              "type": "md"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+              "sha256": "21840595c68e7ae1e7633913d0266a4690ff71bc858dbe4a76c3321932989de0",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json",
+              "sha256": "411190d41c93111a01feb7674fe2638545dc31dcd263515bfa8ba61009f6b5c7",
+              "type": "json"
+            }
+          ]
+        },
+        {
+          "id": "3bf71f37-b348-4cac-a4e9-1989fae6e8c3",
+          "nodeId": "output",
+          "type": "exports",
+          "files": [
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+              "sha256": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73",
+              "type": "glb"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+              "sha256": "a118f2ca3f3b5d4bb15a3f60e35167cf18a96564b5565751c5e7de727587dd10",
+              "type": "blend"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+              "sha256": "56fe28ed05416adfc1bc9e29bfcd23750fe00be2bb341ddffe6d4a4b42c370cc",
+              "type": "png"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+              "sha256": "082418ad0f214a665434ba0a9b742b3e068b6aa70802667cbeb62058b9a6acbd",
+              "type": "md"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+              "sha256": "21840595c68e7ae1e7633913d0266a4690ff71bc858dbe4a76c3321932989de0",
+              "type": "jsonl"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+              "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+              "type": "json"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json",
+              "sha256": "411190d41c93111a01feb7674fe2638545dc31dcd263515bfa8ba61009f6b5c7",
+              "type": "json"
+            },
+            {
+              "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/output/validation.json",
+              "sha256": "c9cb98cd540e47eec3a0c633f083d803e017dd8be0722f0aca7bf80aa448f9e6",
+              "type": "json"
+            }
+          ]
+        }
+      ],
+      "candidate": {
+        "id": "a560a56b-897a-4d41-b643-68cacc54240f",
+        "kind": "revision",
+        "sourceVersionId": null,
+        "prompt": "The app has loaded the COMPLETE base character. Make ONLY Hair mesh coordinates 15 percent wider along local X, matching the wider hair cap in the image. Use vertex coordinate edits, not object scale, and preserve all Hair UVs/materials and all other objects, rig, skin weights, Smile expression and hierarchy. Do not create new parts or alter pose. Keep this bounded: inspect then make the targeted Hair edit and finish. Set the requested reference camera direction without reorienting the character.",
+        "profile": "character",
+        "feedback": "For this branch only, make Hair mesh local X coordinates 25 percent wider than the unchanged base instead of 15 percent. Preserve every protected feature.",
+        "status": "ready",
+        "review": "approved",
+        "artifacts": {
+          "glb": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+          "blend": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+          "render": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+          "task": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+          "audit": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+          "visionInputs": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+          "preservation": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json"
+        },
+        "createdAt": "2026-10-24T02:56:35.546Z",
+        "visualInput": "input.png",
+        "conceptId": null,
+        "referenceSetId": null,
+        "modelingImages": [],
+        "referenceIds": [],
+        "imageInputs": [
+          "input.png"
+        ],
+        "modelReferences": [],
+        "modelReferenceVisuals": [],
+        "consistency": {
+          "status": "not-applicable",
+          "issues": [],
+          "outcome": "allowed"
+        },
+        "consistencySettings": {
+          "enabled": true,
+          "onFailure": "stop"
+        },
+        "editableBase": {
+          "assetId": "fdd250ce-3904-467c-bae2-acb112e7cc1d",
+          "name": "character.blend",
+          "sha256": "58be75aa70d22f094e7d74915fef096bd0b1f1998a5ac30f87c5315190347ead",
+          "format": "blend",
+          "scope": {
+            "editableObjects": [
+              "Hair"
+            ],
+            "allowChanges": [],
+            "allowNewObjects": false
+          },
+          "review": "approved",
+          "authorizedAt": "2026-10-24T02:56:11.518Z",
+          "blend": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.blend",
+          "baseline": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/baseline.json",
+          "validation": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base-validation.json",
+          "source": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/source.blend",
+          "glb": "runs/e7ea01e2-219f-44cc-a867-c0a81e36d461/base/base.glb"
+        },
+        "workflowRunId": "84898582-c9f2-4897-8fe5-64ad460b7724",
+        "workflowNodeId": "edit",
+        "workflowMode": "image",
+        "workflowReviewed": true,
+        "number": 2,
+        "checkpoints": {
+          "input": false,
+          "concept": false,
+          "multiView": false,
+          "preview": false
+        },
+        "refinementSettings": {
+          "enabled": true,
+          "maxIterations": 2
+        },
+        "referenceFingerprint": "d29f2beaf4d43b25a81475c3ae52a5c10c7d20be22d8d5074d52e5bc8502098d",
+        "refinement": {
+          "status": "off",
+          "maxIterations": 2,
+          "iterations": []
+        },
+        "preservation": {
+          "passed": true,
+          "changed": [
+            {
+              "object": "Hair",
+              "features": [
+                "topology",
+                "geometry"
+              ]
+            }
+          ],
+          "unchangedObjects": [
+            "Rig",
+            "Body",
+            "HeadMesh",
+            "ArmMesh.L",
+            "ArmMesh.R",
+            "LegMesh.L",
+            "LegMesh.R"
+          ],
+          "addedObjects": [],
+          "beforeHash": "3354f6c1226d3312932244f5ce489723e2c7d8242a7021e55aeae1a99c184989",
+          "afterHash": "adf1a458de1d36f7bbb0ee8bc199e3970515653d6e7114e9cf5ab1f102f90780",
+          "scope": {
+            "editableObjects": [
+              "Hair"
+            ],
+            "allowChanges": [],
+            "allowNewObjects": false
+          },
+          "roundtrip": {
+            "passed": true,
+            "changed": [],
+            "unchangedObjects": [
+              "Rig",
+              "Body",
+              "HeadMesh",
+              "Hair",
+              "ArmMesh.L",
+              "ArmMesh.R",
+              "LegMesh.L",
+              "LegMesh.R"
+            ],
+            "addedObjects": [],
+            "beforeHash": "9bae916ae57263719c4fdb2448c78faedb70b5d77eeb8b89dea1218d47247d42",
+            "afterHash": "9bae916ae57263719c4fdb2448c78faedb70b5d77eeb8b89dea1218d47247d42",
+            "scope": {
+              "editableObjects": [],
+              "allowChanges": [],
+              "allowNewObjects": false
+            }
+          },
+          "kind": "edited-scene-and-glb-preservation"
+        },
+        "summary": "Widened Hair mesh local X coordinates by 25% from the unchanged base. Verified other mesh data, UVs, materials, weights, expressions, transforms, and hierarchy remain unchanged. Set the reference camera direction without altering the pose.",
+        "metrics": {
+          "meshes": 7
+        }
+      },
+      "activity": 7
+    }
+  ],
+  "startedAt": "2026-10-24T02:55:22.793Z",
+  "limitation": "Focused image-input object and representative simple rigged/expression base; no live text image generation, broad humanoid corpus, or subjective quality claim. Human gates are disabled for these harness runs and covered separately in browser/API tests.",
+  "sourceSha256": "58be75aa70d22f094e7d74915fef096bd0b1f1998a5ac30f87c5315190347ead",
+  "sourceUnchanged": true,
+  "status": "passed",
+  "finishedAt": "2026-10-24T02:57:07.792Z"
+}

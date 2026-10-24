@@ -1,0 +1,124 @@
+{
+  "id": "2737e25f-35c7-4aec-adf6-298fce0ab09f",
+  "runId": "84898582-c9f2-4897-8fe5-64ad460b7724",
+  "nodeId": "refine",
+  "type": "model",
+  "graphRevision": 2,
+  "graphHash": "ce3e9ea907a94e1ed47d45e8d5f4150c7ab078ca1530155a2006325148800b6f",
+  "implementationHash": "f207d55d08ee91970b0082c90c4ba2c6e1990fe8d5aba8e7f5e78a48b1472855",
+  "fingerprint": "0197a2f5d9dbfe399b45c3b185106fcbe4294422ddc98d832928d3dc86d2df5a",
+  "settings": {},
+  "configuration": {
+    "enabled": false,
+    "maxIterations": 2
+  },
+  "dependencyIds": {
+    "model": "3e930212-ee90-4f26-b417-a21dee442565"
+  },
+  "sourceIdentities": [],
+  "data": {
+    "versionId": "a560a56b-897a-4d41-b643-68cacc54240f",
+    "artifacts": {
+      "glb": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+      "blend": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+      "render": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+      "task": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+      "audit": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+      "visionInputs": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+      "preservation": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json"
+    },
+    "preservation": {
+      "passed": true,
+      "changed": [
+        {
+          "object": "Hair",
+          "features": [
+            "topology",
+            "geometry"
+          ]
+        }
+      ],
+      "unchangedObjects": [
+        "Rig",
+        "Body",
+        "HeadMesh",
+        "ArmMesh.L",
+        "ArmMesh.R",
+        "LegMesh.L",
+        "LegMesh.R"
+      ],
+      "addedObjects": [],
+      "beforeHash": "3354f6c1226d3312932244f5ce489723e2c7d8242a7021e55aeae1a99c184989",
+      "afterHash": "adf1a458de1d36f7bbb0ee8bc199e3970515653d6e7114e9cf5ab1f102f90780",
+      "scope": {
+        "editableObjects": [
+          "Hair"
+        ],
+        "allowChanges": [],
+        "allowNewObjects": false
+      },
+      "roundtrip": {
+        "passed": true,
+        "changed": [],
+        "unchangedObjects": [
+          "Rig",
+          "Body",
+          "HeadMesh",
+          "Hair",
+          "ArmMesh.L",
+          "ArmMesh.R",
+          "LegMesh.L",
+          "LegMesh.R"
+        ],
+        "addedObjects": [],
+        "beforeHash": "9bae916ae57263719c4fdb2448c78faedb70b5d77eeb8b89dea1218d47247d42",
+        "afterHash": "9bae916ae57263719c4fdb2448c78faedb70b5d77eeb8b89dea1218d47247d42",
+        "scope": {
+          "editableObjects": [],
+          "allowChanges": [],
+          "allowNewObjects": false
+        }
+      },
+      "kind": "edited-scene-and-glb-preservation"
+    }
+  },
+  "dataHash": "86728cd61b437d05ff80f149470885c2d0c1363355c0722a9efa20131576c967",
+  "files": [
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/model.glb",
+      "sha256": "7ba499d1848cbe7f1f8db69995ae8810ec40ca12ea4f02175a2658eb33dcde73",
+      "type": "glb"
+    },
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/scene.blend",
+      "sha256": "a118f2ca3f3b5d4bb15a3f60e35167cf18a96564b5565751c5e7de727587dd10",
+      "type": "blend"
+    },
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preview.png",
+      "sha256": "56fe28ed05416adfc1bc9e29bfcd23750fe00be2bb341ddffe6d4a4b42c370cc",
+      "type": "png"
+    },
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/TASK.md",
+      "sha256": "082418ad0f214a665434ba0a9b742b3e068b6aa70802667cbeb62058b9a6acbd",
+      "type": "md"
+    },
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/mcp-audit.jsonl",
+      "sha256": "21840595c68e7ae1e7633913d0266a4690ff71bc858dbe4a76c3321932989de0",
+      "type": "jsonl"
+    },
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/vision-inputs.json",
+      "sha256": "8295e8be59bdc002ede280ea14b00ff0fd0fcee278d0b95a57f3d83d55ccc7a7",
+      "type": "json"
+    },
+    {
+      "file": "runs/84898582-c9f2-4897-8fe5-64ad460b7724/edit/preservation.json",
+      "sha256": "411190d41c93111a01feb7674fe2638545dc31dcd263515bfa8ba61009f6b5c7",
+      "type": "json"
+    }
+  ],
+  "createdAt": "2026-10-24T02:57:07.744Z"
+}

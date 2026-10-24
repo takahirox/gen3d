@@ -5,6 +5,9 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Store, AppError } from './store.js';
 import { Runner } from './runner.js';
+import { WorkflowEngine, nodeCatalog } from './workflow.js';
+import { workflowOperations } from './workflow-operations.js';
+import { authorizeBase } from './base-model.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.json': 'application/json', '.jsonl': 'text/plain', '.md': 'text/plain', '.txt': 'text/plain' };
@@ -45,6 +48,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
   try { store = new Store(dataDir, { env, inspect: inspectAsset }); }
   catch (e) { fs.unlinkSync(lockFile); throw e; }
   const runner = new Runner(store, { generate, conceptGenerator, inspectReferences, inspectModel, env });
+  const workflow = new WorkflowEngine(store, runner, workflowOperations(store, runner));
   const server = http.createServer(async (req, res) => {
     try {
       const address = server.address();
@@ -60,6 +64,11 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         const actor = req.headers['x-gen3d-client'] === 'mcp' ? 'mcp' : 'web';
         if (req.method !== 'GET' && !req.headers['content-type']?.startsWith('application/json')) throw new AppError('Use application/json', 415);
         if (parts[1] === 'status' && req.method === 'GET') return json(res, 200, { busy: runner.active, usageLimited: runner.usageLimited, blenderPort: Number(env.GEN3D_BLENDER_PORT || 9877) });
+        if (parts[1] === 'workflows') {
+          if (req.method === 'GET') return json(res, 200, { catalog: nodeCatalog, presets: workflow.presets() });
+          if (req.method === 'POST' && parts[2] === 'presets') return json(res, 201, workflow.savePreset(await body(req)));
+          throw new AppError('Workflow route not found', 404);
+        }
         if (parts[1] === 'library') {
           const library = store.library;
           if (parts.length === 2 && req.method === 'GET') return json(res, 200, library.list(Object.fromEntries(url.searchParams)));
@@ -81,9 +90,28 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         if (!id && req.method === 'POST') return json(res, 201, store.create(await body(req), actor));
         if (id && parts.length === 3 && req.method === 'GET') return json(res, 200, store.get(id));
         if (id && parts.length === 3 && req.method === 'PATCH') return json(res, 200, store.update(id, await body(req), actor));
+        if (parts[3] === 'workflow' && req.method === 'PUT') return json(res, 200, workflow.saveGraph(id, (await body(req)).graph, actor));
+        if (parts[3] === 'editable-base' && req.method === 'POST') return json(res, 200, await authorizeBase(store, id, await body(req), actor));
+        if (parts[3] === 'runs' && req.method === 'POST') {
+          if (parts.length === 4) return json(res, 202, workflow.start(id, await body(req), actor));
+          if (parts[5] === 'nodes' && parts[7] === 'review') return json(res, 200, workflow.review(id, parts[4], parts[6], (await body(req)).decision, actor));
+        }
+        if (parts[3] === 'restore' && req.method === 'POST') {
+          if (actor !== 'web') throw new AppError('Restore requires the web UI', 403);
+          const p = store.get(id); store.idle(p);
+          const v = store.canExport(id, (await body(req)).versionId);
+          p.acceptedVersionId = v.id; store.event(p, actor, 'candidate_restored', { versionId: v.id }); store.save(p); return json(res, 200, p);
+        }
         if (parts[3] === 'artifacts' && req.method === 'GET') {
           const relative = parts.slice(4).join('/');
-          if (url.searchParams.has('download') && parts[4] === 'versions') store.canExport(id, parts[5]);
+          if (url.searchParams.has('download')) {
+            if (parts[4] === 'versions') store.canExport(id, parts[5]);
+            else if (parts[4] === 'runs' && /\.(glb|blend)$/.test(relative)) {
+              const v = store.get(id).versions.find(v => v.status === 'ready' && v.review === 'approved' && v.workflowReviewed && [v.artifacts.glb, v.artifacts.blend].includes(relative));
+              if (!v) throw new AppError('This is an intermediate artifact, not an exportable candidate', 409);
+              store.canExport(id, v.id);
+            }
+          }
           return sendFile(res, store.artifact(id, relative), url.searchParams.has('download'));
         }
         if (req.method === 'POST' && parts[3] === 'input' && parts[4] === 'review') return json(res, 200, store.reviewInput(id, (await body(req)).decision, actor));
@@ -120,7 +148,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
       }).then(resolve, reject);
     });
   });
-  return { server, store, runner, closed };
+  return { server, store, runner, workflow, closed };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
