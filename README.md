@@ -24,7 +24,7 @@ Start the app in a second terminal:
 npm start
 ```
 
-Open **http://127.0.0.1:3333**. Create a project with text or an uploaded image and choose **Object from text / image** or **Humanoid from editable base**. For a humanoid, import a complete GLB/packed `.blend` in Asset library, then explicitly authorize the source and editable mesh names in the studio. Click **Run workflow**. Enabled human checkpoints pause for **Accept & continue / Reject** in the studio.
+Open **http://127.0.0.1:3333**. Create a project with text or an uploaded image and choose **Object from text / image** or **Humanoid from editable base**. For a humanoid, import a complete GLB/packed `.blend` in Asset library, then explicitly authorize the source and editable mesh names in the studio. Click **Generate** (or **Improve** for a base edit). New projects continue automatically through preparation and modeling to an exportable preview; no intermediate review clicks are required. Text still generates its concept and all four views. Optional human pauses live in **Workflow editor → Review & execution settings** and use **Accept & continue / Reject** in the studio.
 
 This release uses project schema 3. Old generated state is unsupported. Follow the [scoped clean-start procedure](docs/local-setup.md#start-fresh); no startup operation deletes external assets or Blender installations.
 
@@ -32,7 +32,9 @@ This release uses project schema 3. Old generated state is unsupported. Follow t
 
 The same project has **Home / Projects**, **Model studio**, **Workflow editor** and **Asset library** navigation. Light / Dark changes display colors and persists in the browser across navigation/reloads.
 
-The studio puts an interactive 3D viewer beside contextual design and review controls. Switch to a source/render comparison, select a candidate or saved run, inspect intermediate artifacts, restore an accepted model, or branch from a completed checkpoint. GLB and Blender-scene export require the candidate’s saved approval/preservation conditions. Partial failures retain their artifacts and error messages.
+The studio puts sources on the left, a dominant interactive 3D preview in the center, and **Describe / Generate** on the right. **Add 3D source** opens imports and saved local models in place; select **Reference-only** or **Reuse / edit**, then explicitly **Authorize selected sources** before generation. **Add image → Use image** attaches an approved supplementary image. Complete-base authorization is separate and names the editable parts. Generating never grants these permissions.
+
+The thumbnail strip selects candidates and preparation images. Use **Compare / Restore / Branch** for the selected candidate, or **Inspect / Branch** for a saved preparation output. **Refine** offers a bounded comparison/revision loop with an on-demand allowance notice; **Retry** reuses valid saved preparation and produces another model. **Accept** records a human decision. Successful default results offer **Download GLB / Blender scene** immediately. Explicit preview pauses still gate export, and Stop consistency, invalid inputs, tool failures, protected edits and usage limits still block. Detailed settings, immutable node outputs, provenance, hashes and refinement records live in the Workflow editor. Partial failures retain their artifacts and visible error messages.
 
 The workflow editor displays connected executable nodes with saved statuses. Click a node to edit supported settings and typed input connections, add/remove nodes, save the project graph, or duplicate it as a reusable local preset. Graph JSON is also editable. Disconnected required ports, incompatible types, unused nodes, unknown settings and cycles fail validation. Bounded refinement replaces unrestricted cycles.
 
@@ -74,4 +76,4 @@ npm run test:workflow-blender    # real Blender, no Codex
 npm run validate:workflow-live   # opt-in real Codex + Blender; uses allowance
 ```
 
-Tests distinguish mocked scheduler/browser fixtures from actual generation. The focused live check requires the representative base fixture produced by `test:workflow-blender`. See [Issue #26 validation and evidence](docs/validation-issue26.md), [local model library](docs/model-library.md), [development flow](docs/development-flow.md) and [review guidelines](docs/review-guidelines.md). Historical validation documents describe their release’s UI/schema.
+Tests distinguish mocked scheduler/browser fixtures from actual generation. See [Issue #28 validation and desktop/mobile screenshots](docs/validation-issue28.md) for the simplified studio and automatic defaults. The focused live check requires the representative base fixture produced by `test:workflow-blender`. See [Issue #26 validation and evidence](docs/validation-issue26.md), [local model library](docs/model-library.md), [development flow](docs/development-flow.md) and [review guidelines](docs/review-guidelines.md). Historical validation documents describe their release’s UI/schema.

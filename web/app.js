@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { setupLibrary } from './library.js';
 const $ = id => document.getElementById(id);
-let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId, runId, selectedNode = 'input';
+let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId, runId, historyCheckpointId, selectedNode = 'input';
 let area = location.hash.slice(1) || 'home', catalog = {}, presets = [], draft, draftProject, dirty = false, status = {}, lastSignature = '';
 const node = (tag, text, className) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (className) e.className = className; return e; };
 function notify(message = '') { $('notice').textContent = message; $('notice').hidden = !message; }
@@ -47,18 +47,22 @@ function fit() {
 async function showModel(v) {
   const file = v?.status === 'ready' ? artifact(v.artifacts.glb) : ''; if (file === loaded) return; loaded = file; const token = ++loadToken;
   if (model) { scene.remove(model); dispose(model); model = null; }
-  $('viewer-message').hidden = false; $('viewer-message').textContent = file ? 'Loading model…' : 'Run a preset to create a candidate. Intermediate checkpoints appear below.';
+  $('viewer-message').hidden = false; $('viewer-message').textContent = file ? 'Loading model…' : 'Describe your model, add sources, then Generate.';
   if (!file || !renderer) return;
   try { const gltf = await new GLTFLoader().loadAsync(file); if (token !== loadToken) { dispose(gltf.scene); return; } model = gltf.scene; scene.add(model); fit(); $('viewer-message').hidden = true; }
   catch { if (token === loadToken) $('viewer-message').textContent = 'Could not load the 3D preview. Inspect source / render comparison and saved artifacts.'; }
 }
 function navigate(next) { area = ['studio','workflow'].includes(next) ? next : 'home'; location.hash = area; lastSignature = ''; render(); window.scrollTo({ top: 0 }); }
-function chooseProject(id) { projectId = id; versionId = runId = undefined; draftProject = null; localStorage.setItem('gen3d-project', id); for (const f of document.querySelectorAll('form')) delete f.dataset.dirty; navigate('studio'); }
+function chooseProject(id) { projectId = id; versionId = runId = historyCheckpointId = undefined; draftProject = null; localStorage.setItem('gen3d-project', id); for (const f of document.querySelectorAll('form')) delete f.dataset.dirty; navigate('studio'); loadBases().catch(e => notify(e.message)); }
 function selectedRun(p) { return p.workflowRuns.find(r => r.id === runId) || p.workflowRuns.at(-1); }
 function selectedVersion(p) { return p.versions.find(v => v.id === versionId) || p.versions.at(-1); }
+function candidateCheckpoint(r, v) {
+  return r?.checkpoints.find(cp => cp.type === 'model' && cp.data.versionId === v?.id)
+    || r?.checkpoints.find(cp => cp.type === 'model' && cp.data.versionId === v?.sourceVersionId);
+}
 function markDirty() { dirty = true; $('graph-warning').textContent = 'Unsaved graph changes. Edited nodes and dependent outputs will recompute; earlier checkpoints stay intact.'; $('graph-json').value = JSON.stringify(draft,null,2); }
 async function saveGraph() { await api(route() + '/workflow','PUT',{ graph: draft }); dirty = false; }
-async function run(input = {}) { if (dirty) await saveGraph(); await api(route() + '/runs','POST', input); runId = undefined; versionId = undefined; }
+async function run(input = {}) { if (dirty) await saveGraph(); await api(route() + '/runs','POST', input); runId = versionId = historyCheckpointId = undefined; }
 function renderFiles(files, compact = false) {
   const wrap = node('div'), grid = node('div', undefined, 'artifact-grid');
   for (const f of files) {
@@ -80,7 +84,8 @@ function checkpointCard(p, r, cp, compact = false) {
 function renderReviews(p) {
   const pending = node('div');
   for (const r of p.workflowRuns.filter(r => r.status === 'waiting-review')) for (const [id,s] of Object.entries(r.nodes).filter(([,s]) => s.status === 'waiting-review')) {
-    const cp = r.checkpoints.find(c => c.id === s.checkpointId), card = node('div', undefined, 'checkpoint'); card.append(node('h3', `Human review: ${id}`), renderFiles(cp.files,true));
+    const cp = r.checkpoints.find(c => c.id === s.checkpointId), card = node('div', undefined, 'checkpoint'); card.append(node('h3', `Human review: ${id === 'review' ? 'model' : id === 'views' ? 'four views' : id}`), renderFiles(cp.files,true));
+    if (cp.type === 'design') card.append(node('p', cp.data.prompt));
     const a = node('div',undefined,'actions');
     for (const [label,decision] of [['Accept & continue','approved'],['Reject','rejected']]) a.append(button(label, () => api(`${route()}/runs/${r.id}/nodes/${id}/review`, 'POST',{ decision }),status.busy));
     card.append(a); pending.append(card);
@@ -103,19 +108,54 @@ function renderStudio(p) {
   options($('versions'), p.versions.length ? p.versions.map(v => [v.id, `#${v.number} · ${v.status} · ${v.review}${v.id === p.acceptedVersionId ? ' · accepted' : ''}`]) : [['','No candidates yet']], v?.id);
   options($('studio-run'), p.workflowRuns.length ? p.workflowRuns.map(r => [r.id, `${r.createdAt.slice(0,19)} · ${r.status}${r.parentRunId ? ' · branch' : ''}`]) : [['','No saved runs']], r?.id);
   showModel(v);
-  $('candidate-info').textContent = v ? `Candidate #${v.number}: ${v.review}. ${v.error || v.summary || ''}${v.preservation ? ' Complete scene and GLB preservation verified.' : ''}` : 'Choose a preset, review your input, and run the workflow.';
+  $('result-details').hidden = !v;
+  $('candidate-info').textContent = v ? `Candidate #${v.number}: ${v.review}. ${v.error || v.summary || ''}${v.preservation ? ' Complete scene and GLB preservation verified.' : ''}` : '';
+  $('studio-preset').textContent = p.workflow.name;
+  $('primary-source').replaceChildren(...(p.inputImage ? [figure(p.inputImage, 'Input image')] : []));
   $('source-image').replaceChildren(...(v?.visualInput || p.inputImage ? [figure(v?.visualInput || p.inputImage,'Original design input')] : []));
   $('render-image').replaceChildren(...(v?.artifacts.render ? [figure(v.artifacts.render,'Candidate render')] : []));
-  const actions = $('candidate-actions'); actions.replaceChildren();
-  if (v) {
-    const candidateRun = p.workflowRuns.find(r => r.id === v.workflowRunId), checkpoint = candidateRun?.checkpoints.find(cp => cp.data?.versionId === v.id && cp.type === 'model');
-    if (v.review === 'approved') actions.append(button('Restore accepted candidate', () => api(route()+'/restore','POST',{versionId:v.id}), status.busy));
-    if (checkpoint) actions.append(button('Branch from this candidate', () => run({runId:candidateRun.id,checkpointId:checkpoint.id}),status.busy));
-    if (!v.workflowRunId && v.status === 'ready') actions.append(button('Accept candidate', () => api(`${route()}/versions/${v.id}/review`, 'POST', {decision:'approved'}), status.busy));
-    if ((v.workflowReviewed || !v.workflowRunId) && v.status === 'ready' && candidateRun?.status !== 'waiting-review') actions.append(button('Reject candidate', () => api(`${route()}/versions/${v.id}/review`,'POST',{decision:'rejected'}),status.busy));
-    actions.append(button('Inspect candidate checkpoint', () => { runId=candidateRun?.id; selectedNode=checkpoint?.nodeId || 'review'; navigate('workflow'); }));
+  const actions = $('candidate-actions'), historyActions = $('history-actions'); actions.replaceChildren(); historyActions.replaceChildren();
+  const candidateRun = p.workflowRuns.find(r => r.id === v?.workflowRunId);
+  const checkpoint = candidateCheckpoint(candidateRun, v);
+  const blocked = status.busy || status.usageLimited || p.workflowRuns.some(r => r.status === 'waiting-review');
+  if (v?.status === 'ready' && (v.workflowReviewed || !v.workflowRunId) && !blocked) {
+    if (checkpoint && p.workflow.nodes.some(n => n.type === 'refine')) actions.append(button('Refine', () => $('refine-dialog').showModal()));
+    let modeling = candidateRun?.graph.nodes.find(n => n.id === checkpoint?.nodeId);
+    while (modeling && !['model','edit'].includes(modeling.type)) {
+      const parent = candidateRun.graph.edges.find(e => e.to === modeling.id && e.input === 'model');
+      modeling = candidateRun.graph.nodes.find(n => n.id === parent?.from);
+    }
+    const upstream = candidateRun?.graph.edges.find(e => e.to === modeling?.id && e.input === 'views');
+    const retryCheckpoint = candidateRun?.checkpoints.find(cp => cp.nodeId === upstream?.from);
+    if (retryCheckpoint) actions.append(button('Retry', () => run({runId:candidateRun.id,checkpointId:retryCheckpoint.id})));
+    actions.append(button('Accept', () => api(`${route()}/versions/${v.id}/review`, 'POST', {decision:'approved'})));
   }
-  $('exports').replaceChildren(...(v?.review === 'approved' && (v.workflowReviewed || !v.workflowRunId) ? [link('Download GLB',v.artifacts.glb,true),link('Blender scene',v.artifacts.blend,true)] : []));
+  $('exports').replaceChildren(...(v?.status === 'ready' && v.review === 'approved' && (v.workflowReviewed || !v.workflowRunId) ? [link('Download GLB',v.artifacts.glb,true),link('Blender scene',v.artifacts.blend,true)] : []));
+  $('result-actions').replaceChildren(...(v?.status === 'ready' && (v.workflowReviewed || !v.workflowRunId) ? [button('Reject candidate', () => api(`${route()}/versions/${v.id}/review`,'POST',{decision:'rejected'}),blocked)] : []));
+  const exportable = !!$('exports').querySelector('a'), editing = !!$('edit').dataset.dirty;
+  $('run-workflow').classList.toggle('primary', !exportable || editing);
+  $('exports').querySelector('a')?.classList.toggle('primary', !editing);
+  const warning = r?.checkpoints.find(cp => cp.data.consistency?.status === 'failed' && cp.data.consistency?.outcome === 'allowed')?.data.consistency;
+  $('task-warning').hidden = !warning; $('warning-info').textContent = warning?.issues.join('; ') || '';
+  const thumbnails = [];
+  function thumbnail(file, label, active, action, id) {
+    const b = button('', action); b.id = id; b.className = 'history-thumb'; b.setAttribute('aria-label', label); b.setAttribute('aria-pressed', String(active));
+    if (file) { const img = node('img'); img.src = artifact(file); img.alt = ''; img.loading = 'lazy'; b.append(img); }
+    else b.append(node('span', '◇', 'thumbnail-placeholder'));
+    b.append(node('span', label)); return b;
+  }
+  for (const candidate of p.versions) thumbnails.push(thumbnail(candidate.artifacts.render, `#${candidate.number} · ${candidate.status === 'ready' ? candidate.review === 'pending' ? 'Review' : candidate.review === 'rejected' ? 'Rejected' : 'Ready' : candidate.status}`, !historyCheckpointId && candidate.id === v?.id, () => { versionId = candidate.id; runId = candidate.workflowRunId; historyCheckpointId = undefined; lastSignature = ''; render(); }, 'candidate-'+candidate.id));
+  for (const cp of r?.checkpoints.filter(cp => ['visual','views'].includes(cp.type)) || []) thumbnails.push(thumbnail(cp.files.find(f => /\.(png|jpg|webp)$/.test(f.file))?.file, cp.type === 'visual' ? 'Concept' : 'Four views', cp.id === historyCheckpointId, () => { historyCheckpointId = cp.id; lastSignature = ''; render(); }, 'checkpoint-'+cp.id));
+  $('visual-history').replaceChildren(...(thumbnails.length ? thumbnails : [node('p','Your candidates will appear here.','muted')]));
+  const chosen = r?.checkpoints.find(cp => cp.id === historyCheckpointId);
+  if (chosen) {
+    historyActions.append(button('Inspect', () => { $('history-heading').textContent = chosen.type === 'views' ? 'Four views' : 'Concept'; $('history-content').replaceChildren(renderFiles(chosen.files, true)); $('history-dialog').showModal(); }), button('Branch', () => run({ runId:r.id, checkpointId:chosen.id }), blocked || r.nodes[chosen.nodeId]?.status !== 'completed'));
+  } else if (v) {
+    historyActions.append(button('Compare', () => $('view-compare').click(), v.status !== 'ready'));
+    if (v.review === 'approved' && p.acceptedVersionId !== v.id) historyActions.append(button('Restore', () => api(route()+'/restore','POST',{versionId:v.id}),blocked));
+    if (checkpoint) historyActions.append(button('Branch', () => run({runId:candidateRun.id,checkpointId:checkpoint.id}),blocked));
+    historyActions.append(button('Details', () => { runId=candidateRun?.id; selectedNode=checkpoint?.nodeId || 'review'; navigate('workflow'); }));
+  }
   $('studio-checkpoints').replaceChildren(...(r ? r.checkpoints.map(cp => checkpointCard(p,r,cp,true)) : [node('p','Every completed node will appear here with its saved artifacts.')]));
   if (!r) {
     const files = [...p.concepts.flatMap(c => Object.values(c.artifacts)), ...p.referenceSets.flatMap(s => [...s.images.map(i => i.file), ...Object.values(s.artifacts)])];
@@ -128,10 +168,19 @@ function renderStudio(p) {
     for (const key of ['input','concept','multiView','preview']) f[key].checked=p.checkpoints[key];
     f.consistency.value=String(p.consistencySettings.enabled); f.onFailure.value=p.consistencySettings.onFailure; f.refinement.value=String(p.refinementSettings.enabled); f.maxIterations.value=p.refinementSettings.maxIterations;
   }
-  $('input-review').replaceChildren(node('p',p.checkpoints.input ? 'Input review: '+p.inputReview : 'Input checkpoint is off'),button('Approve input',()=>api(route()+'/input/review','POST',{decision:'approved'}),status.busy));
-  $('base-info').textContent=p.editableBase ? `Authorized: ${p.editableBase.name} · editable: ${p.editableBase.scope.editableObjects.join(', ')} · source SHA-256 ${p.editableBase.sha256}` : 'No editable base authorized. Humanoid runs will block until one is selected.';
-  $('model-references').replaceChildren(...p.modelReferences.map(ref => { const div=node('div',undefined,'checkpoint'); div.append(node('p',`${ref.name} · ${ref.permission} · ${ref.role || 'general reference'} · ${ref.review}`)); for (const decision of ['approved','rejected']) div.append(button(decision==='approved'?'Approve reference permission':'Reject reference',()=>api(`${route()}/model-references/${ref.assetId}/review`,'POST',{decision}),status.busy)); return div; }));
-  $('references').replaceChildren(...p.references.map(ref => { const div=node('div',undefined,'checkpoint'); div.append(figure(ref.file,`${ref.label} · ${ref.review}`)); for (const decision of ['approved','rejected']) div.append(button(decision,()=>api(`${route()}/references/${ref.id}/review`,'POST',{decision}),status.busy)); return div; }));
+  $('input-review').replaceChildren(...((p.checkpoints.input || p.inputCheckpoint || p.inputReview === 'rejected') && p.inputReview !== 'approved' && !p.workflowRuns.some(r => r.status === 'waiting-review') ? [button('Approve input',()=>api(route()+'/input/review','POST',{decision:'approved'}),status.busy)] : []));
+  const usesBase = p.workflow.nodes.some(n => n.type === 'base');
+  $('base-settings').hidden = !usesBase;
+  if (usesBase && !p.editableBase) $('base-settings').open = true;
+  $('base-info').textContent = p.editableBase ? `Authorized: ${p.editableBase.name} · ${p.editableBase.scope.editableObjects.join(', ')}` : 'Choose a base and authorize the editable parts before generation.';
+  $('model-references').replaceChildren(...p.modelReferences.map(ref => {
+    const div=node('div',undefined,'source-card'), img=node('img'); img.src=`/api/library/assets/${ref.assetId}/preview`; img.alt=''; img.onerror=()=>img.remove();
+    div.append(img, node('strong',ref.name), node('p',`${ref.permission === 'reuse-edit' ? 'Reuse / edit' : 'Reference-only'} · ${ref.review === 'approved' ? 'Authorized' : ref.review}`));
+    if (ref.role) div.append(node('p', ref.role));
+    if (ref.review === 'pending') div.append(button(ref.permission === 'reuse-edit' ? 'Authorize reuse / edit' : 'Authorize reference',()=>api(`${route()}/model-references/${ref.assetId}/review`,'POST',{decision:'approved'}),status.busy), button('Exclude',()=>api(`${route()}/model-references/${ref.assetId}/review`,'POST',{decision:'rejected'}),status.busy));
+    return div;
+  }));
+  $('references').replaceChildren(...p.references.map(ref => { const div=node('div',undefined,'source-card'); div.append(figure(ref.file,`${ref.label} · ${ref.review}`)); for (const [label,decision] of ref.review === 'approved' ? [['Remove','rejected']] : ref.review === 'rejected' ? [['Use image','approved']] : [['Use image','approved'],['Exclude','rejected']]) div.append(button(label,()=>api(`${route()}/references/${ref.id}/review`,'POST',{decision}),status.busy)); return div; }));
   $('refinement-info').textContent=v?.refinement ? `Refinement: ${v.refinement.status}. ${v.refinement.error || ''}` : 'Refinement is optional and bounded to 1–5 cycles.';
   $('refinement-review').disabled = v?.status !== 'running' || v?.refinement?.status !== 'running';
   $('refinement-cycles').replaceChildren(...(v?.refinement?.iterations || []).map(c => { const div=node('div',undefined,'checkpoint');div.append(node('h3',`Cycle ${c.number}: ${c.status}`),node('p',c.error || c.report?.summary || ''),renderFiles(Object.values(c.artifacts),true));return div; }));
@@ -182,7 +231,8 @@ function renderNode(p) {
 }
 function render() {
   const focusedId = document.activeElement?.id;
-  const p=project(), signature=JSON.stringify([projects,projectId,versionId,runId,area,status]);if(signature===lastSignature)return;lastSignature=signature;
+  const p=project(), signature=JSON.stringify([projects,projectId,versionId,runId,historyCheckpointId,area,status]);if(signature===lastSignature)return;lastSignature=signature;
+  document.body.dataset.area = area;
   for(const key of ['home','studio','workflow'])$('nav-'+key).setAttribute('aria-current',String(area===key));
   $('home').hidden=area!=='home';$('workspace').hidden=area==='home'||!p;$('studio').hidden=area!=='studio';$('workflow-editor').hidden=area!=='workflow';
   $('projects').replaceChildren(...projects.map(p=>{const b=button(p.name,()=>chooseProject(p.id));b.id='project-'+p.id;b.setAttribute('aria-current',String(p.id===projectId));return b;}));
@@ -190,32 +240,60 @@ function render() {
   if(!p){if(area!=='home'){$('home').hidden=false;}return;}
   if(draftProject!==p.id){draft=structuredClone(p.workflow);draftProject=p.id;dirty=false;selectedNode='input';}
   else if(!dirty)draft=structuredClone(p.workflow);
-  const r=p.workflowRuns.at(-1);$('title').textContent=p.name;$('project-state').textContent=status.usageLimited?'Codex usage limit':r?`${r.status}${r.error?' · '+r.error:''}`:'Ready';
-  $('run-workflow').disabled=status.busy||status.usageLimited||p.workflowRuns.some(r=>r.status==='waiting-review')||p.concepts.some(c=>c.prompt===p.prompt&&c.profile===p.profile&&c.status==='ready'&&c.review==='pending')||p.referenceSets.some(s=>s.conceptId===p.selectedConceptId&&s.prompt===p.prompt&&s.status==='ready'&&s.review==='pending');
+  const r=p.workflowRuns.at(-1); $('title').textContent=p.name;
+  const waiting = p.workflowRuns.some(r=>r.status==='waiting-review');
+  const pendingSources = [...p.references,...p.modelReferences].some(ref=>ref.review==='pending');
+  const missingBase = p.workflow.nodes.some(n=>n.type==='base') && (p.editableBase?.review !== 'approved' || $('base-form').dataset.dirty);
+  const pendingArtifacts = p.concepts.some(c=>c.prompt===p.prompt&&c.profile===p.profile&&c.status==='ready'&&c.review==='pending')||p.referenceSets.some(s=>s.conceptId===p.selectedConceptId&&s.prompt===p.prompt&&s.profile===p.profile&&s.status==='ready'&&s.review==='pending');
+  const activeNode = r && Object.entries(r.nodes).find(([,s])=>s.status==='running')?.[0];
+  const stageNames = {input:'Preparing input',concept:'Creating concept',views:'Creating four views',consistency:'Checking views',references:'Preparing sources',base:'Preparing base',model:'Generating model',edit:'Improving base',refine:'Refining model',review:'Preparing preview',output:'Validating export'};
+  const runNode = r?.graph.nodes.find(n=>n.id===activeNode);
+  const state = status.usageLimited ? 'Usage limit reached' : status.busy ? stageNames[runNode?.type] || 'Working…' : waiting || pendingArtifacts ? 'Review required' : pendingSources ? 'Authorize sources' : missingBase ? 'Authorize editable base' : r?.status === 'completed' ? 'Ready' : r?.status === 'failed' || r?.status === 'usage-limit' ? 'Stopped' : 'Ready to generate';
+  $('project-state').textContent=state; $('task-progress').textContent=state;
+  $('task-error').textContent=r?.error || ''; $('task-error').hidden=!r?.error;
+  $('run-workflow').textContent=status.busy ? 'Working…' : r?.status === 'failed' ? 'Retry generation' : p.workflow.nodes.some(n=>n.type==='edit') ? 'Improve' : 'Generate';
+  $('run-workflow').disabled=status.busy||status.usageLimited||waiting||pendingArtifacts||pendingSources||missingBase;
+  $('run-editor').disabled=$('run-workflow').disabled;
   renderStudio(p);if(area==='workflow')renderGraph(p);
   $('history').replaceChildren(...p.activity.slice(-150).reverse().map(e=>node('li',`${e.at.slice(0,19)} · ${e.type}${e.nodeId?' · '+e.nodeId:''}${e.message?' · '+e.message:''}${e.decision?' · '+e.decision:''}`)));
   if (focusedId && document.activeElement === document.body) $(focusedId)?.focus({ preventScroll: true });
 }
-let refreshing=false;
-async function refresh(){if(refreshing)return;refreshing=true;try{[projects,status]=await Promise.all([api('/projects'),api('/status')]);$('connection').textContent=status.busy?'Codex → Blender · running':'Local server connected';render();}finally{refreshing=false;}}
+let refreshing=false, connected=true;
+async function refresh(){if(refreshing)return;refreshing=true;try{[projects,status]=await Promise.all([api('/projects'),api('/status')]);if(!connected){notify();lastSignature='';}connected=true;$('connection').textContent=status.busy?'Codex → Blender · running':'Local server connected';render();}finally{refreshing=false;}}
 async function loadPresets(){const data=await api('/workflows');catalog=data.catalog;presets=data.presets;options($('preset'),presets.map(p=>[p.id,p.name||p.graph.name]),$('preset').value);options($('add-type'),Object.keys(catalog).map(t=>[t,t]),'refine');}
 async function loadBases(){const data=await api('/library?limit=100');options($('base-asset'),[['','Choose a library model'],...data.assets.filter(a=>!a.error).map(a=>[a.id,a.name])],project()?.editableBase?.assetId);await inspectBase();}
-async function inspectBase(){const id=$('base-asset').value;if(!id){$('base-objects').textContent='Import a GLB / packed .blend through Asset library.';return;}const a=await api('/library/assets/'+id);$('base-objects').textContent=(a.inspection?.objects||[]).map(o=>`${o.name} (${o.type})`).join('\n')||'Source is inspected when authorized.';}
+async function inspectBase(){
+  const id=$('base-asset').value; $('base-meshes').replaceChildren(); $('base-preview').replaceChildren();
+  if(!id){$('base-objects').textContent='Add a GLB / packed .blend with Add 3D source.';return;}
+  const a=await api('/library/assets/'+id), objects=a.inspection?.objects || [];
+  $('base-objects').textContent=objects.map(o=>`${o.name} (${o.type})`).join('\n')||'Source is inspected when authorized.';
+  const img=node('img'); img.src=`/api/library/assets/${id}/preview`; img.alt=a.name; img.onerror=()=>img.remove(); $('base-preview').append(img);
+  const authorized=project()?.editableBase, chosen=authorized?.assetId===id ? authorized.scope.editableObjects : [];
+  $('base-form').elements.objects.value=chosen.join('\n');
+  for (const key of ['armature','weights','shapeKeys','uvs','materials','allowNewObjects']) $('base-form').elements[key].checked=authorized?.assetId===id && (key==='allowNewObjects' ? authorized.scope.allowNewObjects : authorized.scope.allowChanges.includes(key));
+  for(const object of objects.filter(o=>o.type==='MESH')){
+    const label=node('label',object.name,'check'), check=node('input'); check.type='checkbox'; check.value=object.name; check.checked=chosen.includes(object.name);
+    check.onchange=()=>{$('base-form').elements.objects.value=[...$('base-meshes').querySelectorAll('input:checked')].map(e=>e.value).join('\n');$('base-form').dataset.dirty='true';};
+    label.prepend(check); $('base-meshes').append(label);
+  }
+}
 for(const key of ['home','studio','workflow'])$('nav-'+key).onclick=()=>navigate(key);
 window.addEventListener('hashchange',()=>navigate(location.hash.slice(1)));
 $('theme').value=localStorage.getItem('gen3d-theme')||'dark';document.documentElement.dataset.theme=$('theme').value;
 $('theme').onchange=()=>{document.documentElement.dataset.theme=$('theme').value;localStorage.setItem('gen3d-theme',$('theme').value);};
 for(const id of ['new-project','empty-create'])$(id).onclick=()=>$('create-dialog').showModal();$('close-create').onclick=()=>$('create-dialog').close();
 $('create').elements.mode.onchange=()=>{const image=$('create').elements.mode.value==='image';$('image-label').hidden=!image;$('create').elements.image.required=image;};
-form('create',async data=>{const mode=data.get('mode'),workflowType=data.get('workflowType');const p=await api('/projects','POST',{name:data.get('name'),mode,prompt:data.get('prompt'),workflowType,profile:workflowType==='humanoid'?'character':'object',...(mode==='image'?{image:await imageData(data.get('image'))}:{})});$('create-dialog').close();$('create').reset();projects.push(p);chooseProject(p.id);await loadBases();});
-form('edit',data=>api(route(),'PATCH',{name:data.get('name'),prompt:data.get('prompt'),profile:data.get('profile')}));
+form('create',async data=>{const mode=data.get('mode'),workflowType=data.get('workflowType');const p=await api('/projects','POST',{name:data.get('name')?.trim() || data.get('prompt').trim().slice(0,60),mode,prompt:data.get('prompt'),workflowType,profile:workflowType==='humanoid'?'character':'object',...(mode==='image'?{image:await imageData(data.get('image'))}:{})});$('create-dialog').close();$('create').reset();$('create').elements.mode.onchange();projects.push(p);chooseProject(p.id);});
+form('edit',async data=>{await api(route(),'PATCH',{name:data.get('name'),prompt:data.get('prompt'),profile:data.get('profile')});await run();});
+$('edit').addEventListener('input',()=>{$('run-workflow').classList.add('primary');$('exports').querySelector('a')?.classList.remove('primary');});
 form('settings',data=>api(route(),'PATCH',{checkpoints:Object.fromEntries(['input','concept','multiView','preview'].map(k=>[k,data.has(k)])),consistencySettings:{enabled:data.get('consistency')==='true',onFailure:data.get('onFailure')},refinementSettings:{enabled:data.get('refinement')==='true',maxIterations:Number(data.get('maxIterations'))}}));
-form('reference',async data=>{await api(route()+'/references','POST',{label:data.get('label'),image:await imageData(data.get('image'))});$('reference').reset();});
+form('reference',async data=>{const file=data.get('image'); const p=await api(route()+'/references','POST',{label:file.name,image:await imageData(file)});await api(`${route()}/references/${p.references.at(-1).id}/review`,'POST',{decision:'approved'});$('reference').reset();});
 form('base-form',data=>api(route()+'/editable-base','POST',{assetId:data.get('assetId'),scope:{editableObjects:data.get('objects').split('\n').map(s=>s.trim()).filter(Boolean),allowChanges:['armature','weights','shapeKeys','uvs','materials'].filter(k=>data.has(k)),allowNewObjects:data.has('allowNewObjects')}}));
+$('base-form').addEventListener('input',()=>{$('run-workflow').disabled=$('run-editor').disabled=true;$('task-progress').textContent='Authorize editable base';});
 $('reload-base').onclick=()=>safe(loadBases);$('base-asset').onchange=()=>safe(inspectBase);
-$('versions').onchange=()=>{versionId=$('versions').value;lastSignature='';render();};
-for(const id of ['studio-run','workflow-run'])$(id).onchange=()=>{runId=$(id).value;lastSignature='';render();};
-$('run-workflow').onclick=()=>safe(()=>run());$('save-graph').onclick=()=>safe(saveGraph);
+$('versions').onchange=()=>{historyCheckpointId=undefined;versionId=$('versions').value;lastSignature='';render();};
+for(const id of ['studio-run','workflow-run'])$(id).onchange=()=>{historyCheckpointId=undefined;runId=$(id).value;lastSignature='';render();};
+$('run-editor').onclick=()=>safe(()=>run());$('save-graph').onclick=()=>safe(saveGraph);
 $('load-preset').onclick=()=>{delete $('node-form').dataset.dirty;draft=structuredClone(presets.find(p=>p.id===$('preset').value).graph);markDirty();renderGraph(project());};
 $('save-preset').onclick=()=>safe(async()=>{await api('/workflows/presets','POST',{name:$('preset-name').value,graph:draft});await loadPresets();});
 form('node-form',data=>{const n=draft.nodes.find(n=>n.id===selectedNode),settings={};for(const[key,rule]of Object.entries(catalog[n.type].settings)){const v=data.get('setting:'+key);if(v!==''&&v!==null)settings[key]=rule==='boolean'?v==='true':rule==='bound'?Number(v):v;}n.settings=settings;draft.edges=draft.edges.filter(e=>e.to!==n.id);for(const port of Object.keys(catalog[n.type].inputs)){const from=data.get('port:'+port);if(from)draft.edges.push({from,to:n.id,input:port});}markDirty();renderGraph(project());});
@@ -225,6 +303,21 @@ $('apply-json').onclick=()=>safe(()=>{const parsed=JSON.parse($('graph-json').va
 $('fit').onclick=fit;
 for(const type of ['model','compare'])$('view-'+type).onclick=()=>{$('model-view').hidden=type!=='model';$('comparison').hidden=type!=='compare';$('view-model').setAttribute('aria-pressed',String(type==='model'));$('view-compare').setAttribute('aria-pressed',String(type==='compare'));};
 $('refinement-review').onclick=()=>safe(()=>api(`${route()}/versions/${selectedVersion(project()).id}/refinement-review`,'POST',{}));
-setupLibrary({api,project,refresh});
+$('close-history').onclick=()=>$('history-dialog').close();
+$('close-refine').onclick=()=>$('refine-dialog').close();
+form('refine-form',async data=>{
+  const p=project(), v=selectedVersion(p), r=p.workflowRuns.find(r=>r.id===v.workflowRunId), cp=candidateCheckpoint(r,v);
+  if(!cp) throw new Error('Choose a completed model checkpoint to refine.');
+  let refine=draft.nodes.find(n=>n.type==='refine'&&draft.edges.some(e=>e.from===cp.nodeId&&e.to===n.id&&e.input==='model'));
+  if(!refine){
+    let id='refine', index=2;while(draft.nodes.some(n=>n.id===id))id='refine_'+index++;
+    refine={id,type:'refine',settings:{}};draft.nodes.push(refine);
+    for(const edge of draft.edges.filter(e=>e.from===cp.nodeId&&e.input==='model'))edge.from=id;
+    draft.edges.push({from:cp.nodeId,to:id,input:'model'});
+  }
+  refine.settings={...refine.settings,enabled:true,maxIterations:Number(data.get('maxIterations'))};
+  dirty=true; await saveGraph(); await run({runId:r.id,checkpointId:cp.id}); $('refine-dialog').close();
+});
+setupLibrary({api,project,refresh:async()=>{await refresh();await loadBases();}});
 await safe(async()=>{await loadPresets();await refresh();await loadBases();});
-setInterval(()=>refresh().catch(()=>{$('connection').textContent='Local server disconnected';}),1500);
+setInterval(()=>refresh().catch(()=>{connected=false;$('connection').textContent='Local server disconnected';notify('Local server disconnected. Reconnect to continue.');$('run-workflow').disabled=$('run-editor').disabled=true;}),1500);
