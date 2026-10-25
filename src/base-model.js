@@ -13,12 +13,16 @@ export function editScope(value) {
   return { editableObjects: value.editableObjects, allowChanges: value.allowChanges || [], allowNewObjects: value.allowNewObjects || false };
 }
 export async function authorizeBase(store, id, input, actor) {
-  const p = store.get(id); store.idle(p);
-  if (actor !== 'web') throw new AppError('Editable base authorization requires a human in the web UI', 403);
-  if (p.workflowRuns?.some(r => r.status === 'waiting-review')) throw new AppError('Resolve pending workflow review before changing the editable base', 409);
-  const scope = editScope(input.scope), a = await store.library.inspected(input.assetId);
-  p.editableBase = { assetId: a.id, name: a.name, sha256: a.sha256, format: a.format, scope, review: 'approved', authorizedAt: new Date().toISOString() };
-  store.event(p, actor, 'editable_base_authorized', { assetId: a.id, sha256: a.sha256, scope }); store.save(p); return p;
+  const release = store.beginOperation(id);
+  try {
+    const p = store.get(id); store.idle(p);
+    if (actor !== 'web') throw new AppError('Editable base authorization requires a human in the web UI', 403);
+    if (p.workflowRuns?.some(r => r.status === 'waiting-review')) throw new AppError('Resolve pending workflow review before changing the editable base', 409);
+    const scope = editScope(input.scope), a = await store.library.inspected(input.assetId);
+    store.idle(p);
+    p.editableBase = { assetId: a.id, name: a.name, sha256: a.sha256, format: a.format, scope, review: 'approved', authorizedAt: new Date().toISOString() };
+    store.event(p, actor, 'editable_base_authorized', { assetId: a.id, sha256: a.sha256, scope }); store.save(p); return p;
+  } finally { release(); }
 }
 export async function prepareBase(store, runner, p, base, dir) {
   const a = store.library.get(base.assetId), source = store.library.resolve(a);

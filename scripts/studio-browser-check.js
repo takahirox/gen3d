@@ -113,9 +113,9 @@ try {
     if (m.method === 'Runtime.exceptionThrown') exceptions.push(m.params.exceptionDetails.text);
     if (m.id) { const item = pending.get(m.id); pending.delete(m.id); m.error ? item.reject(new Error(m.error.message)) : item.resolve(m.result); }
   };
-  function call(method, params = {}) { return new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); ws.send(JSON.stringify({ id, method, params })); }); }
-  async function evaluate(expression) {
-    const result = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  function call(method, params = {}, sessionId) { return new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); ws.send(JSON.stringify({ id, method, params, sessionId })); }); }
+  async function evaluate(expression, sessionId) {
+    const result = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
     assert.ok(!result.exceptionDetails, result.exceptionDetails?.text); return result.result.value;
   }
   const visible = id => `!!document.getElementById(${JSON.stringify(id)})?.getClientRects().length`;
@@ -324,6 +324,70 @@ try {
   await evaluate('document.querySelector("#graph-node-input").focus()');assert.equal(await evaluate('document.activeElement.id'),'graph-node-input');
   await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r',windowsVirtualKeyCode:13});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   assert.equal(exceptions.length,0,exceptions.join('\n'));check('keyboard node access and no uncaught browser exceptions');
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  // Project deletion uses one human confirmation, preserves other projects and
+  // shared assets, and reconciles the selected project in another actual tab.
+  const disposable = await request('/projects','POST',{name:'Delete “this” <project>',mode:'text',prompt:'Disposable'});
+  const unselected = await request('/projects','POST',{name:'Delete the other project',mode:'text',prompt:'Disposable'});
+  await openProject(disposable.id); await click('#nav-home');
+  const deletions = [];
+  await call('Network.enable');
+  ws.addEventListener('message', event => { const m=JSON.parse(event.data); if(m.method==='Network.requestWillBeSent'&&m.params.request.method==='DELETE')deletions.push(m.params.request); });
+  const key = async name => { await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code:name,...(name==='Enter'?{text:'\r',windowsVirtualKeyCode:13}:{windowsVirtualKeyCode:name==='Escape'?27:9})});await call('Input.dispatchKeyEvent',{type:'keyUp',key:name,code:name}); };
+  const deleteMenu = async id => { await wait('!document.querySelector("#delete-dialog").open && !document.querySelector("#delete-dialog").contains(document.activeElement)'); await click('#project-actions-'+id); await click('#project-actions-'+id+' + button'); await wait('document.querySelector("#delete-dialog").open'); };
+  // The menu and action can both be reached/activated from the keyboard.
+  await evaluate('document.querySelector("#project-actions-'+disposable.id+'").focus()'); await key('Enter'); await key('Tab');
+  assert.equal(await evaluate('document.activeElement.textContent'),'Delete');
+  await request('/projects/'+unselected.id,'PATCH',{name:'Delete the other project updated'});
+  await wait('document.querySelector("#project-'+unselected.id+'").textContent === "Delete the other project updated"');
+  assert.equal(await evaluate('document.activeElement.id'),'delete-project-'+disposable.id);
+  assert.ok(await evaluate('document.querySelector("#project-actions-'+disposable.id+'").parentElement.open'));
+  await key('Enter');
+  await wait('document.querySelector("#delete-dialog").open');
+  assert.equal(await evaluate('document.activeElement.id'),'cancel-delete');
+  assert.equal(await evaluate('document.querySelector("#delete-project-name").textContent'),disposable.name);
+  assert.equal(await evaluate('document.querySelector("#delete-dialog").getAttribute("aria-describedby")'),'delete-warning');
+  assert.ok(await evaluate('document.querySelector("#delete-warning").textContent.includes("permanently")'));
+  await screenshot('desktop-delete-dark'); await key('Escape'); await wait('!document.querySelector("#delete-dialog").open');
+  await wait('document.activeElement.id === '+JSON.stringify('project-actions-'+disposable.id));
+  await deleteMenu(disposable.id); await click('#cancel-delete'); await wait('!document.querySelector("#delete-dialog").open');
+  await deleteMenu(disposable.id); await call('Input.dispatchMouseEvent',{type:'mousePressed',x:1,y:1,button:'left',clickCount:1});await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:1,y:1,button:'left',clickCount:1});
+  await wait('!document.querySelector("#delete-dialog").open');
+  assert.equal(deletions.length,0); assert.ok(app.store.get(disposable.id));
+  check('project action keyboard access; single named confirmation focuses Cancel; Escape, Cancel and backdrop do not delete');
+  await select('#theme','light'); await deleteMenu(unselected.id); await screenshot('desktop-delete-light'); await click('#confirm-delete');
+  await until(()=>!app.store.projects.has(unselected.id),'delete unselected project');await wait('!document.querySelector("#project-'+unselected.id+'")');
+  assert.equal(await evaluate('localStorage.getItem("gen3d-project")'),disposable.id);
+  assert.equal(deletions.length,1); assert.equal(deletions[0].url,url+'/api/projects/'+unselected.id);assert.equal(deletions[0].postData,undefined);
+  assert.equal(fs.existsSync(path.join(providers.dataDir,unselected.id)),false);
+  const releaseDelete = app.store.beginOperation(disposable.id);
+  try {
+    await deleteMenu(disposable.id); await click('#confirm-delete');await wait('!document.querySelector("#delete-error").hidden');
+    assert.ok(await evaluate('document.querySelector("#delete-error").textContent.includes("Wait")'));
+    assert.ok(app.store.get(disposable.id)); await click('#cancel-delete');
+  } finally { releaseDelete(); }
+  check('only the confirmed ID is sent; deleting another project preserves selection; busy project deletion gives a compact retryable error');
+  const second = await call('Target.createTarget',{url:url+'/#studio'});
+  const {sessionId} = await call('Target.attachToTarget',{targetId:second.targetId,flatten:true});
+  await until(()=>evaluate('document.querySelector("#title")?.textContent === '+JSON.stringify(disposable.name),sessionId),'second tab selected project');
+  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+  await deleteMenu(disposable.id);await screenshot('narrow-delete-light');await click('#cancel-delete');
+  await select('#theme','dark');await deleteMenu(disposable.id);await screenshot('narrow-delete-dark');
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth+1'));
+  await click('#confirm-delete');await wait('!document.querySelector("#delete-dialog").open && location.hash === "#home"');
+  assert.equal(await evaluate('localStorage.getItem("gen3d-project")'),null);
+  await until(()=>evaluate('location.hash === "#home" && !document.querySelector("#project-'+disposable.id+'") && document.querySelector("#workspace").hidden',sessionId),'second tab drops deleted selection');
+  await call('Target.closeTarget',{targetId:second.targetId});
+  assert.ok(app.store.projects.has(automatic.id)); assert.ok(app.store.library.get(assetId));
+  assert.ok(fs.existsSync(path.join(providers.dataDir,'workflow-presets.json')));
+  check('selected deletion clears storage and returns Home in both tabs; dialog fits both themes and narrow/desktop layouts; shared assets/presets remain');
+  // All remaining deletes are explicit Web UI confirmations, including empty state.
+  for (const p of app.store.list()) { await deleteMenu(p.id); await click('#confirm-delete'); await until(()=>!app.store.projects.has(p.id),'delete '+p.name); await wait('!document.querySelector("#delete-dialog").open'); }
+  await wait('!document.querySelector("#projects-empty").hidden && document.querySelectorAll("#project-cards article").length === 0');
+  await wait('document.activeElement.id === "empty-create"');await screenshot('narrow-projects-empty');
+  await call('Page.reload');await wait('!document.querySelector("#projects-empty").hidden');
+  await click('#empty-create'); await wait('document.querySelector("#create-dialog").open');await click('#close-create');
+  assert.equal(exceptions.length,0,exceptions.join('\n'));check('last deletion leaves a usable empty state and create action, persists after reload, with no browser exceptions');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
   const limited=await failure('Usage limit',()=>{usageLimit=true;},'Fixture usage limit reached');
   assert.equal(app.runner.usageLimited,true);const count=app.store.get(limited.id).workflowRuns.length;
