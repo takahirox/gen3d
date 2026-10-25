@@ -20,7 +20,7 @@ const checkpoints = { input: false, concept: false, multiView: false, preview: f
 const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
 let generationNumber = 0;
 let refinementPass = true, partialModelState, failPreservation = false, usageLimit = false;
-let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
+let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false, failInspection = false;
 function selectionGLB() {
   const bytes=fs.readFileSync(path.join(assets,'model-1/model.glb')), length=bytes.readUInt32LE(12);
   const json=JSON.parse(bytes.toString('utf8',20,20+length));
@@ -67,7 +67,7 @@ const providers = {
     }
     return { output: '' };
   },
-  inspectReferences: async () => inspection,
+  inspectReferences: async () => { if (failInspection) throw new Error('Fixture inspection unavailable'); return inspection; },
   inspectModel: async ({ dir, renders, profile, modelReferences = [] }) => {
     const acceptable = refinementPass && path.basename(dir) === '1';
     return { acceptable, modelReferences:modelReferences.map(r=>({assetId:r.assetId,role:r.role,intendedTraits:'Fixture shape',deliberateDifferences:'Primary image remains authoritative',observations:[{trait:'shape',status:'acceptable',detail:'Synthetic role observation'}]})), summary: acceptable ? 'Fixture visual pass.' : 'Fixture torso discrepancy.', revisionTargets: acceptable ? [] : ['geometry'], revisionInstructions: acceptable ? [] : ['Narrow the torso mesh.'],
@@ -131,21 +131,63 @@ try {
   const wait = async expression => { try { return await until(() => evaluate(expression), expression); } catch(e) { console.log(await evaluate('JSON.stringify({library:document.querySelector("#library-dialog").open,base:document.querySelector("#base-dialog").open,error:document.querySelector("#library-error").textContent,parts:document.querySelector("#part-status").textContent})'));throw e; } };
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
   const openProject = async id => {await click('#nav-home');await wait(visible('project-'+id));await click('#project-'+id);};
-  const select = (selector, value) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  const select = async (selector, value) => {
+    await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await wait(`!document.querySelector(${JSON.stringify(selector)}).disabled`);
+  };
   async function fill(selector, values) {
     await evaluate(`(() => { const f = document.querySelector(${JSON.stringify(selector)}); for (const [key,value] of Object.entries(${JSON.stringify(values)})) { const e = f.elements[key]; if (e.type === 'checkbox') e.checked = value; else e.value = value; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); } })()`);
   }
   const submit = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).requestSubmit()`);
-  async function screenshot(name) { await evaluate('window.scrollTo(0,0)'); fs.mkdirSync(output,{recursive:true});fs.writeFileSync(path.join(output,name+'.png'),Buffer.from((await call('Page.captureScreenshot',{format:'png'})).data,'base64')); }
+  async function screenshot(name) {
+    await evaluate('window.scrollTo(0,0)'); fs.mkdirSync(output,{recursive:true});
+    const full = /^policy-warning-narrow-(dark|light)$/.test(name) ? (await call('Page.getLayoutMetrics')).cssContentSize : null;
+    fs.writeFileSync(path.join(output,name+'.png'),Buffer.from((await call('Page.captureScreenshot',{format:'png',...(full?{captureBeyondViewport:true,clip:{x:0,y:0,width:full.width,height:full.height,scale:1}}:{})})).data,'base64'));
+  }
   const check=name=>{checks.push(name);console.log('PASS '+name);};
   await call('Runtime.enable');await call('Page.enable');await call('Emulation.setFocusEmulationEnabled',{enabled:true});
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
   await wait(visible('project-'+automatic.id));await openProject(automatic.id);
   assert.equal(await evaluate('document.querySelectorAll("#studio #settings, #studio #studio-checkpoints").length'),0);
   await screenshot('desktop-empty');
+  assert.deepEqual(automatic.consistencySettings,{enabled:true,onFailure:'continue'});
+  assert.equal(await evaluate('document.querySelector("#four-view-policy").value'),'continue');
+  assert.ok(await evaluate('document.querySelector("#four-view-policy").labels[0].textContent.startsWith("Four-view check")'));
+  assert.ok(await evaluate('document.querySelector("#edit select[name=profile]").getClientRects().length && !document.querySelector("#four-view-policy").closest("details")'));
+  for (const policy of ['off','stop','continue']) {
+    await select('#four-view-policy',policy);
+    await until(()=>app.store.get(automatic.id).consistencySettings.enabled===(policy!=='off') && (policy==='off'||app.store.get(automatic.id).consistencySettings.onFailure===policy),'studio policy '+policy);
+    await call('Page.reload');await wait(visible('four-view-policy'));
+    assert.equal(await evaluate('document.querySelector("#four-view-policy").value'),policy);
+  }
+  await evaluate('document.querySelector("#four-view-policy").focus()');
+  assert.equal(await evaluate('document.activeElement.id'),'four-view-policy');
+  const policyAX=await call('Accessibility.getFullAXTree');
+  assert.ok(policyAX.nodes.some(n=>n.role?.value==='combobox'&&n.name?.value==='Four-view check'));
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowDown',code:'ArrowDown',windowsVirtualKeyCode:40});
+  await call('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowDown',code:'ArrowDown',windowsVirtualKeyCode:40});
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+  // Restore the default explicitly after checking native keyboard selection.
+  await select('#four-view-policy','continue');await until(()=>app.store.get(automatic.id).consistencySettings.onFailure==='continue','keyboard policy persisted');
+  await select('#studio-refinement','true');await until(()=>app.store.get(automatic.id).refinementSettings.enabled,'studio refinement on');
+  await wait(visible('studio-cycles'));await select('#studio-refinement','false');await until(()=>!app.store.get(automatic.id).refinementSettings.enabled,'studio refinement off');
+  check('studio exposes policy, profile, source actions and contextual refinement; all policy choices persist through reload with accessible keyboard controls');
+  inspection={consistent:false,issues:['Different rear shape']};
   await click('#run-workflow');
   await until(()=>app.store.get(automatic.id).workflowRuns[0]?.status==='completed','default generation');
   const defaultRun=app.store.get(automatic.id).workflowRuns[0];
+  assert.equal(defaultRun.checkpoints.find(cp=>cp.nodeId==='consistency').data.consistency.status,'failed');
+  inspection={consistent:true,issues:[]};
+  await wait(visible('task-warning'));
+  await screenshot('policy-warning-desktop-dark');
+  await select('#theme','light');await screenshot('policy-warning-desktop-light');await select('#theme','dark');
+  await evaluate('document.querySelector("#inspect-warning").focus()');await click('#inspect-warning');await wait('document.querySelector("#history-dialog").open');
+  assert.equal(await evaluate('document.querySelectorAll("#history-content img").length'),5);
+  assert.ok(await evaluate('document.querySelector("#warning-info").textContent.includes("Different rear shape")'));
+  await screenshot('policy-warning-details');await click('#close-history');
+  assert.equal(await evaluate('document.activeElement.id'),'inspect-warning');
+  check('new default allows contradictions, retains the report and all images, with one warning action and restored focus');
   assert.deepEqual(defaultRun.decisions,[]);assert.equal(defaultRun.checkpoints.find(c=>c.nodeId==='views').data.images.length,4);
   await wait('document.querySelector("#viewer-message").hidden');
   assert.ok(await evaluate(visible('viewer')));assert.ok(await evaluate('document.querySelector("#exports").textContent.includes("Download GLB")'));
@@ -203,10 +245,13 @@ try {
   await until(()=>app.store.list().length===2,'image project created');
   const imageProject=app.store.list().find(p=>p.id!==automatic.id);
   await wait('document.querySelector("#title").textContent === '+JSON.stringify(imageProject.name));
-  await click('#add-source summary');await upload('#reference input[name=image]',path.join(assets,'concept-1/concept.png'));
+  assert.equal(await evaluate('document.querySelector("#four-view-policy").getClientRects().length'),0);
+  await click('#nav-workflow');assert.equal(await evaluate('document.querySelector("#editor-policy-label").getClientRects().length'),0);await click('#nav-studio');
+  check('image input hides generated four-view policy in studio and editor');
+  await upload('#reference input[name=image]',path.join(assets,'concept-1/concept.png'));
   await until(()=>app.store.get(imageProject.id).references[0]?.review==='approved','supplementary image consent');
   check('Use image attaches and audits a supplementary reference from the Sources panel');
-  await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open');
   await upload('#library-file',path.join(root,'docs/validation/issue26/blender/edited.glb'));
   await wait('document.querySelectorAll("#library-assets article").length === 1 && document.querySelector("#library-dialog").getAttribute("aria-busy") !== "true"');
   assert.equal(app.store.get(imageProject.id).modelReferences.length,0,'upload alone grants no permission');
@@ -235,7 +280,7 @@ try {
   await evaluate('document.querySelector("#model-references details").open=true');
   await evaluate('Array.from(document.querySelectorAll("#model-references button")).find(b=>b.textContent==="Change use…").click()');
   await wait('document.querySelector("#library-dialog").open');
-  await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Use parts of this model');
+  await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Use parts of this model');
   await wait('!document.querySelector("#library-consent").hidden');
   assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reference-only');
   await submit('#library-consent');assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reference-only','unchecked consent cannot submit');
@@ -248,9 +293,9 @@ try {
   await evaluate('document.querySelector("#model-references details").open=true');
   await evaluate('Array.from(document.querySelectorAll("#model-references button")).find(b=>b.textContent==="Remove").click()');
   await until(()=>!app.store.get(imageProject.id).modelReferences.length,'remove model source');assert.ok(app.store.library.get(assetId));
-  await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open');
   await wait('document.querySelectorAll("#library-assets article").length === 1');
-  await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Use parts of this model');await wait('!document.querySelector("#library-consent").hidden');
+  await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Use parts of this model');await wait('!document.querySelector("#library-consent").hidden');
   await fill('#library-consent',{consent:true});await submit('#library-consent');await wait('!document.querySelector("#library-dialog").open');
   check('upload grants no rights; direct reference is atomic and audited; broader copy needs explicit consent; source change/removal preserve library assets');
   await click('#run-workflow');await until(()=>app.store.get(imageProject.id).workflowRuns[0]?.status==='completed','image default with sources');
@@ -297,8 +342,8 @@ try {
   await until(()=>app.store.list().length===4,'humanoid project created');const humanoid=app.store.list().find(p=>p.workflow.nodes.some(n=>n.type==='edit'));
   await wait('document.querySelector("#title").textContent === '+JSON.stringify(humanoid.name));
   assert.ok(await evaluate('document.querySelector("#run-workflow").disabled'));
-  await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
-  await wait('document.querySelectorAll("#library-assets article").length === 1');await evaluate('document.querySelector("#library-assets details").open=true');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await wait('document.querySelectorAll("#library-assets article").length === 1');await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');
   await libraryAction('Edit this model');await wait('document.querySelector("#base-dialog").open && document.querySelectorAll("#base-meshes input").length===2 && document.querySelector("#part-status").textContent !== "Loading parts…"');
   assert.equal(app.store.get(humanoid.id).editableBase,null,'choosing a model does not grant edit scope');
   assert.equal(await evaluate('document.querySelectorAll("#part-viewer canvas").length'),1);
@@ -323,11 +368,11 @@ try {
   await fill('#node-form',{'setting:instructions':editInstructions});await submit('#node-form');
   await wait('document.querySelector("#graph-warning").textContent.includes("Unsaved")');
   assert.deepEqual(app.store.get(textProject.id).workflow,creationWorkflow,'node changes remain unsaved before edit selection');
-  await click('#nav-studio');await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
-  await wait('document.querySelectorAll("#library-assets article").length===1');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
+  await click('#nav-studio');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await wait('document.querySelectorAll("#library-assets article").length===1');await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
   await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#close-base');
   assert.equal(app.store.get(textProject.id).editableBase,null,'cancel edit leaves project unchanged');
-  await click('#select-models');await wait('document.querySelector("#library-dialog").open && document.querySelectorAll("#library-assets article").length===1');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open && document.querySelectorAll("#library-assets article").length===1');await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
   await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#base-meshes input');await submit('#base-form');
   await wait('!document.querySelector("#base-dialog").open && document.querySelector("#run-workflow").textContent === "Improve"');
   assert.ok(app.store.get(textProject.id).workflow.nodes.some(n=>n.type==='base'));
@@ -352,15 +397,18 @@ try {
   await openProject(imageProject.id);await wait('document.querySelector("#references button[aria-label]")');await click('#references button[aria-label]');
   await until(()=>app.store.get(imageProject.id).references[0].review==='rejected','image removed');
   check('existing project switches to Improve through contextual selection; cancellation grants nothing; image removal is direct');
-  // Explicit pauses remain real: configure all four using the advanced UI.
+  // Explicit pauses remain real: all four are directly visible in the editor.
   const reviewProject=await request('/projects','POST',{name:'Human review',mode:'text',prompt:'A cabinet'});
   await openProject(reviewProject.id);await click('#nav-workflow');
-  await evaluate('document.querySelector("#settings").closest("details").open=true');
   await fill('#settings',{input:true,concept:true,multiView:true,preview:true});await submit('#settings');
   await until(()=>app.store.get(reviewProject.id).checkpoints.preview,'manual settings saved');await click('#nav-studio');await click('#run-workflow');
   async function approveNode(id){await wait('document.querySelector("#pending-reviews").textContent.includes('+JSON.stringify('Human review: '+(id==='review'?'model':id==='views'?'four views':id))+')');await evaluate('Array.from(document.querySelectorAll("#pending-reviews button")).find(b=>b.textContent==="Accept & continue").click()');}
   await approveNode('input');await wait('document.querySelector("#pending-reviews").textContent.includes("Human review: concept")');
   await screenshot('desktop-manual-review');
+  const waitingSnapshot=structuredClone(app.store.get(reviewProject.id).workflowRuns[0].snapshot);
+  await select('#four-view-policy','off');await until(()=>!app.store.get(reviewProject.id).consistencySettings.enabled,'future inspection off');
+  assert.deepEqual(app.store.get(reviewProject.id).workflowRuns[0].snapshot,waitingSnapshot);
+  await wait('!document.querySelector("#captured-policy").hidden');
   // Turning future pauses off does not rewrite this waiting run's policy.
   await click('#nav-workflow');await fill('#settings',{input:false,concept:false,multiView:false,preview:false});await submit('#settings');
   await until(()=>!app.store.get(reviewProject.id).checkpoints.preview,'future pauses off');await click('#nav-studio');
@@ -383,8 +431,11 @@ try {
     await wait('document.querySelector("#task-error").textContent.includes('+JSON.stringify(expected)+')');
     assert.equal(await evaluate('document.querySelectorAll("#exports a").length'),0);return p;
   }
-  const inconsistent=await failure('Stop inconsistent views',()=>{inspection={consistent:false,issues:['Different rear shape']};},'Consistency blocker');
+  const inconsistent=await failure('Stop inconsistent views',()=>{inspection={consistent:false,issues:['Different rear shape']};},'Consistency blocker',{consistencySettings:{onFailure:'stop'}});
   assert.equal(app.store.get(inconsistent.id).versions.length,0);inspection={consistent:true,issues:[]};
+  await failure('Inspection execution error',()=>{failInspection=true;},'Fixture inspection unavailable');failInspection=false;
+  await failure('Malformed inspection',()=>{inspection={consistent:'yes',issues:[]};},'Invalid consistency inspection report');inspection={consistent:true,issues:[]};
+  await failure('Incomplete views with inspection Off',()=>{partialViews=true;},'Fixture stopped after first view',{consistencySettings:{enabled:false}});partialViews=false;
   await failure('Incomplete views',()=>{partialViews=true;},'Fixture stopped after first view');partialViews=false;
   await failure('Failed image provider',()=>{failConcept=true;},'Fixture image provider unavailable');failConcept=false;
   await failure('Failed modeling tool',()=>{failModel=true;},'Fixture Blender bridge unavailable');failModel=false;
@@ -393,8 +444,27 @@ try {
   assert.equal(app.store.get(humanoid.id).versions.at(-1).status,'failed');failPreservation=false;
   check('automatic path stops on Stop consistency, incomplete views, provider/tool failure, and required preservation failure');
   const warning=await request('/projects','POST',{name:'Warn and continue',mode:'text',prompt:'A cabinet',consistencySettings:{onFailure:'continue'}});inspection={consistent:false,issues:['Different rear shape']};
-  await request(`/projects/${warning.id}/runs`,'POST',{});await app.runner.pending;assert.equal(app.store.get(warning.id).workflowRuns[0].status,'completed');await openProject(warning.id);await wait('!document.querySelector("#task-warning").hidden');assert.ok(await evaluate('document.querySelector("#warning-info").textContent.includes("Different rear shape")'));inspection={consistent:true,issues:[]};
+  await request(`/projects/${warning.id}/runs`,'POST',{});await app.runner.pending;assert.equal(app.store.get(warning.id).workflowRuns[0].status,'completed');await openProject(warning.id);await wait('!document.querySelector("#task-warning").hidden');await click('#inspect-warning');await wait('document.querySelector("#history-dialog").open');assert.ok(await evaluate('document.querySelector("#warning-info").textContent.includes("Different rear shape")'));await click('#close-history');inspection={consistent:true,issues:[]};
   check('explicit Warn and continue retains the failed inspection report and permits modeling');
+  await click('#nav-workflow');await click('#graph-node-consistency');
+  await fill('#node-form',{'setting:enabled':'true','setting:onFailure':'stop'});await submit('#node-form');await click('#save-graph');
+  await until(()=>app.store.get(warning.id).workflow.nodes.find(n=>n.id==='consistency').settings.onFailure==='stop','node override saved');
+  await click('#nav-studio');await wait('document.querySelector("#policy-overrides").textContent.includes("Stop on issues")');
+  await select('#four-view-policy','off');await until(()=>!app.store.get(warning.id).consistencySettings.enabled,'project Off with override');
+  assert.ok(await evaluate('document.querySelector("#policy-overrides").textContent.includes("Stop on issues")'));
+  await screenshot('policy-node-override');inspection={consistent:false,issues:['Different rear shape']};await click('#run-workflow');
+  await until(()=>app.store.get(warning.id).workflowRuns.at(-1).status==='failed','node Stop blocks project Off');
+  const stoppedRun=structuredClone(app.store.get(warning.id).workflowRuns.at(-1));
+  await select('#four-view-policy','continue');await until(()=>app.store.get(warning.id).consistencySettings.enabled,'future project Warn');
+  assert.deepEqual(app.store.get(warning.id).workflowRuns.at(-1),stoppedRun);
+  await click('#nav-workflow');await click('#graph-node-consistency');
+  await fill('#node-form',{'setting:enabled':'','setting:onFailure':''});await submit('#node-form');await click('#save-graph');
+  await until(()=>!Object.keys(app.store.get(warning.id).workflow.nodes.find(n=>n.id==='consistency').settings).length,'override removed');
+  await click('#nav-studio');await select('#four-view-policy','off');await until(()=>!app.store.get(warning.id).consistencySettings.enabled,'Off selected');
+  failInspection=true;await click('#run-workflow');await until(()=>app.store.get(warning.id).workflowRuns.at(-1).status==='completed','Off skips failing optional inspector');failInspection=false;
+  assert.equal(app.store.get(warning.id).workflowRuns.at(-1).checkpoints.find(cp=>cp.nodeId==='consistency').data.consistency.status,'skipped');
+  inspection={consistent:true,issues:[]};
+  check('studio truthfully exposes node override; explicit node Stop wins over Off; future edits preserve stopped runs; Off skips inspection and generates all views');
   await openProject(automatic.id);await select('#theme','dark');await screenshot('desktop-studio-dark');
   await select('#theme','light');await screenshot('desktop-studio-light');
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth+1'));
@@ -402,6 +472,9 @@ try {
   check('desktop uses sources / dominant preview / action columns in both themes');
   await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
   await click('#nav-studio');await wait(visible('viewer'));await screenshot('narrow-studio-light');await select('#theme','dark');await screenshot('narrow-studio-dark');
+  await screenshot('policy-warning-narrow-dark');await select('#theme','light');await screenshot('policy-warning-narrow-light');await select('#theme','dark');
+  assert.ok(await evaluate('document.querySelector("#four-view-policy").getClientRects().length'));
+  await click('#inspect-warning');await wait('document.querySelector("#history-dialog").open');await screenshot('policy-warning-narrow-details');await click('#close-history');
   assert.ok(await evaluate('document.querySelector("#run-workflow").getClientRects().length && document.querySelector("#select-models").getClientRects().length'));
   await evaluate('document.querySelector("#view-compare").focus()');assert.equal(await evaluate('document.activeElement.id'),'view-compare');
   await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r',windowsVirtualKeyCode:13});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});

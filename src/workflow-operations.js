@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { imageData } from './store.js';
 import { hash, fileHash } from './workflow.js';
 import { taskPrompt } from './runner.js';
-import { requiredViews } from './reference-set.js';
+import { requiredViews, validWorkflowViews } from './reference-set.js';
 import { referenceSheet, maxVisualReferences } from './model-reference-visuals.js';
 import { prepareBase, validateBaseEdit } from './base-model.js';
 const runtime = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../blender');
@@ -80,6 +80,9 @@ export function workflowOperations(store, runner) {
     },
     async consistency(ctx) {
       const data = ctx.inputs.views, settings = ctx.context;
+      if (!validWorkflowViews(data)) throw new Error('Invalid four-view evidence');
+      // Validate decoded image evidence in every policy, before optional inspection.
+      for (const file of [data.visual.file, ...data.images.map(i => i.file)]) store.imageArtifact(ctx.p.id, file);
       let report = { status: data.images.length ? 'skipped' : 'not-applicable', issues: [], outcome: 'allowed' };
       if (data.images.length && settings.enabled) {
         const checked = await runner.inspectReferences({ prompt: data.visual.prompt, profile: data.visual.profile, dir: ctx.dir, images: [{ label: 'base concept', file: store.imageArtifact(ctx.p.id, data.visual.file) }, ...data.images.map(i => ({ label: i.label, file: store.imageArtifact(ctx.p.id, i.file) }))] });

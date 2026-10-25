@@ -5,9 +5,9 @@ import { setupLibrary } from './library.js';
 import { partPicker } from './parts.js';
 const $ = id => document.getElementById(id);
 let projects = [], projectId = localStorage.getItem('gen3d-project'), versionId, runId, historyCheckpointId, selectedNode = 'input';
-let area = location.hash.slice(1) || 'home', catalog = {}, presets = [], draft, draftProject, dirty = false, status = {}, lastSignature = '';
+let area = location.hash.slice(1) || 'home', catalog = {}, presets = [], draft, draftProject, dirty = false, status = {}, lastSignature = '', preparationSaving = false;
 const node = (tag, text, className) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (className) e.className = className; return e; };
-function focusAdd() { $('add-source').querySelector('summary').focus(); }
+function focusAdd() { $('add-image').focus(); }
 function notify(message = '') { $('notice').textContent = message; $('notice').hidden = !message; }
 async function api(route, method = 'GET', input) {
   const response = await fetch('/api' + route, { method, headers: { 'Content-Type': 'application/json' }, body: input ? JSON.stringify(input) : undefined });
@@ -21,6 +21,10 @@ function button(text, action, disabled = false) { const b = node('button', text)
 function link(text, file, download = false) { const a = node('a', text, 'button'); a.href = artifact(file) + (download ? '?download=1' : ''); a.target = '_blank'; a.rel = 'noopener'; return a; }
 function figure(file, caption) { const f = node('figure'), a = node('a'), img = node('img'); a.href = artifact(file); a.target = '_blank'; a.rel = 'noopener'; img.src = a.href; img.alt = caption; img.loading = 'lazy'; a.append(img); f.append(a, node('figcaption', caption)); return f; }
 function options(select, items, value) { select.replaceChildren(...items.map(([id, text]) => { const o = node('option', text); o.value = id; return o; })); if (items.some(i => i[0] === value)) select.value = value; }
+const viewPolicy = settings => !settings.enabled ? 'off' : settings.onFailure;
+const policyName = settings => ({ off: 'Off', continue: 'Warn and continue', stop: 'Stop on issues' })[viewPolicy(settings)];
+// Off changes only enabled, preserving the prior response for explicit callers.
+const policySettings = value => value === 'off' ? { enabled: false } : { enabled: true, onFailure: value };
 function form(id, action) { $(id).oninput = () => { $(id).dataset.dirty = 'true'; }; $(id).onsubmit = event => { event.preventDefault(); safe(async () => { await action(new FormData(event.target)); delete $(id).dataset.dirty; lastSignature = ''; }); }; }
 async function imageData(file) {
   if (!file || file.size > 10_000_000 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('Choose a PNG, JPEG or WebP image, at most 10 MB');
@@ -164,8 +168,15 @@ function renderStudio(p) {
   const exportable = !!$('exports').querySelector('a'), editing = !!$('edit').dataset.dirty;
   $('run-workflow').classList.toggle('primary', !exportable || editing);
   $('exports').querySelector('a')?.classList.toggle('primary', !editing);
-  const warning = r?.checkpoints.find(cp => cp.data.consistency?.status === 'failed' && cp.data.consistency?.outcome === 'allowed')?.data.consistency;
-  $('task-warning').hidden = !warning; $('warning-info').textContent = warning?.issues.join('; ') || '';
+  const warningData = r?.checkpoints.find(cp => cp.type === 'checkedViews' && cp.data.consistency?.status === 'failed' && cp.data.consistency?.outcome === 'allowed')?.data
+    || (!r && v?.consistency?.status === 'failed' && v.consistency.outcome === 'allowed' ? { consistency:v.consistency, images:v.modelingImages, visual:{file:v.visualInput} } : null);
+  $('task-warning').hidden = !warningData;
+  $('inspect-warning').onclick = () => {
+    $('history-heading').textContent = 'Four-view issues';
+    const report = node('p', warningData.consistency.issues.join('; ') || 'The inspection reported inconsistent views.'); report.id = 'warning-info';
+    $('history-content').replaceChildren(report, renderFiles([warningData.visual.file, ...warningData.images.map(i => i.file)], true));
+    $('history-dialog').showModal();
+  };
   const thumbnails = [];
   function thumbnail(file, label, active, action, id) {
     const b = button('', action); b.id = id; b.className = 'history-thumb'; b.setAttribute('aria-label', label); b.setAttribute('aria-pressed', String(active));
@@ -191,11 +202,33 @@ function renderStudio(p) {
     if (files.length) $('studio-checkpoints').replaceChildren(renderFiles([...new Set(files)], true));
   }
   renderReviews(p);
+  const hasFourViews = p.mode === 'text' && draft.nodes.some(n => n.type === 'consistency');
+  $('studio-policy-label').hidden = $('editor-policy-label').hidden = !hasFourViews;
+  $('preparation-settings').querySelectorAll('input, select').forEach(e => { e.disabled = status.busy || preparationSaving; });
+  if (!preparationSaving) {
+    $('four-view-policy').value = viewPolicy(p.consistencySettings);
+    $('studio-refinement').value = String(p.refinementSettings.enabled);
+    if (document.activeElement !== $('studio-cycles')) $('studio-cycles').value = p.refinementSettings.maxIterations;
+  }
+  const hasRefinement = draft.nodes.some(n => n.type === 'refine');
+  $('studio-refinement-label').hidden = !hasRefinement;
+  $('studio-cycles-label').hidden = !hasRefinement || !p.refinementSettings.enabled;
+  $('policy-overrides').replaceChildren(...(hasFourViews ? draft.nodes.filter(n => n.type === 'consistency' && Object.keys(n.settings).length).map(n => {
+    const effective = { ...p.consistencySettings, ...n.settings };
+    return button(`${n.id}: ${policyName(effective)} · workflow override${dirty ? ' (unsaved)' : ''}`, () => { selectedNode = n.id; navigate('workflow'); });
+  }) : []));
+  const captured = r?.snapshot.mode === 'text' ? r.graph.nodes.filter(n => n.type === 'consistency').filter(n => {
+    const next = draft.nodes.find(d => d.id === n.id && d.type === 'consistency');
+    return !next || viewPolicy({ ...r.snapshot.consistencySettings, ...n.settings }) !== viewPolicy({ ...p.consistencySettings, ...next.settings });
+  }) : [];
+  $('captured-policy').hidden = !captured.length;
+  $('captured-policy').textContent = captured.map(n => `Saved run · ${n.id}: ${policyName({ ...r.snapshot.consistencySettings, ...n.settings })}`).join('; ');
+  for (const key of ['concept','multiView']) $('settings').elements[key].closest('label').hidden = p.mode !== 'text';
   if (!$('edit').dataset.dirty) for (const key of ['name','prompt','profile']) $('edit').elements[key].value = p[key];
   if (!$('settings').dataset.dirty) {
     const f=$('settings').elements;
     for (const key of ['input','concept','multiView','preview']) f[key].checked=p.checkpoints[key];
-    f.consistency.value=String(p.consistencySettings.enabled); f.onFailure.value=p.consistencySettings.onFailure; f.refinement.value=String(p.refinementSettings.enabled); f.maxIterations.value=p.refinementSettings.maxIterations;
+    f.policy.value=viewPolicy(p.consistencySettings); f.refinement.value=String(p.refinementSettings.enabled); f.maxIterations.value=p.refinementSettings.maxIterations;
   }
   $('input-review').replaceChildren(...((p.checkpoints.input || p.inputCheckpoint || p.inputReview === 'rejected') && p.inputReview !== 'approved' && !p.workflowRuns.some(r => r.status === 'waiting-review') ? [button('Approve input',()=>api(route()+'/input/review','POST',{decision:'approved'}),status.busy)] : []));
   const base = p.editableBase;
@@ -300,7 +333,7 @@ function render() {
   $('project-state').textContent=state; $('task-progress').textContent=state; $('task-progress').hidden = !state || state === 'Ready';
   $('task-error').textContent=r?.error || ''; $('task-error').hidden=!r?.error;
   $('run-workflow').textContent=status.busy ? 'Working…' : r?.status === 'failed' ? 'Retry generation' : p.workflow.nodes.some(n=>n.type==='edit') ? 'Improve' : 'Generate';
-  $('run-workflow').disabled=status.busy||status.usageLimited||waiting||pendingArtifacts||pendingSources||missingBase;
+  $('run-workflow').disabled=status.busy||preparationSaving||status.usageLimited||waiting||pendingArtifacts||pendingSources||missingBase;
   $('run-editor').disabled=$('run-workflow').disabled;
   renderStudio(p);if(area==='workflow')renderGraph(p);
   $('history').replaceChildren(...p.activity.slice(-150).reverse().map(e=>node('li',`${e.at.slice(0,19)} · ${e.type}${e.nodeId?' · '+e.nodeId:''}${e.message?' · '+e.message:''}${e.decision?' · '+e.decision:''}`)));
@@ -342,7 +375,7 @@ async function openBase(a) {
   } catch(e) { if(token===baseToken) $('part-status').textContent='Part preview unavailable. Use Exact part names to select the scope.'; }
 }
 $('close-base').onclick=()=>$('base-dialog').close();
-$('base-dialog').addEventListener('close',()=>{if($('base-dialog').open)return;++baseToken;picker?.dispose();picker=null;delete $('base-form').dataset.dirty;$('add-source').open=true;$('select-models').focus();});
+$('base-dialog').addEventListener('close',()=>{if($('base-dialog').open)return;++baseToken;picker?.dispose();picker=null;delete $('base-form').dataset.dirty;$('select-models').focus();});
 for(const key of ['home','studio','workflow'])$('nav-'+key).onclick=()=>navigate(key);
 window.addEventListener('hashchange',()=>navigate(location.hash.slice(1)));
 $('theme').value=localStorage.getItem('gen3d-theme')||'dark';document.documentElement.dataset.theme=$('theme').value;
@@ -377,8 +410,21 @@ $('create').elements.mode.onchange=()=>{const image=$('create').elements.mode.va
 form('create',async data=>{const mode=data.get('mode'),workflowType=data.get('workflowType');const p=await api('/projects','POST',{name:data.get('name')?.trim() || data.get('prompt').trim().slice(0,60),mode,prompt:data.get('prompt'),workflowType,profile:workflowType==='humanoid'?'character':'object',...(mode==='image'?{image:await imageData(data.get('image'))}:{})});$('create-dialog').close();$('create').reset();$('create').elements.mode.onchange();projects.push(p);chooseProject(p.id);});
 form('edit',async data=>{await api(route(),'PATCH',{name:data.get('name'),prompt:data.get('prompt'),profile:data.get('profile')});await run();});
 $('edit').addEventListener('input',()=>{$('run-workflow').classList.add('primary');$('exports').querySelector('a')?.classList.remove('primary');});
-form('settings',data=>api(route(),'PATCH',{checkpoints:Object.fromEntries(['input','concept','multiView','preview'].map(k=>[k,data.has(k)])),consistencySettings:{enabled:data.get('consistency')==='true',onFailure:data.get('onFailure')},refinementSettings:{enabled:data.get('refinement')==='true',maxIterations:Number(data.get('maxIterations'))}}));
-form('reference',async data=>{const file=data.get('image'); const p=await api(route()+'/references','POST',{label:file.name,image:await imageData(file)});await api(`${route()}/references/${p.references.at(-1).id}/review`,'POST',{decision:'approved'});$('reference').reset();$('add-source').open=false;});
+form('settings',data=>api(route(),'PATCH',{checkpoints:Object.fromEntries(['input','concept','multiView','preview'].map(k=>[k,data.has(k)])),consistencySettings:policySettings(data.get('policy')),refinementSettings:{enabled:data.get('refinement')==='true',maxIterations:Number(data.get('maxIterations'))}}));
+$('preparation-settings').onsubmit = event => event.preventDefault();
+$('preparation-settings').onchange = event => safe(async () => {
+  const field = event.target;
+  if (!field.reportValidity()) return;
+  const patch = field.name === 'policy' ? { consistencySettings:policySettings(field.value) }
+    : { refinementSettings:field.name === 'refinement' ? { enabled:field.value === 'true' } : { maxIterations:Number(field.value) } };
+  preparationSaving = true;
+  $('preparation-settings').querySelectorAll('input, select').forEach(e => { e.disabled = true; });
+  $('run-workflow').disabled = $('run-editor').disabled = true;
+  try { await api(route(), 'PATCH', patch); }
+  catch (e) { lastSignature = ''; render(); throw e; }
+  finally { preparationSaving = false; lastSignature = ''; await refresh(); }
+});
+form('reference',async data=>{const file=data.get('image'); const p=await api(route()+'/references','POST',{label:file.name,image:await imageData(file)});await api(`${route()}/references/${p.references.at(-1).id}/review`,'POST',{decision:'approved'});$('reference').reset();});
 $('add-image').onclick=()=>$('reference').elements.image.click();
 $('reference').elements.image.onchange=()=>{if($('reference').elements.image.files.length)$('reference').requestSubmit();};
 $('base-form').onsubmit=async event=>{
