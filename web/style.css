@@ -77,3 +77,62 @@ body:has(#exports a) .stage-workspace,body:has(#pending-reviews .checkpoint) .st
 .stage-workspace,.context-panel { padding:10px; } .panel-heading { flex-wrap:wrap; } .comparison { grid-template-columns:1fr; min-height:0; } #viewer { height:350px; }
 .graph { height:440px; } .workspace-heading { gap:12px; } .workspace-heading h1 { font-size:24px; } .workflow-tools button { flex:1; } .theme-label { width:80px; } .action-panel textarea { min-height:70px; } .topbar nav { gap:4px; } .topbar nav button { font-size:11px; }
 }
+/* Intention controls and visual selection replace the permanent setup forms. */
+.sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip-path:inset(50%)!important; white-space:nowrap!important; border:0!important; }
+#add-source { margin:0 0 12px; }
+#add-source>summary { list-style:none; border:1px dashed var(--line); border-radius:7px; padding:9px 12px; text-align:center; }
+#add-source[open]>summary { margin-bottom:8px; }
+.source-add-actions { display:grid; gap:8px; }
+.sources-panel figcaption { display:none; }
+.source-card { position:relative; }
+.source-card>details { margin-top:6px; }
+.source-card>details>summary { width:fit-content; }
+.source-card>details>button { display:block; }
+.source-card>button[aria-label^="Remove"] { position:absolute; top:16px; right:4px; }
+.source-card:has(>button[aria-label^="Remove"])>button { opacity:0; }
+.source-card:hover>button,.source-card:focus-within>button { opacity:1; }
+@media(hover:none) { .source-card:has(>button[aria-label^="Remove"])>button { opacity:1; } }
+#primary-source:empty,#task-progress:empty,#visual-history:empty { display:none; }
+#viewer-message { font-size:48px; color:#657584; }
+#viewer-message:not(:empty) { line-height:1.4; }
+#viewer-message[data-message] { font-size:14px; color:#d3dfe6; }
+.viewer-toolbar { justify-content:flex-end; }
+.project-open>img { width:100%; height:140px; object-fit:contain; border-radius:6px; background:var(--bg); }
+.project-open h2 { margin:8px 0; }
+#library-assets { grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); }
+.library-card { display:flex; flex-direction:column; align-items:stretch; margin:0; padding:12px; gap:8px; }
+.library-card.selected { border-color:var(--accent); }
+.library-card>img { width:100%; height:160px; object-fit:contain; background:var(--bg); border-radius:6px; }
+.library-card>span { text-align:center; font-size:48px; color:var(--muted); }
+.library-card h3 { margin:0; overflow-wrap:anywhere; }
+.library-card-actions { margin-top:auto; }
+.library-card-actions>button { width:100%; }
+.library-card-actions details { margin-top:8px; }
+.library-card-actions details>button { margin-top:8px; width:100%; }
+.library-filters label { margin:16px 0 0; }
+#library-status:empty { display:none; }
+#library-consent { margin-top:20px; border:1px solid var(--accent); border-radius:8px; padding:16px; }
+.upload-model { border:1px dashed var(--line); border-radius:7px; padding:12px; color:var(--text); }
+.upload-model input { border:0; padding:0; }
+#part-viewer { height:280px; background:#1c2532; border-radius:8px; overflow:hidden; }
+#part-viewer canvas { width:100%; height:100%; display:block; }
+#base-meshes { display:flex; flex-wrap:wrap; gap:8px; padding:4px; }
+.part-choice { position:relative; margin:0; }
+.part-choice input { position:absolute; opacity:0; width:1px; }
+.part-choice span { display:block; padding:7px 10px; border:1px solid var(--line); border-radius:6px; color:var(--text); cursor:pointer; }
+.part-choice:has(:checked) span { background:var(--accent); color:var(--ink); }
+.part-choice:has(:focus-visible) span { outline:3px solid var(--accent); outline-offset:2px; }
+#base-settings>p,#part-status { font-size:12px; }
+#base-settings fieldset { margin-top:16px; }
+#base-settings form>button { margin-top:16px; }
+#part-status:empty,#base-info:empty { display:none; }
+@media(max-width:650px) {
+  .sources-panel { order:1; }
+  #add-source { margin:0; }
+  .source-add-actions { grid-template-columns:1fr 1fr; }
+  #model-references,#references { display:flex; gap:12px; overflow:auto; }
+  .sources-panel .source-card { flex:0 0 140px; }
+  #library-assets { grid-template-columns:1fr; }
+  #base-dialog { padding:16px; }
+  #part-viewer { height:230px; }
+}

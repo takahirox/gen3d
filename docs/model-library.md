@@ -4,7 +4,7 @@ Primary input stays **Text OR Image**. Text still creates a concept and all four
 modeling views, with consistency inspection; Image still uses its upload.
 Optional 3D references supplement those images. They never replace them.
 
-Open **Add 3D source** in the studio Sources panel, or **Asset library** in the navigation. Import a model once and select it for any number
+Open **Sources → + Add → Add 3D model** in the studio Sources panel, or **Asset library** in the navigation. Import a model once and select it for any number
 of projects. Select zero, one or several models (up to 32); use filename search,
 source filters and 40-entry pages. Blender creates small, solid material-color
 previews on import/first selection. These previews show shape rather than a
@@ -22,19 +22,28 @@ detach/reselect an available entry. Folder scans validate headers; full validati
 and Blender inspection happen when selecting a model. Uninspected folder entries
 have no thumbnail until first selection.
 
-For each selection, optionally specify a role or instruction (face, proportions,
-hair, clothing, pose, topology, overall style, etc.). Choose **Reference-only** or
-**Reuse / edit**, then explicitly **Authorize selected sources** in the same dialog.
-That action records human permission for each pending selection before execution.
-Selections proposed through MCP remain pending, with contextual authorization
-buttons in the studio. An editable base always needs separate source and part-scope
-authorization, even if reuse/edit permission was already granted. Inspection-only permission does not authorize copying
-meshes, materials or shape keys. New selections and changes to instructions,
-permission or file content require human approval. Rejected entries are excluded;
-pending entries block generation even if other checkpoints are disabled. MCP
-clients can propose selections and reuse permission, but cannot approve them or
-configure a new host folder. Detaching leaves the shared model available to other
-projects. Approval is per project; it does not grant permission in another one.
+Choose **Use as reference** on a model to add appearance guidance immediately.
+This single action stores and audits inspection-only consent for that model;
+there is no second selection/save step. Uploading alone grants no rights.
+
+**More… → Use parts of this model** opens a contextual copying confirmation and
+optional instruction (hair, clothing, chair legs, etc.). Confirm only when you
+have the right to copy and change that geometry. This never grants full-model
+edit scope. **Edit this model** opens a read-only 3D preview: click parts, or focus
+and select the numbered part controls with a keyboard. **Edit selected parts**
+grants only that full-base scope and switches ordinary creation to **Improve**.
+Exact source names and explicit protected-feature exceptions remain in collapsed
+advanced controls. The preview is a display copy; editing and preservation checks
+always use the complete original scene. If the preview cannot display a part,
+a warning directs you to exact names; features are never silently unlocked.
+
+MCP proposals remain pending until a human chooses the intended use in the
+studio. Changing use never approves another pending source. Pending entries
+block generation even with checkpoints disabled; rejected entries are excluded.
+A source's **⋯** menu changes use or removes it from the project, preserving the
+shared library asset. The server enforces human-only approval, file identity,
+part scope and per-project consent. It does not change licensing rights.
+MCP cannot approve sources or configure a new host folder.
 
 Generation/retry snapshots approved selections, roles, permissions, source type,
 file identity, SHA-256 and Blender inspection. Revisions and refinement retain
@@ -200,4 +209,4 @@ reuse/adaptation, semantic modifier and role-aware refinement results.
 
 ## Complete editable bases
 
-The humanoid preset has a separate **Editable base authorization** in Model studio. Reference-only inspection and `reuse-edit` mesh permission do not grant this authorization. A base node copies the complete scene, including supported skeleton/weights/expressions, and checks the initial GLB roundtrip. Human-scoped editable objects and protected features are verified after editing. See [workflow preservation contracts and supported capabilities](workflows.md#complete-base-preservation). The mesh-only limitations above still apply to supplementary reference reuse.
+Choose **More… → Edit this model** in the source chooser, select parts in the visual picker, then **Edit selected parts** to grant full-base edit scope. Reference-only inspection and `reuse-edit` mesh permission do not grant this authorization. A base node copies the complete scene, including supported skeleton/weights/expressions, and checks the initial GLB roundtrip. Human-scoped editable objects and protected features are verified after editing. See [workflow preservation contracts and supported capabilities](workflows.md#complete-base-preservation). The mesh-only limitations above still apply to supplementary reference reuse.

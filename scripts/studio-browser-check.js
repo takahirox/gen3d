@@ -21,8 +21,17 @@ const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
 let generationNumber = 0;
 let refinementPass = true, partialModelState, failPreservation = false, usageLimit = false;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false;
+function selectionGLB() {
+  const bytes=fs.readFileSync(path.join(assets,'model-1/model.glb')), length=bytes.readUInt32LE(12);
+  const json=JSON.parse(bytes.toString('utf8',20,20+length));
+  json.nodes.filter(n=>n.mesh!==undefined).forEach((n,i)=>{n.extras={...n.extras,gen3d_part:i===0?'Hair':'Body'};});
+  const raw=Buffer.from(JSON.stringify(json)), padded=Buffer.alloc(Math.ceil(raw.length/4)*4,32);raw.copy(padded);
+  const chunk=Buffer.alloc(8);chunk.writeUInt32LE(padded.length);chunk.writeUInt32LE(0x4e4f534a,4);
+  const result=Buffer.concat([bytes.subarray(0,12),chunk,padded,bytes.subarray(20+length)]);result.writeUInt32LE(result.length,8);return result;
+}
 const providers = {
   dataDir: path.join(temp, 'data'),
+  selectionPreview: async (a, source, output) => fs.writeFileSync(output,selectionGLB()),
   inspectAsset: async a => {
     const dir = path.join(app.store.library.root, a.id); fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, 'preview.png'));
@@ -119,7 +128,7 @@ try {
     assert.ok(!result.exceptionDetails, result.exceptionDetails?.text); return result.result.value;
   }
   const visible = id => `!!document.getElementById(${JSON.stringify(id)})?.getClientRects().length`;
-  const wait = expression => until(() => evaluate(expression), expression);
+  const wait = async expression => { try { return await until(() => evaluate(expression), expression); } catch(e) { console.log(await evaluate('JSON.stringify({library:document.querySelector("#library-dialog").open,base:document.querySelector("#base-dialog").open,error:document.querySelector("#library-error").textContent,parts:document.querySelector("#part-status").textContent})'));throw e; } };
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
   const openProject = async id => {await click('#nav-home');await wait(visible('project-'+id));await click('#project-'+id);};
   const select = (selector, value) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
@@ -194,21 +203,56 @@ try {
   await until(()=>app.store.list().length===2,'image project created');
   const imageProject=app.store.list().find(p=>p.id!==automatic.id);
   await wait('document.querySelector("#title").textContent === '+JSON.stringify(imageProject.name));
-  await click('#image-sources summary');await upload('#reference input[name=image]',path.join(assets,'concept-1/concept.png'));await submit('#reference');
+  await click('#add-source summary');await upload('#reference input[name=image]',path.join(assets,'concept-1/concept.png'));
   await until(()=>app.store.get(imageProject.id).references[0]?.review==='approved','supplementary image consent');
   check('Use image attaches and audits a supplementary reference from the Sources panel');
-  await click('#select-models');await wait('document.querySelector("#library-dialog").open');
-  await evaluate('document.querySelector("#library-import").closest("details").open=true');
-  await upload('#library-file',path.join(root,'docs/validation/issue26/blender/edited.glb'));await submit('#library-import');
-  await wait('document.querySelectorAll("#library-assets input").length === 1');await click('#library-assets input');
-  assert.equal(app.store.get(imageProject.id).modelReferences.length,0,'selection alone grants no permission');
-  await select('#library-selected select','reuse-edit');await submit('#library-selection');await wait('!document.querySelector("#library-dialog").open');
+  await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await upload('#library-file',path.join(root,'docs/validation/issue26/blender/edited.glb'));
+  await wait('document.querySelectorAll("#library-assets article").length === 1 && document.querySelector("#library-dialog").getAttribute("aria-busy") !== "true"');
+  assert.equal(app.store.get(imageProject.id).modelReferences.length,0,'upload alone grants no permission');
+  await screenshot('desktop-asset-selection');
+  // Actual responsive chooser and keyboard dismissal in both themes.
+  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+  await screenshot('narrow-asset-selection-light');
+  assert.ok(await evaluate('document.querySelector("#library-dialog").scrollWidth <= document.querySelector("#library-dialog").clientWidth+1'));
+  await select('#theme','dark');await screenshot('narrow-asset-selection-dark');
+  await select('#theme','light');
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  await evaluate('document.querySelector("#close-library").focus()');
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await wait('!document.querySelector("#library-dialog").open && document.activeElement.id === "select-models"');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open && document.querySelectorAll("#library-assets article").length===1');
   const assetId=app.store.library.state.assets[0].id;
-  assert.equal(app.store.get(imageProject.id).modelReferences[0].review,'approved');
-  assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reuse-edit');
+  const libraryAction=async label=>evaluate('Array.from(document.querySelectorAll("#library-assets button")).find(b=>b.textContent === '+JSON.stringify(label)+').click()');
+  await evaluate('document.querySelector("#library-assets button").focus()');
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',text:'\r',windowsVirtualKeyCode:13});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await wait('!document.querySelector("#library-dialog").open');
+  let chosenRef=app.store.get(imageProject.id).modelReferences[0];
+  assert.equal(chosenRef.review,'approved');assert.equal(chosenRef.permission,'reference-only');
   assert.equal(app.store.get(imageProject.id).activity.find(e=>e.type==='model_reference_reviewed').actor,'web');
-  assert.equal(app.store.get(imageProject.id).editableBase,null);
-  check('inline import and compact reuse permission are explicitly authorized before execution; reuse is not base consent');
+  await wait('document.activeElement.id === "select-models"');
+  // Change use from the source card; broader use needs an explicit contextual consent.
+  await evaluate('document.querySelector("#model-references details").open=true');
+  await evaluate('Array.from(document.querySelectorAll("#model-references button")).find(b=>b.textContent==="Change use…").click()');
+  await wait('document.querySelector("#library-dialog").open');
+  await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Use parts of this model');
+  await wait('!document.querySelector("#library-consent").hidden');
+  assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reference-only');
+  await submit('#library-consent');assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reference-only','unchecked consent cannot submit');
+  await screenshot('desktop-copy-consent');
+  await click('#cancel-copy');assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reference-only');
+  await libraryAction('Use parts of this model');await wait('!document.querySelector("#library-consent").hidden');
+  await fill('#library-consent',{consent:true,role:'Hair'});await submit('#library-consent');await wait('!document.querySelector("#library-dialog").open');
+  assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reuse-edit');assert.equal(app.store.get(imageProject.id).editableBase,null);
+  // Removing one source never approves another pending source or deletes the library asset.
+  await evaluate('document.querySelector("#model-references details").open=true');
+  await evaluate('Array.from(document.querySelectorAll("#model-references button")).find(b=>b.textContent==="Remove").click()');
+  await until(()=>!app.store.get(imageProject.id).modelReferences.length,'remove model source');assert.ok(app.store.library.get(assetId));
+  await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await wait('document.querySelectorAll("#library-assets article").length === 1');
+  await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Use parts of this model');await wait('!document.querySelector("#library-consent").hidden');
+  await fill('#library-consent',{consent:true});await submit('#library-consent');await wait('!document.querySelector("#library-dialog").open');
+  check('upload grants no rights; direct reference is atomic and audited; broader copy needs explicit consent; source change/removal preserve library assets');
   await click('#run-workflow');await until(()=>app.store.get(imageProject.id).workflowRuns[0]?.status==='completed','image default with sources');
   assert.equal(app.store.get(imageProject.id).versions[0].modelReferences[0].permission,'reuse-edit');
   assert.deepEqual(app.store.get(imageProject.id).workflowRuns[0].decisions,[]);
@@ -221,8 +265,8 @@ try {
     const response=await fetch(url+'/api'+route,{method:'POST',headers:{'Content-Type':'application/json','x-gen3d-client':'mcp'},body:JSON.stringify({decision:'approved',assetId,scope:{editableObjects:['Hair']}})});assert.equal(response.status,403);
   }
   const denied=await fetch(url+`/api/projects/${imageProject.id}/runs`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(denied.status,409);
-  await wait('document.querySelector("#model-references").textContent.includes("Authorize reference")');
-  await evaluate('document.querySelector("#model-references button").click()');await until(()=>app.store.get(imageProject.id).modelReferences[0].review==='approved','reference-only consent');
+  await wait('document.querySelector("#model-references").textContent.includes("Choose use…")');
+  await evaluate('document.querySelector("#model-references>div>button").click()');await wait('document.querySelector("#library-dialog").open');await libraryAction('Use as reference');await wait('!document.querySelector("#library-dialog").open');await until(()=>app.store.get(imageProject.id).modelReferences[0].review==='approved','reference-only consent');
   check('changed permission blocks generation and MCP cannot authorize reuse or an editable base');
   await evaluate('Array.from(document.querySelectorAll("#candidate-actions button")).find(b=>b.textContent==="Refine").click()');
   await wait('document.querySelector("#refine-dialog").open');assert.ok(await evaluate('document.querySelector("#refine-dialog").textContent.includes("allowance")'));
@@ -253,13 +297,61 @@ try {
   await until(()=>app.store.list().length===4,'humanoid project created');const humanoid=app.store.list().find(p=>p.workflow.nodes.some(n=>n.type==='edit'));
   await wait('document.querySelector("#title").textContent === '+JSON.stringify(humanoid.name));
   assert.ok(await evaluate('document.querySelector("#run-workflow").disabled'));
-  await select('#base-asset',assetId);await wait('document.querySelectorAll("#base-meshes input").length===2');
-  assert.equal(app.store.get(humanoid.id).editableBase,null,'choosing a source is not authorization');
-  await screenshot('desktop-base-consent');await click('#base-meshes input');await submit('#base-form');await until(()=>app.store.get(humanoid.id).editableBase?.review==='approved','base authorization');
+  await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await wait('document.querySelectorAll("#library-assets article").length === 1');await evaluate('document.querySelector("#library-assets details").open=true');
+  await libraryAction('Edit this model');await wait('document.querySelector("#base-dialog").open && document.querySelectorAll("#base-meshes input").length===2 && document.querySelector("#part-status").textContent !== "Loading parts…"');
+  assert.equal(app.store.get(humanoid.id).editableBase,null,'choosing a model does not grant edit scope');
+  assert.equal(await evaluate('document.querySelectorAll("#part-viewer canvas").length'),1);
+  assert.equal(await evaluate('document.querySelector("#part-status").textContent'),'');
+  assert.ok(await evaluate('document.querySelector("#base-form button[type=submit]").disabled'));
+  await screenshot('desktop-base-consent');
+  // Keyboard selection highlights/selects the corresponding geometry; exact name remains accessible.
+  await evaluate('document.querySelector("#base-meshes input").focus()');
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',text:' ',windowsVirtualKeyCode:32});await call('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+  assert.ok(await evaluate('document.querySelector("#base-meshes input").checked'));
+  assert.equal(await evaluate('document.querySelector("#base-meshes input").getAttribute("aria-label")'),'Part 1: Hair');
+  await submit('#base-form');await until(()=>app.store.get(humanoid.id).editableBase?.review==='approved','base scope consent');
+  await wait('!document.querySelector("#base-dialog").open');
   assert.deepEqual(app.store.get(humanoid.id).editableBase.scope,{editableObjects:['Hair'],allowChanges:[],allowNewObjects:false});
   await wait('!document.querySelector("#run-workflow").disabled');await click('#run-workflow');await until(()=>{const r=app.store.get(humanoid.id).workflowRuns[0];if(r&&r.status!=='running')assert.equal(r.status,'completed',r.error);return r?.status==='completed';},'humanoid edit with synthetic preservation');
   await wait('document.querySelector("#exports").textContent.includes("Download GLB")');
   check('main studio selects complete base and exact parts, separately authorizes scope, then Improve reaches preview (synthetic preservation)');
+  // Switching an existing object project to editing retains applied, unsaved node settings.
+  await openProject(textProject.id);await click('#nav-workflow');await click('#graph-node-model');
+  const editInstructions='Make the toolbox taller, preserving the protected body';
+  const creationWorkflow=structuredClone(app.store.get(textProject.id).workflow);
+  await fill('#node-form',{'setting:instructions':editInstructions});await submit('#node-form');
+  await wait('document.querySelector("#graph-warning").textContent.includes("Unsaved")');
+  assert.deepEqual(app.store.get(textProject.id).workflow,creationWorkflow,'node changes remain unsaved before edit selection');
+  await click('#nav-studio');await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  await wait('document.querySelectorAll("#library-assets article").length===1');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
+  await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#close-base');
+  assert.equal(app.store.get(textProject.id).editableBase,null,'cancel edit leaves project unchanged');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open && document.querySelectorAll("#library-assets article").length===1');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
+  await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#base-meshes input');await submit('#base-form');
+  await wait('!document.querySelector("#base-dialog").open && document.querySelector("#run-workflow").textContent === "Improve"');
+  assert.ok(app.store.get(textProject.id).workflow.nodes.some(n=>n.type==='base'));
+  await click('#run-workflow');await until(()=>app.store.get(textProject.id).workflowRuns.length===2 && app.store.get(textProject.id).workflowRuns.at(-1).status==='completed','existing project edited');
+  const editRun=app.store.get(textProject.id).workflowRuns.at(-1), editedVersion=app.store.get(textProject.id).versions.at(-1);
+  assert.equal(editRun.graph.nodes.find(n=>n.id==='model').type,'edit','Improve must execute an edit node after unsaved workflow changes');
+  assert.equal(editRun.graph.nodes.find(n=>n.id==='model').settings.instructions,editInstructions);
+  assert.ok(editRun.graph.edges.some(e=>e.from==='base'&&e.to==='model'&&e.input==='base'));
+  assert.deepEqual(editRun.snapshot.base,app.store.get(textProject.id).editableBase);
+  assert.equal(editedVersion.editableBase.assetId,assetId);
+  assert.deepEqual(editedVersion.editableBase.scope,{editableObjects:['Hair'],allowChanges:[],allowNewObjects:false});
+  assert.equal(editedVersion.feedback,editInstructions);
+  assert.equal(editedVersion.preservation.passed,true);
+  check('Improve retains unsaved workflow settings and executes with the selected editable base and protected scope');
+  assert.deepEqual(app.store.get(textProject.id).editableBase.scope.allowChanges,[]);
+  const savedEdit=structuredClone(app.store.get(textProject.id).versions.at(-1).editableBase);
+  await wait('document.querySelector("#base-source details")');await evaluate('document.querySelector("#base-source details").open=true');
+  await evaluate('Array.from(document.querySelectorAll("#base-source button")).find(b=>b.textContent==="Remove model").click()');
+  await until(()=>!app.store.get(textProject.id).editableBase,'remove editable source');
+  await wait('document.querySelector("#run-workflow").disabled');
+  assert.deepEqual(app.store.get(textProject.id).versions.at(-1).editableBase,savedEdit,'prior edit retains immutable base scope');
+  await openProject(imageProject.id);await wait('document.querySelector("#references button[aria-label]")');await click('#references button[aria-label]');
+  await until(()=>app.store.get(imageProject.id).references[0].review==='rejected','image removed');
+  check('existing project switches to Improve through contextual selection; cancellation grants nothing; image removal is direct');
   // Explicit pauses remain real: configure all four using the advanced UI.
   const reviewProject=await request('/projects','POST',{name:'Human review',mode:'text',prompt:'A cabinet'});
   await openProject(reviewProject.id);await click('#nav-workflow');

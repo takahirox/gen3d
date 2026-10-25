@@ -87,6 +87,16 @@ const manifest = store.library.jobFiles([{ assetId: managed.id, name: managed.na
 const before = Object.fromEntries(manifest.map(a => [a.assetId, hash(a.path)]));
 const parts = await store.library.import({ name: 'parts.glb', data: fs.readFileSync(path.join(source, 'parts.glb')).toString('base64') });
 const hair = await store.library.import({ name: 'hair.glb', data: fs.readFileSync(path.join(source, 'hair.glb')).toString('base64') });
+// Visual scope previews keep exact source names and never grant edit rights.
+for (const asset of [parts, head]) {
+  const sourceHash=hash(store.library.resolve(asset));
+  const preview=await store.library.partPreview(asset.id), bytes=fs.readFileSync(preview);
+  const gltf=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
+  const names=gltf.nodes.filter(n=>n.extras?.gen3d_part).map(n=>n.extras.gen3d_part).sort();
+  assert.deepEqual(names,store.library.get(asset.id).inspection.objects.filter(o=>o.type==='MESH').map(o=>o.name).sort());
+  assert.equal(hash(store.library.resolve(asset)),sourceHash);
+  assert.equal(await store.library.partPreview(asset.id),preview,'reuses the same source-hashed preview');
+}
 const combinedManifest = store.library.jobFiles([
   { assetId: parts.id, sha256: parts.sha256, role: 'body and collar', permission: 'reuse-edit' },
   { assetId: hair.id, sha256: hair.sha256, role: 'hair', permission: 'reuse-edit' },
@@ -327,6 +337,6 @@ for (const record of rendered) {
   await referenceSheet(manifest.find(r => r.assetId === record.assetId), record.views, path.join(output, 'reference-renders', record.assetId));
 }
 const after = Object.fromEntries(manifest.map(a => [a.assetId, hash(a.path)])); assert.deepEqual(after, before);
-const report = { realBlender: true, codexUsed: false, checkedAt: new Date().toISOString(), checks: ['real GLB managed import', 'real .blend folder inspection', 'modern .blend header', 'reject valid-header corrupt file', 'reject unpacked missing/external textures', 'load both into separate scenes', 'reject reference-only duplication', 'reuse independent mesh/materials/shape keys/node groups/images', 'semantic shape-key edit and optional subdivision', 'reimport GLB and verify evaluated subdivision geometry', 'reject inspection-object modifier dependencies', 'reject empty evaluated modifier results', 'strip incidental geometry from render/GLB/.blend', 'reopen .blend and check single mesh and scene', 'unchanged library/source file hashes', 'ordinary joins preserve multiple assets and same-asset source objects', 'joined contributor permissions and removed geometry checked', 'combined GLB geometry/materials and saved .blend provenance verified'], sourceHashes: before, combinedSourceHashes: combinedHashes, fixtureHashes, combinedProvenance, isolation: JSON.parse(fs.readFileSync(path.join(output, 'isolation.json'))), outputMeshes: 1 };
+const report = { realBlender: true, codexUsed: false, checkedAt: new Date().toISOString(), checks: ['visual part previews from GLB and packed .blend preserve exact mesh mapping and source bytes', 'real GLB managed import', 'real .blend folder inspection', 'modern .blend header', 'reject valid-header corrupt file', 'reject unpacked missing/external textures', 'load both into separate scenes', 'reject reference-only duplication', 'reuse independent mesh/materials/shape keys/node groups/images', 'semantic shape-key edit and optional subdivision', 'reimport GLB and verify evaluated subdivision geometry', 'reject inspection-object modifier dependencies', 'reject empty evaluated modifier results', 'strip incidental geometry from render/GLB/.blend', 'reopen .blend and check single mesh and scene', 'unchanged library/source file hashes', 'ordinary joins preserve multiple assets and same-asset source objects', 'joined contributor permissions and removed geometry checked', 'combined GLB geometry/materials and saved .blend provenance verified'], sourceHashes: before, combinedSourceHashes: combinedHashes, fixtureHashes, combinedProvenance, isolation: JSON.parse(fs.readFileSync(path.join(output, 'isolation.json'))), outputMeshes: 1 };
 fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
 console.log(`Real Blender library checks passed: ${output}`);

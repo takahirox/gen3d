@@ -51,7 +51,7 @@ export function validateModel(bytes, filename) {
 }
 
 export class AssetLibrary {
-  constructor(root, { env = process.env, inspect } = {}) {
+  constructor(root, { env = process.env, inspect, selectionPreview } = {}) {
     this.root = path.join(root, 'library');
     fs.mkdirSync(this.root, { recursive: true });
     this.root = fs.realpathSync(this.root);
@@ -60,6 +60,12 @@ export class AssetLibrary {
     if (this.state.schemaVersion !== 1 || !Array.isArray(this.state.assets) || !Array.isArray(this.state.sources)) throw new AppError('Unsupported model library schema; use a fresh gen3d data directory');
     this.env = env;
     this.pendingInspections = new Map();
+    this.pendingPreviews = new Map();
+    this.selectionPreview = selectionPreview || (async (asset, source, output) => {
+      const script = path.join(this.root, asset.id, 'selection-preview.py');
+      fs.writeFileSync(script, `import sys\nsys.path.insert(0, ${JSON.stringify(path.dirname(runtime))})\nimport reference_runtime as refs\nrefs.selection_preview(${JSON.stringify(source)}, ${JSON.stringify(output)})\n`);
+      await runProcess(env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 60000, env });
+    });
     this.inspect = inspect || (async (asset, file) => {
       const dir = path.join(this.root, asset.id); fs.mkdirSync(dir, { recursive: true });
       const script = path.join(dir, 'inspect.py');
@@ -182,6 +188,20 @@ export class AssetLibrary {
   }
   jobFiles(snapshots) {
     return snapshots.map(s => { const a = this.get(s.assetId); if (this.verify(a).sha256 !== s.sha256) throw new AppError(`${s.name}: source changed since job approval`, 409); return { ...s, path: this.resolve(a) }; });
+  }
+  async partPreview(id) {
+    if (!this.pendingPreviews.has(id)) {
+      const task = (async () => {
+        const a = await this.inspected(id), dir = path.join(this.root, a.id);
+        const file = path.join(dir, `selection-${a.sha256}.glb`);
+        if (!fs.existsSync(file)) await this.selectionPreview(a, this.resolve(a), file);
+        if (this.verify(this.get(id)).sha256 !== a.sha256) throw new AppError('Model changed; choose it again', 409);
+        if (!fs.lstatSync(file).isFile() || fs.realpathSync(file) !== file) throw new AppError('Part preview unavailable', 409);
+        return file;
+      })().finally(() => this.pendingPreviews.delete(id));
+      this.pendingPreviews.set(id, task);
+    }
+    return this.pendingPreviews.get(id);
   }
   preview(id) { const a = this.get(id); this.resolve(a); const file = path.join(this.root, a.id, 'preview.png'); if (!a.inspection || !fs.existsSync(file) || !fs.lstatSync(file).isFile() || fs.realpathSync(file) !== file) throw new AppError('Preview unavailable', 404); return file; }
 }

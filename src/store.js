@@ -257,6 +257,34 @@ export class Store {
       this.event(p, actor, 'model_references_selected', { models: structuredClone(selections) }); this.save(p); return p;
     } finally { release(); }
   }
+  // A deliberate studio action selects and approves only this exact source.
+  // Inspection/validation finish before either selections or audit history change.
+  async useModel(id, input, actor) {
+    if (actor !== 'web') throw new AppError('Source use requires a human in the web UI', 403);
+    const release = this.beginOperation(id);
+    try {
+      const p = this.get(id); this.idle(p);
+      if (!['reference', 'parts', 'remove'].includes(input.use)) throw new AppError('Choose how to use this model');
+      if (typeof input.assetId !== 'string') throw new AppError('Choose a model');
+      if (input.use === 'remove') {
+        p.modelReferences = p.modelReferences.filter(r => r.assetId !== input.assetId);
+        this.event(p, actor, 'model_reference_removed', { assetId: input.assetId }); this.save(p); return p;
+      }
+      if (input.use === 'parts' && input.copyConsent !== true) throw new AppError('Confirm that you can copy and change parts of this model', 403);
+      if (input.role !== undefined && (typeof input.role !== 'string' || input.role.length > 1000)) throw new AppError('Role must contain at most 1000 characters');
+      if (!p.modelReferences.some(r => r.assetId === input.assetId) && p.modelReferences.length >= 32) throw new AppError('Select at most 32 models');
+      const a = await this.library.inspected(input.assetId);
+      if (a.sha256 !== input.sha256 || this.library.verify(this.library.get(a.id)).sha256 !== a.sha256) throw new AppError('Model changed; choose it again', 409);
+      this.idle(p);
+      const selection = { assetId: a.id, name: a.name, origin: a.sourceId ? 'folder' : 'managed', role: (input.role || '').trim(), permission: input.use === 'parts' ? 'reuse-edit' : 'reference-only', sha256: a.sha256, review: 'approved' };
+      const index = p.modelReferences.findIndex(r => r.assetId === a.id);
+      if (index < 0 && p.modelReferences.length >= 32) throw new AppError('Select at most 32 models');
+      if (index < 0) p.modelReferences.push(selection); else p.modelReferences[index] = selection;
+      this.event(p, actor, 'model_references_selected', { models: structuredClone(p.modelReferences) });
+      this.event(p, actor, 'model_reference_reviewed', { ...selection, decision: 'approved', intent: input.use });
+      this.save(p); return p;
+    } finally { release(); }
+  }
   reviewModelReference(id, assetId, decision, actor) {
     const p = this.get(id); this.idle(p);
     if (actor !== 'web') throw new AppError('3D reference and reuse permission approval requires the web UI', 403);
