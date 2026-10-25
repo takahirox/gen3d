@@ -4,7 +4,7 @@ Primary input stays **Text OR Image**. Text still creates a concept and all four
 modeling views, with consistency inspection; Image still uses its upload.
 Optional 3D references supplement those images. They never replace them.
 
-Open **Sources → + Add → Add 3D model** in the studio Sources panel, or **Asset library** in the navigation. Import a model once and select it for any number
+Open **Sources → Add 3D model** in the studio Sources panel, or **Asset library** in the navigation. Import a model once and select it for any number
 of projects. Select zero, one or several models (up to 32); use filename search,
 source filters and 40-entry pages. Blender creates small, solid material-color
 previews on import/first selection. These previews show shape rather than a

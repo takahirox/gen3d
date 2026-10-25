@@ -578,8 +578,8 @@ test('missing/invalid/unavailable views and inspection failures block modeling w
   }
 });
 
-test('cross-view contradictions require regeneration from the same base and cannot be approved away', async t => {
-  const store = new Store(temporary(t)), p = store.create(input, 'web');
+test('explicit Stop contradictions require regeneration from the same base and cannot be approved away', async t => {
+  const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: { onFailure: 'stop' } }, 'web');
   const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => ({ consistent: false, issues: ['Back view is missing a leg'] }), generate: () => assert.fail('No modeling inconsistent views') });
   runner.start(p.id, {}, 'web'); await runner.pending;
   const set = p.referenceSets[0]; assert.equal(set.status, 'ready'); assert.equal(set.consistency.status, 'failed'); assert.equal(set.review, 'pending');
@@ -797,7 +797,7 @@ test('inspection crashes, unavailable tools and malformed reports remain errors 
 
 test('contradictory successful reports and failed reports without issue text remain failed, never passed', async t => {
   for (const report of [{ consistent: true, issues: ['Different shape'] }, { consistent: false, issues: [] }]) {
-    const store = new Store(temporary(t)), p = store.create(input, 'web');
+    const store = new Store(temporary(t)), p = store.create({ ...input, consistencySettings: { onFailure: 'stop' } }, 'web');
     const runner = new Runner(store, { conceptGenerator, inspectReferences: async () => report, generate: () => assert.fail('Stop mode blocks') });
     runner.start(p.id, {}, 'web'); await runner.pending;
     assert.equal(p.referenceSets[0].consistency.status, 'failed'); assert.equal(p.versions.length, 0);
@@ -888,14 +888,14 @@ test('human multi-view approval gates every policy across restart and settings c
 
 test('consistency defaults persist and reject invalid settings without mutation', t => {
   const dir = temporary(t), store = new Store(dir), p = store.create(input, 'web');
-  assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'stop' });
+  assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'continue' });
   for (const bad of [null, [], false, { enabled: 'off' }, { onFailure: 'ignore' }, { other: true }]) {
     assert.throws(() => store.create({ ...input, consistencySettings: bad }, 'web'), /Consistency settings/);
     assert.throws(() => store.update(p.id, { consistencySettings: bad }, 'web'), /Consistency settings/);
-    assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'stop' });
+    assert.deepEqual(p.consistencySettings, { enabled: true, onFailure: 'continue' });
   }
   assert.equal(store.list().length, 1);
-  assert.deepEqual(new Store(dir).get(p.id).consistencySettings, { enabled: true, onFailure: 'stop' });
+  assert.deepEqual(new Store(dir).get(p.id).consistencySettings, { enabled: true, onFailure: 'continue' });
 });
 
 test('HTTP and MCP share consistency settings, reports, outcomes, warnings and history in every mode', async t => {

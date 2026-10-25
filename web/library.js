@@ -69,15 +69,14 @@ export function setupLibrary({ api, project, refresh, editModel }) {
     if (busy) return;
     opener = event?.currentTarget || document.activeElement; targetProject = project()?.id || null; copyAsset = null;
     $('library-project').textContent = targetProject ? `Sources for ${project().name}` : 'Create a project to use a model.';
-    $('library-consent').hidden = true; $('add-source').open = false;
+    $('library-consent').hidden = true;
     page = 0; $('library-assets').replaceChildren(); $('library-dialog').showModal(); load();
   }
   $('open-library').onclick = open; $('select-models').onclick = open;
   $('close-library').onclick = () => $('library-dialog').close();
   $('library-dialog').addEventListener('close', () => {
     if ($('library-dialog').open || $('base-dialog').open) return;
-    if (opener?.id === 'select-models') $('add-source').open = true;
-    (opener?.isConnected ? opener : $('add-source').querySelector('summary')).focus();
+    (opener?.isConnected ? opener : $('select-models')).focus();
   });
   $('cancel-copy').onclick = () => { $('library-consent').hidden = true; $('library-assets').querySelector(`[data-asset-id="${copyAsset.id}"] summary`)?.focus(); copyAsset = null; };
   let timer;

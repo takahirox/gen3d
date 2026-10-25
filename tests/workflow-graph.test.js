@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../src/store.js';
 import { Runner } from '../src/runner.js';
-import { WorkflowEngine, workflowPreset, validateGraph, hash } from '../src/workflow.js';
+import { WorkflowEngine, workflowPreset, validateGraph, validateNodeOutput, hash } from '../src/workflow.js';
 import { workflowOperations } from '../src/workflow-operations.js';
 import { createApp } from '../src/server.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -17,11 +17,11 @@ import { categories } from '../src/refinement.js';
 const fixture = path.resolve('docs/validation/issue10/prop');
 const png = fs.readFileSync(path.join(fixture, 'concept-1/concept.png'));
 const off = { input: false, concept: false, multiView: false, preview: false };
-function setup(t, { mode = 'image', checkpoints, inspect, failViews = false, refinement = false } = {}) {
+function setup(t, { mode = 'image', checkpoints, consistencySettings, inspect, failViews = false, refinement = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-graph-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const store = new Store(root), calls = [];
-  const p = store.create({ name: 'Graph test', mode, prompt: 'A teal cabinet', ...(mode === 'image' ? { image: 'data:image/png;base64,' + png.toString('base64') } : {}), checkpoints, refinementSettings: { enabled: refinement, maxIterations: 1 } }, 'web');
+  const p = store.create({ name: 'Graph test', mode, prompt: 'A teal cabinet', ...(mode === 'image' ? { image: 'data:image/png;base64,' + png.toString('base64') } : {}), checkpoints, consistencySettings, refinementSettings: { enabled: refinement, maxIterations: 1 } }, 'web');
   const runner = new Runner(store, {
     conceptGenerator: {
       async generate() { calls.push('concept'); return { ext: 'png', bytes: png }; },
@@ -133,7 +133,7 @@ test('human approvals cannot be bypassed by MCP, settings, forks or restart', as
 });
 
 test('consistency blockers and partial failed views never become reusable modeling checkpoints', async t => {
-  for (const options of [{ inspect: { consistent: false, issues: ['Different feet'] } }, { failViews: true }]) {
+  for (const options of [{ inspect: { consistent: false, issues: ['Different feet'] }, consistencySettings: { onFailure: 'stop' } }, { failViews: true }]) {
     const c = setup(t, { mode: 'text', ...options }); const r = await c.run(); assert.equal(r.status, 'failed'); assert.ok(!c.calls.includes('model'));
     assert.ok(!r.checkpoints.some(cp => cp.nodeId === 'consistency'));
     assert.equal(c.p.versions.length, 0);
@@ -220,7 +220,10 @@ test('a branch from a completed model publishes a separate candidate without cha
 
 test('HTTP and a real MCP client share catalog, preset, graph execution and checkpoint state', async t => {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'gen3d-graph-http-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const app=createApp({dataDir:root,generate:async(p,v,dir)=>{for(const f of ['model.glb','scene.blend','preview.png','mcp-audit.jsonl'])fs.copyFileSync(path.join(fixture,'model-1',f),path.join(dir,f));}});
+  const app=createApp({dataDir:root,conceptGenerator:{
+    generate:async()=>({bytes:png,ext:'png'}),
+    generateViews:async({onImage})=>{for(const view of ['front','side','back','three-quarter'])await onImage({view,side:'left',bytes:png,ext:'png'});}
+  },inspectReferences:async()=>({consistent:false,issues:['Different rear shape']}),generate:async(p,v,dir)=>{for(const f of ['model.glb','scene.blend','preview.png','mcp-audit.jsonl'])fs.copyFileSync(path.join(fixture,'model-1',f),path.join(dir,f));}});
   app.server.listen(0,'127.0.0.1');await once(app.server,'listening');const url=`http://127.0.0.1:${app.server.address().port}`;
   const client=new Client({name:'graph-test',version:'1'}),transport=new StdioClientTransport({command:process.execPath,args:[path.resolve('src/mcp.js')],env:{...process.env,GEN3D_URL:url},stderr:'pipe'});
   await client.connect(transport);
@@ -233,6 +236,15 @@ test('HTTP and a real MCP client share catalog, preset, graph execution and chec
   await call('run_workflow',{projectId:p.id});await app.runner.pending;
   const shared=await call('get_project',{projectId:p.id});assert.equal(shared.workflowRuns[0].status,'completed',shared.workflowRuns[0].error);
   const web=await(await fetch(url+`/api/projects/${p.id}`)).json();assert.deepEqual(web.workflowRuns,shared.workflowRuns);
+  for (const settings of [undefined,{enabled:false},{enabled:true,onFailure:'stop'}]) {
+    const text=await call('create_project',{name:'MCP text policy',mode:'text',prompt:'A teal cabinet',...(settings?{consistencySettings:settings}:{})});
+    if(!settings)assert.deepEqual(text.consistencySettings,{enabled:true,onFailure:'continue'});
+    await call('run_workflow',{projectId:text.id});await app.runner.pending;
+    const shared=await call('get_project',{projectId:text.id}),run=shared.workflowRuns[0];
+    assert.equal(run.status,settings?.onFailure==='stop'?'failed':'completed',run.error);
+    assert.equal(run.checkpoints.find(cp=>cp.nodeId==='views').data.images.length,4);
+    assert.deepEqual(shared,await(await fetch(url+`/api/projects/${text.id}`)).json());
+  }
   const denied=await fetch(url+`/api/projects/${p.id}/editable-base`,{method:'POST',headers:{'content-type':'application/json','x-gen3d-client':'mcp'},body:JSON.stringify({assetId:'fake',scope:{editableObjects:['Hair']}})});assert.equal(denied.status,403);
 });
 
@@ -282,4 +294,105 @@ test('human stop during initial modeling skips downstream refinement and forces 
   assert.equal(r.nodes.review.status,'waiting-review');assert.equal(r.checkpoints.find(cp=>cp.nodeId==='model').data.reviewRequired,true);
   assert.throws(()=>c.engine.start(c.p.id,{runId:r.id,checkpointId:r.checkpoints[0].id}),/pending/);
   c.engine.review(c.p.id,r.id,'review','approved','web');await c.runner.pending;assert.equal(r.status,'completed',r.error);
+});
+
+test('default warnings, explicit policies and node overrides retain truthful reports across saved presets', async t => {
+  const contradiction = { consistent: false, issues: ['Rear shape differs'] };
+  for (const settings of [undefined, { enabled: false }, { onFailure: 'stop' }]) {
+    const c = setup(t, { mode: 'text', consistencySettings: settings, inspect: contradiction });
+    const r = await c.run();
+    assert.equal(r.status, settings?.onFailure === 'stop' ? 'failed' : 'completed', r.error);
+    assert.equal(c.calls.includes('consistency'), settings?.enabled !== false);
+    assert.equal(r.checkpoints.find(cp => cp.nodeId === 'views').data.images.length, 4);
+    if (r.status === 'completed') {
+      const cp = r.checkpoints.find(cp => cp.nodeId === 'consistency');
+      assert.equal(cp.data.consistency.status, settings ? 'skipped' : 'failed');
+      assert.equal(cp.data.consistency.outcome, 'allowed');
+      if (!settings) assert.deepEqual(cp.data.consistency.report, contradiction);
+    }
+    for (const override of [{ enabled: true, onFailure: 'stop' }, { enabled: true, onFailure: 'continue' }, { enabled: false }]) {
+      const graph = workflowPreset(); graph.nodes.find(n => n.type === 'consistency').settings = override;
+      const preset = c.engine.savePreset({ name: 'Policy preset', graph });
+      c.engine.saveGraph(c.p.id, preset.graph, 'web');
+      const run = await c.run();
+      assert.equal(run.status, override.enabled && override.onFailure === 'stop' ? 'failed' : 'completed', run.error);
+      assert.deepEqual(c.engine.context(graph.nodes.find(n => n.type === 'consistency'), run.snapshot), { ...c.p.consistencySettings, ...override });
+    }
+  }
+});
+
+test('policy changes invalidate checked views and descendants while preserving preparation and old stopped runs', async t => {
+  const c = setup(t, { mode: 'text', inspect: { consistent: false, issues: ['Different feet'] } });
+  const original = await c.run(), before = hash(original);
+  const checked = original.checkpoints.find(cp => cp.nodeId === 'consistency');
+  const views = original.checkpoints.find(cp => cp.nodeId === 'views');
+  c.store.update(c.p.id, { consistencySettings: { onFailure: 'stop' } }, 'mcp');
+  assert.throws(() => c.engine.start(c.p.id, { runId: original.id, checkpointId: checked.id }), /upstream/);
+  const stopped = await c.run({ runId: original.id, checkpointId: views.id });
+  assert.equal(stopped.status, 'failed'); assert.equal(stopped.nodes.views.reusedFrom, original.id);
+  assert.notEqual(stopped.nodes.consistency.fingerprint, original.nodes.consistency.fingerprint);
+  assert.equal(hash(original), before);
+  const stoppedBefore = hash(stopped);
+  c.store.update(c.p.id, { consistencySettings: { enabled: false } }, 'web');
+  assert.equal(hash(stopped), stoppedBefore);
+  assert.equal(new Store(c.root).get(c.p.id).workflowRuns.at(-1).status, 'failed');
+  const skipped = await c.run({ runId: stopped.id, checkpointId: stopped.checkpoints.find(cp => cp.nodeId === 'views').id });
+  assert.equal(skipped.status, 'completed', skipped.error);
+  assert.equal(skipped.checkpoints.find(cp => cp.nodeId === 'consistency').data.consistency.status, 'skipped');
+});
+
+test('execution/parsing errors and invalid four-view metadata stay hard blockers in graph policies', async t => {
+  for (const settings of [{ enabled: true, onFailure: 'continue' }, { enabled: true, onFailure: 'stop' }, { enabled: false, onFailure: 'continue' }]) {
+    for (const badViews of [
+      ['front'], ['front', 'side', 'back', 'back'], ['front', 'side', 'back', 'wrong'],
+      ['front', 'side', 'back', 'three-quarter', 'front']
+    ]) {
+      const c = setup(t, { mode: 'text', consistencySettings: settings });
+      c.runner.conceptGenerator.generateViews = async ({ onImage }) => {
+        for (const view of badViews) await onImage({ view, side: 'left', bytes: png, ext: 'png' });
+      };
+      const run = await c.run(); assert.equal(run.status, 'failed');
+      assert.ok(!c.calls.includes('model')); assert.ok(!c.calls.includes('consistency'));
+    }
+    const c = setup(t, { mode: 'text', consistencySettings: settings });
+    c.runner.conceptGenerator.generateViews = async ({ onImage }) => {
+      for (const view of ['front', 'side', 'back', 'three-quarter']) await onImage({ view, side: 'unknown', bytes: png, ext: 'png' });
+    };
+    assert.equal((await c.run()).status, 'failed'); assert.ok(!c.calls.includes('model'));
+    if (!settings.enabled) continue;
+    for (const inspect of [async () => { throw new Error('Inspection unavailable'); }, async () => null, async () => ({ consistent: 'yes', issues: [] }), async () => ({ consistent: false, issues: [42] })]) {
+      const c = setup(t, { mode: 'text', consistencySettings: settings }); c.runner.inspectReferences = inspect;
+      const run = await c.run(); assert.equal(run.status, 'failed'); assert.ok(!c.calls.includes('model'));
+      assert.ok(!run.checkpoints.some(cp => cp.nodeId === 'consistency'));
+    }
+  }
+});
+
+test('fully overridden policy preserves reusable checked views when only project defaults change', async t => {
+  const c = setup(t, { mode: 'text', inspect: { consistent: false, issues: ['Changed rear'] } });
+  const graph = workflowPreset(); graph.nodes.find(n => n.type === 'consistency').settings = { enabled: true, onFailure: 'continue' };
+  c.engine.saveGraph(c.p.id, graph, 'web');
+  const original = await c.run(), checked = original.checkpoints.find(cp => cp.nodeId === 'consistency');
+  c.store.update(c.p.id, { consistencySettings: { enabled: false, onFailure: 'stop' } }, 'web');
+  const fork = await c.run({ runId: original.id, checkpointId: checked.id });
+  assert.equal(fork.status, 'completed', fork.error);
+  assert.equal(fork.nodes.consistency.reusedFrom, original.id);
+  assert.equal(fork.nodes.consistency.fingerprint, original.nodes.consistency.fingerprint);
+});
+
+test('typed graph evidence rejects wrong, duplicate, missing and mislinked views before optional inspection', async t => {
+  const c = setup(t, { mode: 'text' }), run = await c.run();
+  const views = run.checkpoints.find(cp => cp.nodeId === 'views').data;
+  for (const change of [
+    d => d.images.pop(), d => d.images.push({ ...d.images[0], view: 'other' }),
+    d => d.images[1].file = d.images[0].file,
+    d => d.images[1].view = 'front', d => d.images[1].side = 'unknown',
+    d => d.images[0].referenceSetId = 'different', d => d.images[0].parentImage = 'different.png',
+    d => d.images[0].role = 'supplementary', d => d.images[0].file = d.visual.file
+  ]) {
+    const data = structuredClone(views); change(data);
+    assert.throws(() => validateNodeOutput('views', data), /invalid typed/);
+    data.consistency = { status: 'skipped', outcome: 'allowed' };
+    assert.throws(() => validateNodeOutput('consistency', data), /invalid typed/);
+  }
 });

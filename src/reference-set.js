@@ -4,7 +4,7 @@ import { runProcess, subscriptionEnv } from './codex.js';
 import { AppError } from './store.js';
 
 export const requiredViews = ['front', 'side', 'back', 'three-quarter'];
-export function consistencySettings(value = {}, previous = { enabled: true, onFailure: 'stop' }) {
+export function consistencySettings(value = {}, previous = { enabled: true, onFailure: 'continue' }) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.entries(value).some(([key, v]) => key === 'enabled' ? typeof v !== 'boolean'
       : key === 'onFailure' ? !['stop', 'continue'].includes(v) : true)) throw new AppError('Consistency settings must be enabled (boolean) and onFailure (stop or continue)');
@@ -24,11 +24,25 @@ export function referenceProfile(value, prompt) {
 }
 
 export function validateViewSet(set) {
-  if (!requiredViews.every(view => set.images.filter(i => i.role === 'modeling-view' && i.view === view).length === 1)
+  if (set.images.length !== requiredViews.length || !requiredViews.every(view => set.images.filter(i => i.role === 'modeling-view' && i.view === view).length === 1)
     || new Set(set.images.map(i => i.file)).size !== set.images.length
     || set.images.some(i => i.parentConceptId !== set.conceptId || i.referenceSetId !== set.id
       || path.posix.dirname(i.file) !== `reference-sets/${set.id}`)
     || !['left', 'right'].includes(set.images.find(i => i.view === 'side')?.side)) throw new AppError('A complete reference set requires distinct front, labeled left/right side, back and three-quarter images from the chosen concept', 409);
+}
+
+// Graph views use run-scoped paths, but require the same complete, typed evidence
+// even when optional inspection is Off. Image input never generates extra views.
+export function validWorkflowViews(data) {
+  if (!Array.isArray(data?.images)) return false;
+  if (data.visual?.mode === 'image') return data.images.length === 0;
+  return data.visual?.mode === 'text' && typeof data.setId === 'string'
+    && data.images.length === requiredViews.length
+    && requiredViews.every(view => data.images.filter(i => i?.view === view && i.role === 'modeling-view').length === 1)
+    && data.images.every(i => typeof i.file === 'string' && i.file !== data.visual.file
+      && i.parentImage === data.visual.file && i.referenceSetId === data.setId)
+    && new Set(data.images.map(i => i.file)).size === requiredViews.length
+    && ['left', 'right'].includes(data.images.find(i => i.view === 'side')?.side);
 }
 
 // A separate Codex inspection has no Blender tools and cannot begin modeling.

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { AppError } from './errors.js';
+import { validWorkflowViews } from './reference-set.js';
 
 const contract = (inputs, output, settings = {}) => ({ inputs, output, settings });
 export const nodeCatalog = {
@@ -78,8 +79,8 @@ export function validateNodeOutput(type, data) {
   const check = {
     input: () => ['text', 'image'].includes(data.mode) && typeof data.prompt === 'string' && typeof data.profile === 'string',
     concept: () => image(data),
-    views: () => image(data.visual) && Array.isArray(data.images) && (data.visual.mode === 'image' ? data.images.length === 0 : requiredViewNames.every(v => data.images.filter(i => i.view === v && typeof i.file === 'string').length === 1)),
-    consistency: () => image(data.visual) && Array.isArray(data.images) && data.consistency?.outcome === 'allowed',
+    views: () => image(data.visual) && validWorkflowViews(data),
+    consistency: () => image(data.visual) && validWorkflowViews(data) && data.consistency?.outcome === 'allowed',
     references: () => Array.isArray(data.models) && Array.isArray(data.images) && Array.isArray(data.visuals),
     base: () => data.review === 'approved' && typeof data.blend === 'string' && typeof data.baseline === 'string' && typeof data.sha256 === 'string' && Array.isArray(data.scope?.editableObjects),
     model: () => model(data), edit: () => model(data), refine: () => model(data), review: () => model(data),
@@ -87,7 +88,6 @@ export function validateNodeOutput(type, data) {
   }[type];
   if (!check?.()) fail(`${type}: invalid typed node output`);
 }
-const requiredViewNames = ['front', 'side', 'back', 'three-quarter'];
 
 // One durable scheduler owns both HTTP and MCP execution. Operations are injected
 // so graph tests can distinguish scheduler behavior from real Codex/Blender work.
