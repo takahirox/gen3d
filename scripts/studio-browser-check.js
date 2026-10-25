@@ -316,8 +316,14 @@ try {
   await wait('!document.querySelector("#run-workflow").disabled');await click('#run-workflow');await until(()=>{const r=app.store.get(humanoid.id).workflowRuns[0];if(r&&r.status!=='running')assert.equal(r.status,'completed',r.error);return r?.status==='completed';},'humanoid edit with synthetic preservation');
   await wait('document.querySelector("#exports").textContent.includes("Download GLB")');
   check('main studio selects complete base and exact parts, separately authorizes scope, then Improve reaches preview (synthetic preservation)');
-  // Edit selection also works on an existing object project, without visiting Workflow.
-  await openProject(textProject.id);await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+  // Switching an existing object project to editing retains applied, unsaved node settings.
+  await openProject(textProject.id);await click('#nav-workflow');await click('#graph-node-model');
+  const editInstructions='Make the toolbox taller, preserving the protected body';
+  const creationWorkflow=structuredClone(app.store.get(textProject.id).workflow);
+  await fill('#node-form',{'setting:instructions':editInstructions});await submit('#node-form');
+  await wait('document.querySelector("#graph-warning").textContent.includes("Unsaved")');
+  assert.deepEqual(app.store.get(textProject.id).workflow,creationWorkflow,'node changes remain unsaved before edit selection');
+  await click('#nav-studio');await evaluate('document.querySelector("#add-source").open=true');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
   await wait('document.querySelectorAll("#library-assets article").length===1');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
   await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#close-base');
   assert.equal(app.store.get(textProject.id).editableBase,null,'cancel edit leaves project unchanged');
@@ -326,6 +332,16 @@ try {
   await wait('!document.querySelector("#base-dialog").open && document.querySelector("#run-workflow").textContent === "Improve"');
   assert.ok(app.store.get(textProject.id).workflow.nodes.some(n=>n.type==='base'));
   await click('#run-workflow');await until(()=>app.store.get(textProject.id).workflowRuns.length===2 && app.store.get(textProject.id).workflowRuns.at(-1).status==='completed','existing project edited');
+  const editRun=app.store.get(textProject.id).workflowRuns.at(-1), editedVersion=app.store.get(textProject.id).versions.at(-1);
+  assert.equal(editRun.graph.nodes.find(n=>n.id==='model').type,'edit','Improve must execute an edit node after unsaved workflow changes');
+  assert.equal(editRun.graph.nodes.find(n=>n.id==='model').settings.instructions,editInstructions);
+  assert.ok(editRun.graph.edges.some(e=>e.from==='base'&&e.to==='model'&&e.input==='base'));
+  assert.deepEqual(editRun.snapshot.base,app.store.get(textProject.id).editableBase);
+  assert.equal(editedVersion.editableBase.assetId,assetId);
+  assert.deepEqual(editedVersion.editableBase.scope,{editableObjects:['Hair'],allowChanges:[],allowNewObjects:false});
+  assert.equal(editedVersion.feedback,editInstructions);
+  assert.equal(editedVersion.preservation.passed,true);
+  check('Improve retains unsaved workflow settings and executes with the selected editable base and protected scope');
   assert.deepEqual(app.store.get(textProject.id).editableBase.scope.allowChanges,[]);
   const savedEdit=structuredClone(app.store.get(textProject.id).versions.at(-1).editableBase);
   await wait('document.querySelector("#base-source details")');await evaluate('document.querySelector("#base-source details").open=true');

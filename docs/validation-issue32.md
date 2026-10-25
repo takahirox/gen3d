@@ -97,3 +97,18 @@ Additional captures: [copy consent](validation/issue32/after/desktop-copy-consen
 [narrow chooser Dark](validation/issue32/after/narrow-asset-selection-dark.png).
 
 No post-merge verification is required by the Issue.
+
+## Review regression: unsaved workflow settings when switching to editing
+
+The added Chrome regression first reproduced the reported defect: after applying
+node instructions without saving the graph, choosing an editable base and clicking
+Improve executed a creation node. The conversion now uses the active draft and
+synchronizes it with the saved edit graph. The passing regression checks the
+executed edit node, retained instructions, base connection, selected asset, exact
+protected scope, candidate feedback and synthetic preservation result.
+
+After the fix, `npm test` passed all 132 tests, `npm run check` passed, and
+`GEN3D_BROWSER_OUTPUT=.gen3d/issue32-draft-regression-after npm run test:browser`
+passed all 27 checks with zero uncaught browser exceptions. `git diff --check`
+passed. This run used injected providers and recorded GLBs; no real Codex
+generation or Blender preservation run was performed for this regression.

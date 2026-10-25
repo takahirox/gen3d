@@ -387,8 +387,8 @@ $('base-form').onsubmit=async event=>{
   const submit=$('base-form').querySelector('button[type=submit]'), baseRoute='/projects/'+baseTarget; submit.disabled=true;
   try {
     if(baseTarget!==projectId)throw new Error('Project changed. Choose the model again.');
-    // Add an editable base input to the existing modeling graph, retaining its settings.
-    const graph=structuredClone(project().workflow), model=graph.nodes.find(n=>n.type==='model'), hadBase=graph.nodes.some(n=>n.type==='base');
+    // Convert the active draft so applied, unsaved node settings survive the switch to editing.
+    const graph=structuredClone(dirty ? draft : project().workflow), model=graph.nodes.find(n=>n.type==='model'), hadBase=graph.nodes.some(n=>n.type==='base');
     if(!graph.nodes.some(n=>n.type==='base')) {
       if(!model || graph.nodes.filter(n=>n.type==='model').length!==1)throw new Error('Choose the edit preset in the Workflow editor for this custom workflow.');
       model.type='edit'; let id='base'; while(graph.nodes.some(n=>n.id===id))id+='-edit';
@@ -396,7 +396,11 @@ $('base-form').onsubmit=async event=>{
       const input=graph.nodes.find(n=>n.type==='input'); graph.edges.push({from:input.id,to:id,input:'design'},{from:id,to:model.id,input:'base'});
     }
     await api(baseRoute+'/editable-base','POST',{assetId:baseSelection.id,sha256:baseSelection.sha256,scope});
-    if(!hadBase)await api(baseRoute+'/workflow','PUT',{graph});
+    if(!hadBase || dirty) {
+      const saved=await api(baseRoute+'/workflow','PUT',{graph});
+      draft=structuredClone(saved.workflow); dirty=false;
+      delete $('node-form').dataset.dirty;
+    }
     $('base-dialog').close(); await refresh();
   } catch(e) { $('base-info').textContent=e.message; }
   finally { submit.disabled=false; }
