@@ -10,6 +10,7 @@ import { AppError } from './errors.js';
 export { AppError } from './errors.js';
 import { workflowPreset, fileHash, hash } from './workflow.js';
 import { AssetLibrary } from './asset-library.js';
+const projectIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export function text(value, name, max = 12000) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new AppError(`${name} must contain 1–${max} characters`);
   return value.trim();
@@ -64,13 +65,17 @@ export class Store {
   constructor(root, options = {}) {
     this.root = path.resolve(root);
     fs.mkdirSync(this.root, { recursive: true });
+    this.root = fs.realpathSync(this.root);
     this.projects = new Map();
+    this.operations = new Map();
     this.library = new AssetLibrary(this.root, options);
     for (const entry of fs.readdirSync(this.root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const file = path.join(this.root, entry.name, 'project.json');
       if (!fs.existsSync(file)) continue;
+      this.verifyProjectDirectory(entry.name, { id: entry.name });
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
+      this.verifyProjectDirectory(entry.name, project);
       if (project.schemaVersion !== 3) throw new AppError('Unsupported project schema. Start fresh by clearing only the gen3d-managed data store; see docs/local-setup.md#start-fresh.');
       this.projects.set(project.id, project);
       for (const set of project.referenceSets) {
@@ -106,20 +111,66 @@ export class Store {
       this.save(project);
     }
   }
-  dir(id) { this.get(id); return path.join(this.root, id); }
+  dir(id) {
+    this.get(id);
+    const dir = path.join(this.root, id);
+    if (!fs.lstatSync(dir).isDirectory() || fs.realpathSync(dir) !== dir) throw new AppError('Unsafe project directory', 409);
+    return dir;
+  }
   get(id) {
+    if (!projectIdPattern.test(id)) throw new AppError('Project not found', 404);
     const p = this.projects.get(id);
     if (!p) throw new AppError('Project not found', 404);
     return p;
   }
   list() { return [...this.projects.values()].map(p => structuredClone(p)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
+  verifyProjectDirectory(id, p) {
+    if (!projectIdPattern.test(id) || p.id !== id) throw new AppError('Unsafe project identity', 409);
+    const dir = path.join(this.root, id), manifest = path.join(dir, 'project.json');
+    if (!fs.lstatSync(dir).isDirectory() || fs.realpathSync(dir) !== dir
+      || !fs.lstatSync(manifest).isFile() || fs.realpathSync(manifest) !== manifest) throw new AppError('Unsafe project directory', 409);
+    return dir;
+  }
+  beginOperation(id) {
+    this.get(id);
+    this.operations.set(id, (this.operations.get(id) || 0) + 1);
+    return () => {
+      const remaining = this.operations.get(id) - 1;
+      if (remaining) this.operations.set(id, remaining); else this.operations.delete(id);
+    };
+  }
+  delete(id, actor) {
+    if (actor !== 'web') throw new AppError('Project deletion requires a human in the web UI', 403);
+    const p = this.get(id); this.idle(p);
+    if (this.operations.has(id)) throw new AppError('Wait for this project’s current operation to finish, then delete again', 409);
+    const dir = this.verifyProjectDirectory(id, p);
+    const manifest = path.join(dir, 'project.json'), savedManifest = fs.readFileSync(manifest, 'utf8');
+    const saved = JSON.parse(savedManifest);
+    if (saved.id !== id || saved.schemaVersion !== 3) throw new AppError('Unsafe project identity', 409);
+    // Synchronous validation/removal cannot interleave with a new server writer.
+    // rm unlinks nested symlinks; it never follows them into shared/external assets.
+    try {
+      // Keep the identity manifest until the contents are gone, so a partial
+      // filesystem failure remains recognizable and deletion can be retried.
+      for (const name of fs.readdirSync(dir)) if (name !== 'project.json') fs.rmSync(path.join(dir, name), { recursive: true });
+      if (fs.readdirSync(dir).some(name => name !== 'project.json')) throw new Error('Project files remain');
+      fs.unlinkSync(manifest);
+      try { fs.rmdirSync(dir); }
+      catch (e) { fs.writeFileSync(manifest, savedManifest, { flag: 'wx' }); throw e; }
+    }
+    catch { throw new AppError('Could not delete all project files. Check folder permissions and try again.', 500); }
+    if (fs.existsSync(dir)) throw new AppError('Project files remain; try deleting again', 500);
+    this.projects.delete(id);
+    return { id };
+  }
   event(p, actor, type, details = {}) {
     p.updatedAt = new Date().toISOString();
     p.activity.push({ id: randomUUID(), at: p.updatedAt, actor, type, ...details });
   }
   save(p) {
-    const dir = path.join(this.root, p.id);
-    fs.mkdirSync(dir, { recursive: true });
+    // A stale async callback must never recreate a deleted project.
+    if (this.get(p.id) !== p) throw new AppError('Project is no longer current', 409);
+    const dir = this.dir(p.id);
     fs.writeFileSync(path.join(dir, 'project.json.tmp'), JSON.stringify(p, null, 2));
     fs.renameSync(path.join(dir, 'project.json.tmp'), path.join(dir, 'project.json'));
   }
@@ -132,8 +183,8 @@ export class Store {
     const profile = referenceProfile(input.profile, prompt);
     const p = { schemaVersion: 3, workflow: { ...workflowPreset(input.workflowType || 'object'), revision: 1 }, workflowRuns: [], acceptedVersionId: null, editableBase: null, id: randomUUID(), name, mode: input.mode, prompt, profile, inputImage: null, checkpoints: settings, consistencySettings: consistencySettings(input.consistencySettings), refinementSettings: refinementSettings(input.refinementSettings), inputReview: 'pending', inputCheckpoint: settings.input, concepts: [], selectedConceptId: null, referenceSets: [], selectedReferenceSetId: null, references: [], modelReferences: [], versions: [], activity: [], updatedAt: '' };
     this.projects.set(p.id, p);
+    fs.mkdirSync(path.join(this.root, p.id));
     if (image) {
-      fs.mkdirSync(this.dir(p.id), { recursive: true });
       p.inputImage = `input.${image.ext}`;
       fs.writeFileSync(path.join(this.dir(p.id), p.inputImage), image.bytes);
     }
@@ -183,25 +234,28 @@ export class Store {
     r.review = decision; this.event(p, actor, 'reference_reviewed', { referenceId: refId, decision }); this.save(p); return p;
   }
   async selectModels(id, input, actor) {
-    const p = this.get(id); this.idle(p);
-    if (!Array.isArray(input.models) || input.models.length > 32) throw new AppError('Select zero to 32 library models');
-    const seen = new Set();
-    const selections = [];
-    for (const item of input.models) {
-      if (!item || typeof item.assetId !== 'string' || seen.has(item.assetId)) throw new AppError('Choose unique library model IDs');
-      seen.add(item.assetId);
-      if (!['reference-only', 'reuse-edit'].includes(item.permission)) throw new AppError('Specify reference-only or reuse-edit permission');
-      if (item.role !== undefined && (typeof item.role !== 'string' || item.role.length > 1000)) throw new AppError('Role must contain at most 1000 characters');
-      const a = await this.library.inspected(item.assetId);
-      const selection = { assetId: a.id, name: a.name, origin: a.sourceId ? 'folder' : 'managed', role: (item.role || '').trim(), permission: item.permission, sha256: a.sha256, review: 'pending' };
-      const previous = p.modelReferences.find(r => r.assetId === a.id);
-      if (previous && previous.role === selection.role && previous.permission === selection.permission && previous.sha256 === a.sha256) selection.review = previous.review;
-      selections.push(selection);
-    }
-    // An asynchronous inspection must not mutate a newly running project.
-    this.idle(p);
-    p.modelReferences = selections;
-    this.event(p, actor, 'model_references_selected', { models: structuredClone(selections) }); this.save(p); return p;
+    const release = this.beginOperation(id);
+    try {
+      const p = this.get(id); this.idle(p);
+      if (!Array.isArray(input.models) || input.models.length > 32) throw new AppError('Select zero to 32 library models');
+      const seen = new Set();
+      const selections = [];
+      for (const item of input.models) {
+        if (!item || typeof item.assetId !== 'string' || seen.has(item.assetId)) throw new AppError('Choose unique library model IDs');
+        seen.add(item.assetId);
+        if (!['reference-only', 'reuse-edit'].includes(item.permission)) throw new AppError('Specify reference-only or reuse-edit permission');
+        if (item.role !== undefined && (typeof item.role !== 'string' || item.role.length > 1000)) throw new AppError('Role must contain at most 1000 characters');
+        const a = await this.library.inspected(item.assetId);
+        const selection = { assetId: a.id, name: a.name, origin: a.sourceId ? 'folder' : 'managed', role: (item.role || '').trim(), permission: item.permission, sha256: a.sha256, review: 'pending' };
+        const previous = p.modelReferences.find(r => r.assetId === a.id);
+        if (previous && previous.role === selection.role && previous.permission === selection.permission && previous.sha256 === a.sha256) selection.review = previous.review;
+        selections.push(selection);
+      }
+      // An asynchronous inspection must not mutate a newly running project.
+      this.idle(p);
+      p.modelReferences = selections;
+      this.event(p, actor, 'model_references_selected', { models: structuredClone(selections) }); this.save(p); return p;
+    } finally { release(); }
   }
   reviewModelReference(id, assetId, decision, actor) {
     const p = this.get(id); this.idle(p);

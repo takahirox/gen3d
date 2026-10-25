@@ -54,6 +54,31 @@ async function showModel(v) {
 }
 function navigate(next) { area = ['studio','workflow'].includes(next) ? next : 'home'; location.hash = area; lastSignature = ''; render(); window.scrollTo({ top: 0 }); }
 function chooseProject(id) { projectId = id; versionId = runId = historyCheckpointId = undefined; draftProject = null; localStorage.setItem('gen3d-project', id); for (const f of document.querySelectorAll('form')) delete f.dataset.dirty; navigate('studio'); loadBases().catch(e => notify(e.message)); }
+function clearProject() {
+  projectId = null; versionId = runId = historyCheckpointId = undefined; draftProject = null; dirty = false;
+  localStorage.removeItem('gen3d-project');
+  for (const f of document.querySelectorAll('form')) delete f.dataset.dirty;
+  showModel(); navigate('home');
+}
+let deletingProject, deleteFocusId, deletePending = false;
+function confirmDelete(p) {
+  deletingProject = p.id; deleteFocusId = 'project-actions-' + p.id;
+  $('delete-project-name').textContent = p.name;
+  $('delete-error').hidden = true;
+  $('delete-dialog').showModal(); $('cancel-delete').focus();
+}
+function projectCard(p) {
+  const card = node('article', undefined, 'project-card'), open = button('', () => chooseProject(p.id));
+  open.className = 'project-open';
+  open.append(node('h2', p.name), node('p', `${p.workflow.name} · ${p.workflowRuns.length} runs`), node('small', p.acceptedVersionId ? 'Accepted candidate saved' : 'Ready to explore'));
+  const menu = node('details', undefined, 'project-menu'), trigger = node('summary', '⋯');
+  trigger.id = 'project-actions-' + p.id; trigger.setAttribute('aria-label', 'Actions for ' + p.name);
+  const remove = node('button', 'Delete', 'danger'); remove.type = 'button';
+  remove.id = 'delete-project-' + p.id;
+  remove.onclick = () => { menu.open = false; confirmDelete(p); };
+  menu.onkeydown = event => { if (event.key === 'Escape') { menu.open = false; trigger.focus(); event.stopPropagation(); } };
+  menu.append(trigger, remove); card.append(open, menu); return card;
+}
 function selectedRun(p) { return p.workflowRuns.find(r => r.id === runId) || p.workflowRuns.at(-1); }
 function selectedVersion(p) { return p.versions.find(v => v.id === versionId) || p.versions.at(-1); }
 function candidateCheckpoint(r, v) {
@@ -231,13 +256,16 @@ function renderNode(p) {
 }
 function render() {
   const focusedId = document.activeElement?.id;
+  const openMenuId = document.querySelector('.project-menu[open] summary')?.id;
   const p=project(), signature=JSON.stringify([projects,projectId,versionId,runId,historyCheckpointId,area,status]);if(signature===lastSignature)return;lastSignature=signature;
   document.body.dataset.area = area;
   for(const key of ['home','studio','workflow'])$('nav-'+key).setAttribute('aria-current',String(area===key));
   $('home').hidden=area!=='home';$('workspace').hidden=area==='home'||!p;$('studio').hidden=area!=='studio';$('workflow-editor').hidden=area!=='workflow';
   $('projects').replaceChildren(...projects.map(p=>{const b=button(p.name,()=>chooseProject(p.id));b.id='project-'+p.id;b.setAttribute('aria-current',String(p.id===projectId));return b;}));
-  $('project-cards').replaceChildren(...projects.map(p=>{const b=button('',()=>chooseProject(p.id));b.append(node('h2',p.name),node('p',`${p.workflow.name} · ${p.workflowRuns.length} runs`),node('small',p.acceptedVersionId?'Accepted candidate saved':'Ready to explore'));return b;}));
-  if(!p){if(area!=='home'){$('home').hidden=false;}return;}
+  $('project-cards').replaceChildren(...projects.map(projectCard));
+  if (openMenuId && $(openMenuId)) $(openMenuId).parentElement.open = true;
+  $('projects-empty').hidden = projects.length > 0;
+  if(!p){if(area!=='home'){$('home').hidden=false;}if(focusedId&&document.activeElement===document.body)$(focusedId)?.focus({preventScroll:true});return;}
   if(draftProject!==p.id){draft=structuredClone(p.workflow);draftProject=p.id;dirty=false;selectedNode='input';}
   else if(!dirty)draft=structuredClone(p.workflow);
   const r=p.workflowRuns.at(-1); $('title').textContent=p.name;
@@ -259,7 +287,7 @@ function render() {
   if (focusedId && document.activeElement === document.body) $(focusedId)?.focus({ preventScroll: true });
 }
 let refreshing=false, connected=true;
-async function refresh(){if(refreshing)return;refreshing=true;try{[projects,status]=await Promise.all([api('/projects'),api('/status')]);if(!connected){notify();lastSignature='';}connected=true;$('connection').textContent=status.busy?'Codex → Blender · running':'Local server connected';render();}finally{refreshing=false;}}
+async function refresh(){if(refreshing)return;refreshing=true;try{[projects,status]=await Promise.all([api('/projects'),api('/status')]);if(projectId&&!project())clearProject();if(!connected){notify();lastSignature='';}connected=true;$('connection').textContent=status.busy?'Codex → Blender · running':'Local server connected';render();}finally{refreshing=false;}}
 async function loadPresets(){const data=await api('/workflows');catalog=data.catalog;presets=data.presets;options($('preset'),presets.map(p=>[p.id,p.name||p.graph.name]),$('preset').value);options($('add-type'),Object.keys(catalog).map(t=>[t,t]),'refine');}
 async function loadBases(){const data=await api('/library?limit=100');options($('base-asset'),[['','Choose a library model'],...data.assets.filter(a=>!a.error).map(a=>[a.id,a.name])],project()?.editableBase?.assetId);await inspectBase();}
 async function inspectBase(){
@@ -282,6 +310,31 @@ window.addEventListener('hashchange',()=>navigate(location.hash.slice(1)));
 $('theme').value=localStorage.getItem('gen3d-theme')||'dark';document.documentElement.dataset.theme=$('theme').value;
 $('theme').onchange=()=>{document.documentElement.dataset.theme=$('theme').value;localStorage.setItem('gen3d-theme',$('theme').value);};
 for(const id of ['new-project','empty-create'])$(id).onclick=()=>$('create-dialog').showModal();$('close-create').onclick=()=>$('create-dialog').close();
+$('cancel-delete').onclick = () => $('delete-dialog').close();
+$('delete-dialog').addEventListener('cancel', event => { if (deletePending) event.preventDefault(); });
+$('delete-dialog').addEventListener('close', () => {
+  // A queued close event may arrive after the next project dialog was opened.
+  if ($('delete-dialog').open) return;
+  deletingProject = null; ($(deleteFocusId) || $('empty-create')).focus();
+});
+$('delete-dialog').onclick = event => {
+  if (event.target !== $('delete-dialog') || deletePending) return;
+  const box = event.target.getBoundingClientRect();
+  if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) event.target.close();
+};
+$('confirm-delete').onclick = async () => {
+  if (deletePending || !deletingProject) return;
+  const id = deletingProject; deletePending = true;
+  $('confirm-delete').disabled = $('cancel-delete').disabled = true; $('delete-error').hidden = true;
+  try {
+    await api('/projects/' + encodeURIComponent(id), 'DELETE');
+    projects = projects.filter(p => p.id !== id);
+    if (projectId === id) clearProject();
+    lastSignature = ''; render(); $('delete-dialog').close();
+    await refresh();
+  } catch (e) { $('delete-error').textContent = e.message; $('delete-error').hidden = false; }
+  finally { deletePending = false; $('confirm-delete').disabled = $('cancel-delete').disabled = false; }
+};
 $('create').elements.mode.onchange=()=>{const image=$('create').elements.mode.value==='image';$('image-label').hidden=!image;$('create').elements.image.required=image;};
 form('create',async data=>{const mode=data.get('mode'),workflowType=data.get('workflowType');const p=await api('/projects','POST',{name:data.get('name')?.trim() || data.get('prompt').trim().slice(0,60),mode,prompt:data.get('prompt'),workflowType,profile:workflowType==='humanoid'?'character':'object',...(mode==='image'?{image:await imageData(data.get('image'))}:{})});$('create-dialog').close();$('create').reset();$('create').elements.mode.onchange();projects.push(p);chooseProject(p.id);});
 form('edit',async data=>{await api(route(),'PATCH',{name:data.get('name'),prompt:data.get('prompt'),profile:data.get('profile')});await run();});

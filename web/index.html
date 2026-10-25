@@ -11,7 +11,7 @@
 <div id="notice" role="alert" hidden></div>
 <div class="layout"><aside class="project-sidebar"><div class="panel-heading"><h2>Projects</h2><button id="new-project" type="button" aria-label="New project">+</button></div><nav id="projects" aria-label="Projects"></nav><p id="connection" role="status">Connecting…</p></aside>
 <main id="main" tabindex="-1">
-<section id="home"><h1>Make a model. Keep every possibility.</h1><button id="empty-create" type="button">Create project</button><div id="project-cards" class="cards"></div></section>
+<section id="home"><h1>Make a model. Keep every possibility.</h1><button id="empty-create" type="button">Create project</button><p id="projects-empty" class="muted" hidden>No projects yet.</p><div id="project-cards" class="cards"></div></section>
 <section id="workspace" hidden><div class="workspace-heading"><div><h1 id="title"></h1></div><span id="project-state" class="badge" role="status"></span></div>
 <section id="studio" aria-label="Model studio"><div class="studio-grid">
 <aside class="sources-panel"><h2>Sources</h2><div id="primary-source"></div>
@@ -44,4 +44,5 @@
 <form id="library-selection"><h3 id="library-selection-count">0 selected</h3><div id="library-selected"></div><p>Reference-only permits inspection. Reuse / edit permits copying and changing parts. Neither authorizes a complete editable base. Only authorize sources you have permission to use.</p><button id="library-save" type="submit">Authorize selected sources</button></form></dialog>
 <dialog id="refine-dialog" aria-labelledby="refine-heading"><div class="panel-heading"><h2 id="refine-heading">Refine model</h2><button id="close-refine" type="button" aria-label="Close refinement">✕</button></div><form id="refine-form"><p>Enable refinement for this workflow and improve this candidate against its saved references. Each cycle uses Codex allowance. Errors and unresolved results stop for review.</p><label>Maximum cycles<input name="maxIterations" type="number" min="1" max="5" value="1" required></label><button class="primary" type="submit">Start refinement</button></form></dialog>
 <dialog id="history-dialog" aria-labelledby="history-heading"><div class="panel-heading"><h2 id="history-heading">Preparation</h2><button id="close-history" type="button" aria-label="Close preparation">✕</button></div><div id="history-content"></div></dialog>
+<dialog id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-warning"><h2 id="delete-heading">Delete project “<span id="delete-project-name"></span>”?</h2><p id="delete-warning">This project and its generated data will be permanently deleted.</p><p id="delete-error" class="warning" role="alert" hidden></p><div class="actions"><button id="cancel-delete" type="button" autofocus>Cancel</button><button id="confirm-delete" type="button" class="danger">Delete</button></div></dialog>
 </body></html>

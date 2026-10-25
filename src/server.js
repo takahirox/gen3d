@@ -89,6 +89,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         if (!id && req.method === 'GET') return json(res, 200, store.list());
         if (!id && req.method === 'POST') return json(res, 201, store.create(await body(req), actor));
         if (id && parts.length === 3 && req.method === 'GET') return json(res, 200, store.get(id));
+        if (id && parts.length === 3 && req.method === 'DELETE') return json(res, 200, store.delete(id, actor));
         if (id && parts.length === 3 && req.method === 'PATCH') return json(res, 200, store.update(id, await body(req), actor));
         if (parts[3] === 'workflow' && req.method === 'PUT') return json(res, 200, workflow.saveGraph(id, (await body(req)).graph, actor));
         if (parts[3] === 'editable-base' && req.method === 'POST') return json(res, 200, await authorizeBase(store, id, await body(req), actor));
