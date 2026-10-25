@@ -13,6 +13,7 @@ import { categories } from '../src/refinement.js';
 import { referenceViews } from '../src/model-reference-visuals.js';
 import { Transformer } from '@napi-rs/image';
 import { createApp } from '../src/server.js';
+import { authorizeBase } from '../src/base-model.js';
 
 const fixture = 'docs/validation/issue10/prop/model-1';
 const glb = fs.readFileSync(fixture + '/model.glb'), blend = fs.readFileSync(fixture + '/scene.blend');
@@ -231,4 +232,55 @@ test('HTTP and real MCP clients see the same library and selections, but only We
   assert.equal((await post(`/projects/${p.id}/model-references/${a.id}/review`, { decision: 'approved' }, false)).status, 200);
   assert.equal((await call('get_project', { projectId: p.id })).modelReferences[0].review, 'approved');
   assert.equal((await client.readResource({ uri: 'gen3d://library' })).contents.length, 1);
+});
+
+test('direct source intentions are atomic, scoped to one asset, persisted and human-only', async t => {
+  const store = new Store(temporary(t), { inspect }), p = store.create(input, 'web');
+  const [a,b] = await imports(store);
+  const use = (asset, intent = 'reference', extra = {}, actor = 'web') => store.useModel(p.id, { assetId:asset.id,sha256:asset.sha256,use:intent,...extra },actor);
+  assert.deepEqual(p.modelReferences, [], 'import alone grants nothing');
+  await store.selectModels(p.id, { models:[model(b,'reuse-edit')] }, 'mcp');
+  const before = JSON.stringify(p);
+  await assert.rejects(use(a,'reference',{},'mcp'), /human/);
+  await assert.rejects(use(a,'parts'), /Confirm/);
+  await assert.rejects(use(a,'parts',{copyConsent:true,sha256:'stale'}), /changed/);
+  await assert.rejects(use(a,'reference',{role:3}), /Role/);
+  assert.equal(JSON.stringify(p),before,'failed actions leave selection and audit unchanged');
+  await use(a);
+  assert.equal(p.modelReferences.find(r=>r.assetId===a.id).review,'approved');
+  assert.equal(p.modelReferences.find(r=>r.assetId===b.id).review,'pending','does not approve unrelated proposals');
+  const event=p.activity.at(-1); assert.equal(event.type,'model_reference_reviewed');assert.equal(event.actor,'web');assert.equal(event.permission,'reference-only');assert.equal(event.sha256,a.sha256);
+  await use(a,'parts',{copyConsent:true,role:'Hair'});
+  assert.equal(p.modelReferences.find(r=>r.assetId===a.id).permission,'reuse-edit');assert.equal(p.editableBase,null);
+  await use(a);assert.equal(p.modelReferences.find(r=>r.assetId===a.id).permission,'reference-only','explicit change narrows rights');
+  const restarted=new Store(store.root,{inspect});assert.deepEqual(restarted.get(p.id).modelReferences,p.modelReferences);
+  await use(a,'remove');assert.equal(p.modelReferences.length,1);assert.ok(store.library.get(a.id));
+  p.versions.push({status:'running'});await assert.rejects(use(a),/finish/);
+});
+
+test('direct source endpoint rejects MCP use/removal and stores a web reference in one request', async t => {
+  const app=createApp({dataDir:temporary(t),inspectAsset:inspect});app.server.listen(0,'127.0.0.1');await once(app.server,'listening');
+  t.after(async()=>{app.server.close();await app.closed;});
+  const p=app.store.create(input,'web'), [a]=await imports(app.store), url=`http://127.0.0.1:${app.server.address().port}/api/projects/${p.id}/model-references/use`;
+  const post=(body,mcp=false)=>fetch(url,{method:'POST',headers:{'content-type':'application/json',...(mcp?{'x-gen3d-client':'mcp'}:{})},body:JSON.stringify(body)});
+  for(const use of ['reference','parts','remove'])assert.equal((await post({assetId:a.id,sha256:a.sha256,use,copyConsent:true},true)).status,403);
+  assert.equal(p.modelReferences.length,0);
+  assert.equal((await post({assetId:a.id,sha256:a.sha256,use:'reference'})).status,200);
+  assert.equal(p.modelReferences[0].permission,'reference-only');assert.equal(p.modelReferences[0].review,'approved');
+  await authorizeBase(app.store,p.id,{assetId:a.id,scope:{editableObjects:['test mesh']}},'web');
+  const baseURL=url.replace('/model-references/use','/editable-base');
+  assert.equal((await fetch(baseURL,{method:'DELETE',headers:{'content-type':'application/json','x-gen3d-client':'mcp'}})).status,403);
+  assert.ok(p.editableBase);
+  assert.equal((await fetch(baseURL,{method:'DELETE',headers:{'content-type':'application/json'}})).status,200);assert.equal(p.editableBase,null);
+});
+
+
+test('contextual base scope rejects changed content and nonexistent parts before granting rights', async t => {
+  const store=new Store(temporary(t),{inspect}), p=store.create(input,'web'), [a]=await imports(store);
+  const before=JSON.stringify(p);
+  await assert.rejects(authorizeBase(store,p.id,{assetId:a.id,sha256:'stale',scope:{editableObjects:['test mesh']}},'web'),/changed/);
+  await assert.rejects(authorizeBase(store,p.id,{assetId:a.id,sha256:a.sha256,scope:{editableObjects:['not a mesh']}},'web'),/parts present/);
+  assert.equal(JSON.stringify(p),before);
+  await authorizeBase(store,p.id,{assetId:a.id,sha256:a.sha256,scope:{editableObjects:['test mesh']}},'web');
+  assert.deepEqual(p.editableBase.scope,{editableObjects:['test mesh'],allowChanges:[],allowNewObjects:false});
 });

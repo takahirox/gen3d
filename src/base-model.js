@@ -19,6 +19,9 @@ export async function authorizeBase(store, id, input, actor) {
     if (actor !== 'web') throw new AppError('Editable base authorization requires a human in the web UI', 403);
     if (p.workflowRuns?.some(r => r.status === 'waiting-review')) throw new AppError('Resolve pending workflow review before changing the editable base', 409);
     const scope = editScope(input.scope), a = await store.library.inspected(input.assetId);
+    if (input.sha256 !== undefined && input.sha256 !== a.sha256) throw new AppError('Model changed; choose it again', 409);
+    const meshes = a.inspection.objects.filter(o => o.type === 'MESH').map(o => o.name);
+    if (scope.editableObjects.some(name => !meshes.includes(name))) throw new AppError('Choose parts present in this model');
     store.idle(p);
     p.editableBase = { assetId: a.id, name: a.name, sha256: a.sha256, format: a.format, scope, review: 'approved', authorizedAt: new Date().toISOString() };
     store.event(p, actor, 'editable_base_authorized', { assetId: a.id, sha256: a.sha256, scope }); store.save(p); return p;

@@ -98,7 +98,7 @@ test('all active project stages block deletion, while another project can be del
 test('async library selection and base authorization block deletion until their final writes finish', async t => {
   for (const operation of ['selection', 'base']) {
     const store = new Store(temporary(t)), p = store.create(input, 'web'), barrier = gate();
-    store.library.inspected = async () => { await barrier.promise; return { id: 'asset', name: 'Shared', sha256: 'hash', format: 'glb' }; };
+    store.library.inspected = async () => { await barrier.promise; return { id: 'asset', name: 'Shared', sha256: 'hash', format: 'glb', inspection: { objects: [{ name: 'Mesh', type: 'MESH' }] } }; };
     const pending = operation === 'selection' ? store.selectModels(p.id, { models: [{ assetId: 'asset', permission: 'reference-only' }] }, 'web')
       : authorizeBase(store, p.id, { assetId: 'asset', scope: { editableObjects: ['Mesh'] } }, 'web');
     assert.throws(() => store.delete(p.id, 'web'), /current operation/);

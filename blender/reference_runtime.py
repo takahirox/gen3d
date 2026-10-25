@@ -334,6 +334,22 @@ def remove_references():
         bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
 
 
+def selection_preview(file, output):
+    """Read-only visual picker. Extras map preview meshes to exact source names.
+
+    This simplified GLB is never used as an editable base or a deliverable.
+    """
+    scene, _ = load_file(file, 'selection-preview')
+    bpy.context.window.scene = scene
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in scene.objects:
+        if obj.type == 'MESH':
+            obj['gen3d_part'] = obj.name
+            obj.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=output, export_format='GLB', use_selection=True,
+                              export_extras=True, export_animations=False)
+
+
 def inspect_file(file, thumbnail=None):
     scene, info = load_file(file, 'inspection')
     if thumbnail:

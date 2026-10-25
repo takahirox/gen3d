@@ -34,7 +34,7 @@ function sendFile(res, file, download) {
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
 
-export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, inspectReferences, inspectModel, inspectAsset, env = process.env } = {}) {
+export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os.homedir(), '.gen3d'), generate, conceptGenerator, inspectReferences, inspectModel, inspectAsset, selectionPreview, env = process.env } = {}) {
   // A single server owns the data directory, even if a second process starts.
   fs.mkdirSync(dataDir, { recursive: true });
   const lockFile = path.join(path.resolve(dataDir), 'server.lock');
@@ -45,7 +45,7 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
   }
   fs.writeFileSync(lockFile, String(process.pid), { flag: 'wx' });
   let store;
-  try { store = new Store(dataDir, { env, inspect: inspectAsset }); }
+  try { store = new Store(dataDir, { env, inspect: inspectAsset, selectionPreview }); }
   catch (e) { fs.unlinkSync(lockFile); throw e; }
   const runner = new Runner(store, { generate, conceptGenerator, inspectReferences, inspectModel, env });
   const workflow = new WorkflowEngine(store, runner, workflowOperations(store, runner));
@@ -78,9 +78,11 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
           if (parts[2] === 'assets' && parts.length === 4 && req.method === 'GET') return json(res, 200, library.get(parts[3]));
           if (parts[2] === 'assets' && parts[4] === 'inspect' && req.method === 'POST') return json(res, 200, await library.inspected(parts[3]));
           if (parts[2] === 'assets' && parts[4] === 'preview' && req.method === 'GET') return sendFile(res, library.preview(parts[3]));
+          if (parts[2] === 'assets' && parts[4] === 'parts' && req.method === 'GET') return sendFile(res, await library.partPreview(parts[3]));
           throw new AppError('Library route not found', 404);
         }
         if (parts[1] === 'projects' && parts[3] === 'model-references' && req.method === 'POST') {
+          if (parts.length === 5 && parts[4] === 'use') return json(res, 200, await store.useModel(parts[2], await body(req), actor));
           if (parts.length === 4) return json(res, 200, await store.selectModels(parts[2], await body(req), actor));
           if (parts[5] === 'review') return json(res, 200, store.reviewModelReference(parts[2], parts[4], (await body(req)).decision, actor));
         }
@@ -93,6 +95,13 @@ export function createApp({ dataDir = process.env.GEN3D_DATA_DIR || path.join(os
         if (id && parts.length === 3 && req.method === 'PATCH') return json(res, 200, store.update(id, await body(req), actor));
         if (parts[3] === 'workflow' && req.method === 'PUT') return json(res, 200, workflow.saveGraph(id, (await body(req)).graph, actor));
         if (parts[3] === 'editable-base' && req.method === 'POST') return json(res, 200, await authorizeBase(store, id, await body(req), actor));
+        if (parts[3] === 'editable-base' && req.method === 'DELETE') {
+          if (actor !== 'web') throw new AppError('Change the model to edit in the web UI', 403);
+          const p = store.get(id); store.idle(p);
+          if (p.workflowRuns.some(r => r.status === 'waiting-review')) throw new AppError('Resolve pending review before changing the model to edit', 409);
+          const assetId = p.editableBase?.assetId; p.editableBase = null;
+          store.event(p, actor, 'editable_base_removed', { assetId }); store.save(p); return json(res, 200, p);
+        }
         if (parts[3] === 'runs' && req.method === 'POST') {
           if (parts.length === 4) return json(res, 202, workflow.start(id, await body(req), actor));
           if (parts[5] === 'nodes' && parts[7] === 'review') return json(res, 200, workflow.review(id, parts[4], parts[6], (await body(req)).decision, actor));
