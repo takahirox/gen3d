@@ -130,6 +130,7 @@ try {
   const visible = id => `!!document.getElementById(${JSON.stringify(id)})?.getClientRects().length`;
   const wait = async expression => { try { return await until(() => evaluate(expression), expression); } catch(e) { console.log(await evaluate('JSON.stringify({library:document.querySelector("#library-dialog").open,base:document.querySelector("#base-dialog").open,error:document.querySelector("#library-error").textContent,parts:document.querySelector("#part-status").textContent})'));throw e; } };
   const click = selector => evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+  const key = async name => { await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code:name,...(name==='Enter'?{text:'\r',windowsVirtualKeyCode:13}:{windowsVirtualKeyCode:name==='Escape'?27:9})});await call('Input.dispatchKeyEvent',{type:'keyUp',key:name,code:name}); };
   const openProject = async id => {await click('#nav-home');await wait(visible('project-'+id));await click('#project-'+id);};
   const select = async (selector, value) => {
     await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
@@ -147,7 +148,46 @@ try {
   const check=name=>{checks.push(name);console.log('PASS '+name);};
   await call('Runtime.enable');await call('Page.enable');await call('Emulation.setFocusEmulationEnabled',{enabled:true});
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
-  await wait(visible('project-'+automatic.id));await openProject(automatic.id);
+  await wait(visible('project-'+automatic.id));
+  assert.equal(await evaluate('document.querySelector("#home").innerText.includes("Make a model")'),false);
+  assert.deepEqual(await evaluate('document.querySelector("#home").innerText.split(/\\n+/).map(s=>s.trim()).filter(Boolean)'), ['Projects','Create project','Workshop cabinet','⋯']);
+  assert.ok(await evaluate('document.querySelector("#empty-create").classList.contains("primary")'));
+  await screenshot('home-populated');
+  await click('#empty-create');await wait('document.querySelector("#create-dialog").open');
+  assert.ok(await evaluate('document.querySelector("#create input[name=name]").getClientRects().length && !document.querySelector("#create input[name=name]").closest("details")'));
+  assert.equal(await evaluate('document.activeElement.name'),'name');
+  assert.equal(await evaluate('document.querySelector("#create input[name=name]").required'),false);
+  const createAX=await call('Accessibility.getFullAXTree');
+  assert.ok(createAX.nodes.some(n=>n.role?.value==='textbox'&&n.name?.value==='Project name'));
+  await key('Tab');assert.equal(await evaluate('document.activeElement.name'),'workflowType');
+  await key('Tab');assert.equal(await evaluate('document.activeElement.name'),'mode');
+  await key('Tab');assert.equal(await evaluate('document.activeElement.name'),'prompt');
+  for (const task of ['object','humanoid']) for (const mode of ['text','image']) {
+    await fill('#create',{workflowType:task,mode,name:'Keep this name',prompt:'Keep this description'});
+    assert.equal(await evaluate('document.querySelector("#image-label").getClientRects().length > 0'),mode==='image');
+    assert.equal(await evaluate('document.querySelector("#create").elements.image.required'),mode==='image');
+    assert.ok(await evaluate('["name","workflowType","mode","prompt"].every(k=>document.querySelector("#create").elements[k].getClientRects().length>0)'));
+    assert.equal(await evaluate('document.querySelector("#create").elements.prompt.value'),'Keep this description');
+    await screenshot('create-'+task+'-'+mode);
+  }
+  for (const theme of ['light','dark']) {
+    await select('#theme',theme);
+    await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+    await screenshot('narrow-create-'+theme);
+    assert.ok(await evaluate('document.querySelector("#create-dialog").scrollWidth <= document.querySelector("#create-dialog").clientWidth+1'));
+    await key('Escape');await wait('!document.querySelector("#create-dialog").open && document.activeElement.id === "empty-create"');
+    assert.equal(await evaluate('document.activeElement.id'),'empty-create');
+    await screenshot('narrow-home-'+theme);
+    assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth+1'));
+    await click('#empty-create');
+  }
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  await evaluate('document.querySelector("#create").reset();document.querySelector("#create").elements.mode.onchange()');
+  await screenshot('create-text');await fill('#create',{mode:'image'});await screenshot('create-image');
+  await fill('#create',{mode:'text'});await click('#close-create');
+  check('Home prioritizes Create and project names; visible optional name has an accessible label and keyboard order; Create/Edit × Text/Image keeps common fields visible and only requires applicable files; dialog focus and narrow Light/Dark fit');
+  await openProject(automatic.id);
+  assert.ok(await evaluate('document.querySelector("#edit input[name=name]").getClientRects().length && !document.querySelector("#edit input[name=name]").closest("details")'));
   assert.equal(await evaluate('document.querySelectorAll("#studio #settings, #studio #studio-checkpoints").length'),0);
   await screenshot('desktop-empty');
   assert.deepEqual(automatic.consistencySettings,{enabled:true,onFailure:'continue'});
@@ -202,6 +242,24 @@ try {
   await click('#close-history');assert.ok(await evaluate('Array.from(document.querySelectorAll("#history-actions button")).find(b=>b.textContent==="Branch")?.disabled === false'));
   check('preparation thumbnails expose saved concept/four-view images and contextual branching');
   await click('#nav-workflow');await wait(visible('graph'));
+  assert.ok(await evaluate('Array.from(document.querySelectorAll("#settings input[type=checkbox],#settings select")).every(e=>e.getClientRects().length && !e.closest("details"))'));
+  assert.ok(await evaluate(visible('editor-cycles-label')));
+  assert.equal(await evaluate(visible('refinement-cost')),false);
+  assert.equal(await evaluate(visible('refinement-history')),false);
+  assert.equal(await evaluate('document.querySelector("#graph-warning").textContent'),'');
+  await fill('#settings',{refinement:'true'});await wait(visible('refinement-cost'));
+  assert.ok(await evaluate('document.querySelector("#refinement-cost").innerText.includes("allowance")'));
+  // An unrelated project update must retain the unsaved setting and its cost notice.
+  await request('/projects/'+automatic.id,'PATCH',{name:automatic.name+' updated'});
+  await wait('document.querySelector("#title").textContent === "Workshop cabinet updated"');
+  assert.ok(await evaluate(visible('refinement-cost')));
+  await request('/projects/'+automatic.id,'PATCH',{name:automatic.name});
+  await wait('document.querySelector("#title").textContent === "Workshop cabinet"');
+  await fill('#settings',{refinement:'false'});
+  assert.ok(await evaluate(visible('editor-cycles-label')));
+  assert.equal(await evaluate(visible('refinement-cost')),false);
+  await screenshot('workflow-settings');
+  check('workflow review and preparation settings, including cycle limits, stay direct; cost follows saved/unsaved refinement; empty refinement history and saved-graph prose are absent');
   assert.equal(await evaluate('document.querySelectorAll(".graph-node").length'),9);
   assert.equal(await evaluate('document.querySelectorAll("#graph path").length'),9);
   await click('#graph-node-model');await fill('#node-form',{'setting:instructions':'Make the cabinet taller'});await submit('#node-form');
@@ -240,11 +298,15 @@ try {
     const dom=await call('DOM.getDocument'), fileNode=await call('DOM.querySelector',{nodeId:dom.root.nodeId,selector});
     await call('DOM.setFileInputFiles',{nodeId:fileNode.nodeId,files:[file]});
   }
-  await click('#nav-home');await click('#new-project');await fill('#create',{mode:'image',prompt:'A cabinet from this image'});
+  await click('#nav-home');await screenshot('home-candidates');await click('#new-project');await fill('#create',{name:'  Cabinet study  ',mode:'image',prompt:'A cabinet from this image'});
   await upload('#create input[name=image]',path.join(assets,'concept-1/concept.png'));await submit('#create');
   await until(()=>app.store.list().length===2,'image project created');
   const imageProject=app.store.list().find(p=>p.id!==automatic.id);
+  assert.equal(imageProject.name,'Cabinet study');
   await wait('document.querySelector("#title").textContent === '+JSON.stringify(imageProject.name));
+  await call('Page.reload');await wait('document.querySelector("#title").textContent === "Cabinet study"');
+  await click('#nav-home');await wait('document.querySelector("#project-cards").textContent.includes("Cabinet study")');await openProject(imageProject.id);
+  check('explicit project name is trimmed, saved by the create dialog, and survives reload and Home selection');
   assert.equal(await evaluate('document.querySelector("#four-view-policy").getClientRects().length'),0);
   await click('#nav-workflow');assert.equal(await evaluate('document.querySelector("#editor-policy-label").getClientRects().length'),0);await click('#nav-studio');
   check('image input hides generated four-view policy in studio and editor');
@@ -254,6 +316,8 @@ try {
   await click('#select-models');await wait('document.querySelector("#library-dialog").open');
   await upload('#library-file',path.join(root,'docs/validation/issue26/blender/edited.glb'));
   await wait('document.querySelectorAll("#library-assets article").length === 1 && document.querySelector("#library-dialog").getAttribute("aria-busy") !== "true"');
+  assert.ok(await evaluate('document.querySelector("#library-source").getClientRects().length && !document.querySelector("#library-source").closest("details")'));
+  assert.ok(await evaluate('Array.from(document.querySelectorAll("#library-assets button")).filter(b=>["Use as reference","Edit this model"].includes(b.textContent)).every(b=>b.getClientRects().length && !b.closest("details"))'));
   assert.equal(app.store.get(imageProject.id).modelReferences.length,0,'upload alone grants no permission');
   await screenshot('desktop-asset-selection');
   // Actual responsive chooser and keyboard dismissal in both themes.
@@ -289,6 +353,8 @@ try {
   await libraryAction('Use parts of this model');await wait('!document.querySelector("#library-consent").hidden');
   await fill('#library-consent',{consent:true,role:'Hair'});await submit('#library-consent');await wait('!document.querySelector("#library-dialog").open');
   assert.equal(app.store.get(imageProject.id).modelReferences[0].permission,'reuse-edit');assert.equal(app.store.get(imageProject.id).editableBase,null);
+  assert.ok(await evaluate('Array.from(document.querySelectorAll("#model-references p")).some(e=>e.textContent==="Hair" && e.getClientRects().length && !e.closest("details"))'));
+  await screenshot('studio-source-role');
   // Removing one source never approves another pending source or deletes the library asset.
   await evaluate('document.querySelector("#model-references details").open=true');
   await evaluate('Array.from(document.querySelectorAll("#model-references button")).find(b=>b.textContent==="Remove").click()');
@@ -331,7 +397,11 @@ try {
   assert.equal(await evaluate('document.querySelector("#create").elements.image.required'),false);
   await submit('#create');await until(()=>app.store.list().length===3,'text creation after image creation');
   const textProject=app.store.list().find(p=>p.name==='A tiny toolbox');
-  await wait('document.querySelector("#title").textContent === "A tiny toolbox"');await click('#run-workflow');
+  assert.ok(textProject);
+  await wait('document.querySelector("#title").textContent === "A tiny toolbox"');
+  await call('Page.reload');await wait('document.querySelector("#title").textContent === "A tiny toolbox"');
+  await click('#nav-home');await wait('document.querySelector("#project-cards").textContent.includes("A tiny toolbox")');await openProject(textProject.id);
+  await click('#run-workflow');
   await until(()=>app.store.get(textProject.id).workflowRuns[0]?.status==='completed','text creation via UI');
   assert.equal(app.store.get(textProject.id).versions[0].modelingImages.length,4);
   assert.deepEqual(app.store.get(textProject.id).workflowRuns[0].decisions,[]);
@@ -343,7 +413,7 @@ try {
   await wait('document.querySelector("#title").textContent === '+JSON.stringify(humanoid.name));
   assert.ok(await evaluate('document.querySelector("#run-workflow").disabled'));
   await click('#select-models');await wait('document.querySelector("#library-dialog").open');
-  await wait('document.querySelectorAll("#library-assets article").length === 1');await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');
+  await wait('document.querySelectorAll("#library-assets article").length === 1');
   await libraryAction('Edit this model');await wait('document.querySelector("#base-dialog").open && document.querySelectorAll("#base-meshes input").length===2 && document.querySelector("#part-status").textContent !== "Loading parts…"');
   assert.equal(app.store.get(humanoid.id).editableBase,null,'choosing a model does not grant edit scope');
   assert.equal(await evaluate('document.querySelectorAll("#part-viewer canvas").length'),1);
@@ -369,10 +439,10 @@ try {
   await wait('document.querySelector("#graph-warning").textContent.includes("Unsaved")');
   assert.deepEqual(app.store.get(textProject.id).workflow,creationWorkflow,'node changes remain unsaved before edit selection');
   await click('#nav-studio');await click('#select-models');await wait('document.querySelector("#library-dialog").open');
-  await wait('document.querySelectorAll("#library-assets article").length===1');await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
+  await wait('document.querySelectorAll("#library-assets article").length===1');await libraryAction('Edit this model');
   await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#close-base');
   assert.equal(app.store.get(textProject.id).editableBase,null,'cancel edit leaves project unchanged');
-  await click('#select-models');await wait('document.querySelector("#library-dialog").open && document.querySelectorAll("#library-assets article").length===1');await wait('document.querySelector("#library-assets details")');await evaluate('document.querySelector("#library-assets details").open=true');await libraryAction('Edit this model');
+  await click('#select-models');await wait('document.querySelector("#library-dialog").open && document.querySelectorAll("#library-assets article").length===1');await libraryAction('Edit this model');
   await wait('document.querySelector("#base-dialog").open && document.querySelector("#part-status").textContent === ""');await click('#base-meshes input');await submit('#base-form');
   await wait('!document.querySelector("#base-dialog").open && document.querySelector("#run-workflow").textContent === "Improve"');
   assert.ok(app.store.get(textProject.id).workflow.nodes.some(n=>n.type==='base'));
@@ -394,7 +464,9 @@ try {
   await until(()=>!app.store.get(textProject.id).editableBase,'remove editable source');
   await wait('document.querySelector("#run-workflow").disabled');
   assert.deepEqual(app.store.get(textProject.id).versions.at(-1).editableBase,savedEdit,'prior edit retains immutable base scope');
-  await openProject(imageProject.id);await wait('document.querySelector("#references button[aria-label]")');await click('#references button[aria-label]');
+  await openProject(imageProject.id);await wait('document.querySelector("#references button[aria-label]")');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector("#references button[aria-label]")).opacity'),'1');
+  await click('#references button[aria-label]');
   await until(()=>app.store.get(imageProject.id).references[0].review==='rejected','image removed');
   check('existing project switches to Improve through contextual selection; cancellation grants nothing; image removal is direct');
   // Explicit pauses remain real: all four are directly visible in the editor.
@@ -498,7 +570,6 @@ try {
   const deletions = [];
   await call('Network.enable');
   ws.addEventListener('message', event => { const m=JSON.parse(event.data); if(m.method==='Network.requestWillBeSent'&&m.params.request.method==='DELETE')deletions.push(m.params.request); });
-  const key = async name => { await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code:name,...(name==='Enter'?{text:'\r',windowsVirtualKeyCode:13}:{windowsVirtualKeyCode:name==='Escape'?27:9})});await call('Input.dispatchKeyEvent',{type:'keyUp',key:name,code:name}); };
   const deleteMenu = async id => { await wait('!document.querySelector("#delete-dialog").open && !document.querySelector("#delete-dialog").contains(document.activeElement)'); await click('#project-actions-'+id); await click('#project-actions-'+id+' + button'); await wait('document.querySelector("#delete-dialog").open'); };
   // The menu and action can both be reached/activated from the keyboard.
   await evaluate('document.querySelector("#project-actions-'+disposable.id+'").focus()'); await key('Enter'); await key('Tab');
@@ -551,6 +622,16 @@ try {
   await wait('!document.querySelector("#projects-empty").hidden && document.querySelectorAll("#project-cards article").length === 0');
   await wait('document.activeElement.id === "empty-create"');await screenshot('narrow-projects-empty');
   await call('Page.reload');await wait('!document.querySelector("#projects-empty").hidden');
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  await screenshot('home-empty');
+  assert.ok(await evaluate('document.querySelector("#empty-create").getClientRects().length && document.querySelector("#home").innerText.includes("No projects yet.")'));
+  for (const theme of ['light','dark']) {
+    await select('#theme',theme);await screenshot('home-empty-'+theme);
+    await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+    await screenshot('narrow-home-empty-'+theme);
+    assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth+1'));
+    await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  }
   await click('#empty-create'); await wait('document.querySelector("#create-dialog").open');await click('#close-create');
   assert.equal(exceptions.length,0,exceptions.join('\n'));check('last deletion leaves a usable empty state and create action, persists after reload, with no browser exceptions');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
