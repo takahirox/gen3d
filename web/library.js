@@ -47,12 +47,13 @@ export function setupLibrary({ api, project, refresh, editModel }) {
         const buttons = el('div'); buttons.className = 'library-card-actions';
         buttons.append(sourceButton('Use as reference', a, () => action(() => use(a, 'reference')), 'Inspect appearance only; no geometry is copied.'));
         const details = el('details'), summary = el('summary', 'More…'); summary.setAttribute('aria-label', `More ways to use ${a.name}`);
-        details.append(summary, sourceButton('Edit this model', a, () => action(async () => {
+        buttons.append(sourceButton('Edit this model', a, () => action(async () => {
           const id = targetProject, inspected = await api(`/library/assets/${a.id}/inspect`, 'POST', {});
           if (project()?.id !== id) throw new Error('Project changed; choose the model again.');
           // Close this modal before opening the contextual part picker.
           $('library-dialog').close(); await editModel(inspected);
-        })), sourceButton('Use parts of this model', a, () => action(async () => {
+        })));
+        details.append(summary, sourceButton('Use parts of this model', a, () => action(async () => {
           copyAsset = await api(`/library/assets/${a.id}/inspect`, 'POST', {}); $('copy-name').textContent = a.name; $('library-consent').reset(); $('library-consent').hidden = false;
           $('library-consent').scrollIntoView({ block: 'nearest' }); $('library-consent').elements.consent.focus();
         })));

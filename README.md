@@ -24,7 +24,7 @@ Start the app in a second terminal:
 npm start
 ```
 
-Open **http://127.0.0.1:3333**. Create a project with text or an uploaded image and choose **Object from text / image** or **Edit an existing model**. To edit a model, use **Sources → Add 3D model**, choose **More… → Edit this model**, select the parts in the preview, then **Edit selected parts**. Click **Generate** (or **Improve** for a base edit). New projects continue automatically through preparation and modeling to an exportable preview; no intermediate review clicks are required. Text still generates its concept and all four views. Optional human pauses live in **Workflow editor → Review & execution settings** and use **Accept & continue / Reject** in the studio.
+Open **http://127.0.0.1:3333**. Choose **Create project**, enter an optional **Project name**, and select **Create a model** or **Edit an existing model**, then Text or Image. A blank name uses the description. To edit a model, use **Sources → Add 3D model**, choose **Edit this model**, select the parts in the preview, then **Edit selected parts**. Click **Generate** (or **Improve** for a base edit). New projects continue automatically through preparation and modeling to an exportable preview; no intermediate review clicks are required. Text still generates its concept and all four views. Optional human pauses live in **Workflow editor → Review & execution settings** and use **Accept & continue / Reject** in the studio.
 
 This release uses project schema 3. Old generated state is unsupported. Follow the [scoped clean-start procedure](docs/local-setup.md#start-fresh); no startup operation deletes external assets or Blender installations.
 

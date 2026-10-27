@@ -213,6 +213,9 @@ function renderStudio(p) {
   const hasRefinement = draft.nodes.some(n => n.type === 'refine');
   $('studio-refinement-label').hidden = !hasRefinement;
   $('studio-cycles-label').hidden = !hasRefinement || !p.refinementSettings.enabled;
+  $('editor-refinement-label').hidden = $('editor-cycles-label').hidden = !hasRefinement;
+  const editorRefinement = $('settings').dataset.dirty ? $('settings').elements.refinement.value === 'true' : p.refinementSettings.enabled;
+  $('refinement-cost').hidden = !hasRefinement || !editorRefinement;
   $('policy-overrides').replaceChildren(...(hasFourViews ? draft.nodes.filter(n => n.type === 'consistency' && Object.keys(n.settings).length).map(n => {
     const effective = { ...p.consistencySettings, ...n.settings };
     return button(`${n.id}: ${policyName(effective)} · workflow override${dirty ? ' (unsaved)' : ''}`, () => { selectedNode = n.id; navigate('workflow'); });
@@ -250,7 +253,7 @@ function renderStudio(p) {
     if (ref.review === 'pending') {
       div.append(node('p', 'Choose how to use this model.', 'warning'),button('Choose use…', () => $('select-models').click(),status.busy));
     }
-    if (ref.role) menu.append(node('p',ref.role));
+    if (ref.role) div.append(node('p',ref.role));
     return div;
   }));
   $('references').replaceChildren(...p.references.filter(ref => ref.review !== 'rejected').map(ref => {
@@ -259,7 +262,8 @@ function renderStudio(p) {
     if (ref.review === 'pending') div.append(button('Use image',()=>api(`${route()}/references/${ref.id}/review`,'POST',{decision:'approved'}),status.busy));
     return div;
   }));
-  $('refinement-info').textContent=v?.refinement ? `Refinement: ${v.refinement.status}. ${v.refinement.error || ''}` : 'Refinement is optional and bounded to 1–5 cycles.';
+  $('refinement-history').hidden = !v?.refinement || v.refinement.status === 'off';
+  $('refinement-info').textContent=v?.refinement ? `Refinement: ${v.refinement.status}. ${v.refinement.error || ''}` : '';
   $('refinement-review').disabled = v?.status !== 'running' || v?.refinement?.status !== 'running';
   $('refinement-cycles').replaceChildren(...(v?.refinement?.iterations || []).map(c => { const div=node('div',undefined,'checkpoint');div.append(node('h3',`Cycle ${c.number}: ${c.status}`),node('p',c.error || c.report?.summary || ''),renderFiles(Object.values(c.artifacts),true));return div; }));
 }
@@ -282,7 +286,7 @@ function renderGraph(p) {
     const state = r?.nodes[n.id], b=button('',()=>{selectedNode=n.id;renderNode(p);renderGraphSelection();});b.className='graph-node';b.id='graph-node-'+n.id;b.dataset.status=state?.status || 'draft';b.classList.toggle('selected',n.id===selectedNode);b.style.left=positions[n.id].x+'px';b.style.top=positions[n.id].y+'px';b.append(node('strong',n.id),node('small',`${n.type} → ${catalog[n.type]?.output || '?'}`),node('small',state?.status || 'draft'));surface.append(b);
   }
   const scroll=[$('graph').scrollLeft,$('graph').scrollTop];$('graph').replaceChildren(surface);$('graph').scrollLeft=scroll[0];$('graph').scrollTop=scroll[1];
-  $('graph-warning').textContent=dirty?'Unsaved changes invalidate edited nodes and their descendants. Save, then branch from a valid earlier checkpoint.':'Saved graph. Nodes display the selected run’s recorded status; new settings apply to the next run.';
+  $('graph-warning').textContent=dirty?'Unsaved changes invalidate edited nodes and their descendants. Save, then branch from a valid earlier checkpoint.':'';
   if(document.activeElement!==$('graph-json'))$('graph-json').value=JSON.stringify(draft,null,2);
   renderNode(p);
 }
@@ -380,7 +384,10 @@ for(const key of ['home','studio','workflow'])$('nav-'+key).onclick=()=>navigate
 window.addEventListener('hashchange',()=>navigate(location.hash.slice(1)));
 $('theme').value=localStorage.getItem('gen3d-theme')||'dark';document.documentElement.dataset.theme=$('theme').value;
 $('theme').onchange=()=>{document.documentElement.dataset.theme=$('theme').value;localStorage.setItem('gen3d-theme',$('theme').value);};
-for(const id of ['new-project','empty-create'])$(id).onclick=()=>$('create-dialog').showModal();$('close-create').onclick=()=>$('create-dialog').close();
+let createOpener;
+for(const id of ['new-project','empty-create'])$(id).onclick=event=>{createOpener=event.currentTarget;$('create-dialog').showModal();};
+$('close-create').onclick=()=>$('create-dialog').close();
+$('create-dialog').addEventListener('close',()=>{if(!$('create-dialog').open && createOpener?.getClientRects().length)createOpener.focus();});
 $('cancel-delete').onclick = () => $('delete-dialog').close();
 $('delete-dialog').addEventListener('cancel', event => { if (deletePending) event.preventDefault(); });
 $('delete-dialog').addEventListener('close', () => {
@@ -411,6 +418,9 @@ form('create',async data=>{const mode=data.get('mode'),workflowType=data.get('wo
 form('edit',async data=>{await api(route(),'PATCH',{name:data.get('name'),prompt:data.get('prompt'),profile:data.get('profile')});await run();});
 $('edit').addEventListener('input',()=>{$('run-workflow').classList.add('primary');$('exports').querySelector('a')?.classList.remove('primary');});
 form('settings',data=>api(route(),'PATCH',{checkpoints:Object.fromEntries(['input','concept','multiView','preview'].map(k=>[k,data.has(k)])),consistencySettings:policySettings(data.get('policy')),refinementSettings:{enabled:data.get('refinement')==='true',maxIterations:Number(data.get('maxIterations'))}}));
+$('settings').elements.refinement.addEventListener('change', () => {
+  $('refinement-cost').hidden = $('settings').elements.refinement.value !== 'true';
+});
 $('preparation-settings').onsubmit = event => event.preventDefault();
 $('preparation-settings').onchange = event => safe(async () => {
   const field = event.target;
