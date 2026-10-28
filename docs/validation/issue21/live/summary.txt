@@ -1,3 +1,0 @@
-Created and inspected the teal cabinet with two doors, round orange knobs, four tapered orange feet, and an overhanging top.
-
-Reused the authorized GLB geometry and refined its materials. The inspection-only .blend guided proportions and finish; none of its geometry was incorporated. All 19 mesh parts have materials and are ready for GLB export.
