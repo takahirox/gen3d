@@ -48,6 +48,13 @@ export async function checkPosedWorkflow(output, fixtures) {
   for (const [kind, source] of [['blend', 'posed.blend'], ['glb', 'blend/base.glb'], ['constraint', 'constraint.blend']]) {
     const asset = await store.library.import({ name: `posed-${kind}.${kind === 'glb' ? 'glb' : 'blend'}`, data: fs.readFileSync(path.join(fixtures, source)).toString('base64') });
     const before = fileHash(store.library.resolve(asset));
+    let selectionPreview;
+    if (kind !== 'constraint') {
+      const preview = await store.library.partPreview(asset.id);
+      const evidence = path.join(output, `preview-${kind}.json`);
+      await blender('execute_code', { code: `import sys, runpy\nsys.path.insert(0, ${JSON.stringify(path.resolve('blender'))})\nimport preservation as p\ncheck = runpy.run_path(${JSON.stringify(path.resolve('scripts/posed-rig-check.py'))})['check_selection_preview']\np.write(${JSON.stringify(evidence)}, check(p, ${JSON.stringify(store.library.resolve(asset))}, ${JSON.stringify(preview)}))\n` });
+      selectionPreview = JSON.parse(fs.readFileSync(evidence, 'utf8'));
+    }
     const project = store.create({ name: `Posed ${kind}`, workflowType: 'humanoid', mode: 'image', refinementSettings: { enabled: false }, image: 'data:image/png;base64,' + png.toString('base64') }, 'web');
     await assert.rejects(authorizeBase(store, project.id, { assetId: asset.id, scope: { editableObjects: ['Hair'] } }, 'mcp'), /human/);
     await authorizeBase(store, project.id, { assetId: asset.id, sha256: asset.sha256, scope: { editableObjects: ['Hair'] } }, 'web');
@@ -70,7 +77,7 @@ export async function checkPosedWorkflow(output, fixtures) {
       assert.equal(new Store(store.root).get(project.id).editableBase.sha256, asset.sha256);
     }
     assert.equal(fileHash(store.library.resolve(asset)), before);
-    results.push({ source: kind, status: run.status, error: run.error || null, sourceUnchanged: true, scope: project.editableBase.scope });
+    results.push({ source: kind, status: run.status, error: run.error || null, sourceUnchanged: true, scope: project.editableBase.scope, selectionPreview });
   }
   return { realBlender: true, realWorkflow: true, codexUsed: false, deterministicModeler: true, results };
 }

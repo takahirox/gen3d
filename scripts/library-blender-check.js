@@ -90,7 +90,10 @@ const hair = await store.library.import({ name: 'hair.glb', data: fs.readFileSyn
 // Visual scope previews keep exact source names and never grant edit rights.
 for (const asset of [parts, head]) {
   const sourceHash=hash(store.library.resolve(asset));
+  const legacy = path.join(store.library.root, asset.id, `selection-${asset.sha256}.glb`);
+  fs.writeFileSync(legacy, 'legacy preview must not be reused');
   const preview=await store.library.partPreview(asset.id), bytes=fs.readFileSync(preview);
+  assert.notEqual(preview, legacy, 'invalidate cached previews that may have lost the pose');
   const gltf=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)));
   const names=gltf.nodes.filter(n=>n.extras?.gen3d_part).map(n=>n.extras.gen3d_part).sort();
   assert.deepEqual(names,store.library.get(asset.id).inspection.objects.filter(o=>o.type==='MESH').map(o=>o.name).sort());

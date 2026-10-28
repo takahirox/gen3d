@@ -11,6 +11,53 @@ import sys
 from mathutils import Matrix
 
 
+def check_selection_preview(p, source, preview):
+    """Measure the actual AssetLibrary picker GLB against the evaluated source."""
+    import struct
+
+    def surfaces():
+        result = {}
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        for obj in bpy.context.scene.objects:
+            if obj.type != 'MESH':
+                continue
+            evaluated = obj.evaluated_get(depsgraph)
+            mesh = evaluated.to_mesh()
+            try:
+                mesh.calc_loop_triangles()
+                points = [evaluated.matrix_world @ v.co for v in mesh.vertices]
+                result[obj.get('gen3d_part', obj.name)] = sorted(
+                    sorted(tuple(points[i]) for i in triangle.vertices)
+                    for triangle in mesh.loop_triangles)
+            finally:
+                evaluated.to_mesh_clear()
+        return result
+
+    p.open_base(source)
+    expected = surfaces()
+    # Mapping is checked on GLB mesh nodes, not inferred from renamed Blender IDs.
+    with open(preview, 'rb') as f:
+        raw = f.read()
+    doc = json.loads(raw[20:20 + struct.unpack_from('<I', raw, 12)[0]])
+    nodes = [n for n in doc['nodes'] if 'mesh' in n]
+    names = [n.get('extras', {}).get('gen3d_part') for n in nodes]
+    assert len(names) == len(expected) and set(names) == set(expected), names
+    assert all('skin' not in n for n in nodes), 'Picker must contain only static evaluated surfaces'
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.import_scene.gltf(filepath=preview)
+    actual = surfaces()
+    assert set(actual) == set(expected)
+    measurements = []
+    for name in sorted(expected):
+        assert len(expected[name]) == len(actual[name]), name
+        error = max((sum((a - b) ** 2 for a, b in zip(before, after)) ** 0.5
+                     for t1, t2 in zip(expected[name], actual[name])
+                     for before, after in zip(t1, t2)), default=0)
+        assert error < 0.00001, (name, error)
+        measurements.append({'part': name, 'triangles': len(expected[name]), 'maxSurfaceError': error})
+    return {'exactPartMapping': names, 'evaluatedSurfaces': measurements}
+
+
 def fixture(directory):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     arm = bpy.data.armatures.new('Skeleton')

@@ -193,7 +193,8 @@ export class AssetLibrary {
     if (!this.pendingPreviews.has(id)) {
       const task = (async () => {
         const a = await this.inspected(id), dir = path.join(this.root, a.id);
-        const file = path.join(dir, `selection-${a.sha256}.glb`);
+        // v1 previews could show a posed rig in its rest shape.
+        const file = path.join(dir, `selection-v2-${a.sha256}.glb`);
         if (!fs.existsSync(file)) await this.selectionPreview(a, this.resolve(a), file);
         if (this.verify(this.get(id)).sha256 !== a.sha256) throw new AppError('Model changed; choose it again', 409);
         if (!fs.lstatSync(file).isFile() || fs.realpathSync(file) !== file) throw new AppError('Part preview unavailable', 409);

@@ -1,5 +1,6 @@
 // Deterministic browser regression using injected providers and previously recorded
-// assets. No Codex, Blender process, external service or allowance is used.
+// assets. Optional posed cases use the production Blender preview and workflow.
+// No Codex, external service or provider allowance is used.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,6 +12,7 @@ import { categories, anatomyCategories } from '../src/refinement.js';
 import { Transformer } from '@napi-rs/image';
 import { referenceViews } from '../src/model-reference-visuals.js';
 import { createApp } from '../src/server.js';
+import { AssetLibrary } from '../src/asset-library.js';
 import { blenderExecutor, deterministicEdit } from './posed-workflow-check.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,16 +29,19 @@ let generationNumber = 0;
 let refinementPass = true, partialModelState, failPreservation = false, usageLimit = false;
 let inspection = { consistent: true, issues: [] }, releaseModel, failConcept = false, failModel = false, partialViews = false, failInspection = false;
 function selectionGLB() {
-  const bytes=fs.readFileSync(realPosed ? path.join(posedFixtures,'blend/base.glb') : path.join(assets,'model-1/model.glb')), length=bytes.readUInt32LE(12);
+  const bytes=fs.readFileSync(path.join(assets,'model-1/model.glb')), length=bytes.readUInt32LE(12);
   const json=JSON.parse(bytes.toString('utf8',20,20+length));
-  json.nodes.filter(n=>n.mesh!==undefined).forEach((n,i)=>{n.extras={...n.extras,gen3d_part:realPosed?n.name:i===0?'Hair':'Body'};});
+  json.nodes.filter(n=>n.mesh!==undefined).forEach((n,i)=>{n.extras={...n.extras,gen3d_part:i===0?'Hair':'Body'};});
   const raw=Buffer.from(JSON.stringify(json)), padded=Buffer.alloc(Math.ceil(raw.length/4)*4,32);raw.copy(padded);
   const chunk=Buffer.alloc(8);chunk.writeUInt32LE(padded.length);chunk.writeUInt32LE(0x4e4f534a,4);
   const result=Buffer.concat([bytes.subarray(0,12),chunk,padded,bytes.subarray(20+length)]);result.writeUInt32LE(result.length,8);return result;
 }
 const providers = {
   dataDir: path.join(temp, 'data'),
-  selectionPreview: async (a, source, output) => fs.writeFileSync(output,selectionGLB()),
+  selectionPreview: async (a, source, output) => {
+    if (realPosed) return productionSelectionPreview(a, source, output);
+    fs.writeFileSync(output,selectionGLB());
+  },
   inspectAsset: async a => {
     const dir = path.join(app.store.library.root, a.id); fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, 'preview.png'));
@@ -96,6 +101,8 @@ const providers = {
   }
 };
 const app = createApp(providers);
+// Capture the default AssetLibrary implementation for the real posed cases.
+const productionSelectionPreview = new AssetLibrary(providers.dataDir).selectionPreview;
 app.runner.blender = providers.blender;
 let chrome, ws, page;
 const checks = [], exceptions = [];
@@ -658,7 +665,7 @@ try {
       const asset=app.store.library.list().assets.find(a=>a.name===path.basename(source));
       await evaluate('document.querySelector("#library-search").value='+JSON.stringify(path.basename(source))+';document.querySelector("#library-search").dispatchEvent(new Event("input",{bubbles:true}))');
       await wait('document.querySelectorAll("#library-assets article").length===1');
-      await libraryAction('Edit this model');await wait('document.querySelector("#base-dialog").open && document.querySelectorAll("#base-meshes input").length===2');
+      await libraryAction('Edit this model');await wait('document.querySelector("#base-dialog").open && document.querySelectorAll("#base-meshes input").length===2 && document.querySelector("#part-status").textContent === ""');
       await evaluate('document.querySelector("#base-meshes input").click()');await submit('#base-form');
       await until(()=>app.store.get(project.id).editableBase?.review==='approved','posed scope');
       await wait('!document.querySelector("#base-dialog").open && !document.querySelector("#run-workflow").disabled');
