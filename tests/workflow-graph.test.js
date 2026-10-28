@@ -396,3 +396,28 @@ test('typed graph evidence rejects wrong, duplicate, missing and mislinked views
     assert.throws(() => validateNodeOutput('consistency', data), /invalid typed/);
   }
 });
+
+test('failed posed-rig preflight retains human scope and blocks modeling and base checkpoints', async t => {
+  const c = setup(t);
+  c.store.library.inspect = async () => ({ objects: [{ name: 'Hair', type: 'MESH' }] });
+  const asset = await c.store.library.import({ name: 'posed.glb', data: fs.readFileSync(path.join(fixture, 'model-1/model.glb')).toString('base64') });
+  c.engine.saveGraph(c.p.id, workflowPreset('humanoid'), 'web');
+  await authorizeBase(c.store, c.p.id, { assetId: asset.id, sha256: asset.sha256, scope: { editableObjects: ['Hair'] } }, 'web');
+  const authorized = structuredClone(c.p.editableBase);
+  let preparations = 0;
+  c.runner.blender = async (tool, { code }) => {
+    assert.equal(tool, 'execute_code');
+    assert.match(code, /preservation.prepare/);
+    preparations++;
+    throw new Error('Unverifiable GLB bind/rest after import: mixamorig:Spine');
+  };
+  const run = await c.run();
+  assert.equal(run.status, 'failed');
+  assert.match(run.error, /Unverifiable GLB bind\/rest.*mixamorig:Spine/);
+  assert.equal(preparations, 1);
+  assert.equal(c.calls.includes('model'), false);
+  assert.equal(run.checkpoints.some(cp => cp.nodeId === 'base'), false);
+  assert.deepEqual(c.p.editableBase, authorized);
+  assert.equal(c.store.library.verify(asset).sha256, asset.sha256);
+  assert.equal(c.p.activity.filter(e => e.type === 'editable_base_authorized').length, 1);
+});

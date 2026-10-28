@@ -84,7 +84,9 @@ def load_file(file, asset_id, permission='reference-only'):
                 if obj:
                     scene.collection.objects.link(obj)
         elif file.lower().endswith('.glb'):
-            bpy.ops.import_scene.gltf(filepath=file)
+            # Importer bone-shape helpers are not source parts and must not
+            # appear as extra selectable meshes in inspection or the picker.
+            bpy.ops.import_scene.gltf(filepath=file, disable_bone_shape=True)
         else:
             raise RuntimeError('Unsupported model format')
         # Validate only this asset's appended resources, preserving the deliverable.
@@ -339,15 +341,37 @@ def selection_preview(file, output):
 
     This simplified GLB is never used as an editable base or a deliverable.
     """
+    original = bpy.context.scene
     scene, _ = load_file(file, 'selection-preview')
-    bpy.context.window.scene = scene
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in scene.objects:
-        if obj.type == 'MESH':
-            obj['gen3d_part'] = obj.name
-            obj.select_set(True)
-    bpy.ops.export_scene.gltf(filepath=output, export_format='GLB', use_selection=True,
-                              export_extras=True, export_animations=False)
+    preview = bpy.data.scenes.new('gen3d_selection_surface')
+    temporary = []
+    try:
+        bpy.context.window.scene = scene
+        bpy.context.view_layer.update()
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        for obj in scene.objects:
+            if obj.type != 'MESH':
+                continue
+            # Mesh-only export omits the rig and otherwise shows rest geometry.
+            # Freeze the evaluated surface in disposable picker objects only;
+            # neither the loaded source nor its rig/mesh data is modified.
+            evaluated = obj.evaluated_get(depsgraph)
+            mesh = bpy.data.meshes.new_from_object(evaluated, preserve_all_data_layers=True, depsgraph=depsgraph)
+            copy = bpy.data.objects.new(obj.name, mesh)
+            temporary.append(copy)
+            preview.collection.objects.link(copy)
+            copy.matrix_world = evaluated.matrix_world.copy()
+            copy['gen3d_part'] = obj.name
+        bpy.context.window.scene = preview
+        bpy.ops.export_scene.gltf(filepath=output, export_format='GLB', use_active_scene=True,
+                                  export_extras=True, export_animations=False)
+    finally:
+        bpy.context.window.scene = original
+        for obj in temporary:
+            mesh = obj.data
+            bpy.data.objects.remove(obj, do_unlink=True)
+            bpy.data.meshes.remove(mesh)
+        bpy.data.scenes.remove(preview)
 
 
 def inspect_file(file, thumbnail=None):

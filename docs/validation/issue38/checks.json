@@ -1,0 +1,41 @@
+{
+  "issue": 38,
+  "blender": "5.1.2",
+  "node": "26.12.1",
+  "commands": [
+    {
+      "command": "npm test",
+      "status": "passed",
+      "tests": 138,
+      "failures": 0
+    },
+    {
+      "command": "npm run check",
+      "status": "passed"
+    },
+    {
+      "command": "npm run test:workflow-blender",
+      "status": "passed",
+      "realBlender": true,
+      "posedRejections": 31,
+      "realStoreWorkflow": true
+    },
+    {
+      "command": "npm run test:library-blender",
+      "status": "passed",
+      "realBlender": true
+    },
+    {
+      "command": "GEN3D_BROWSER_POSED_FIXTURES=.gen3d/workflow-blender-check/posed npm run test:browser",
+      "status": "passed",
+      "realBrowser": true,
+      "realBlenderInPosedCases": true,
+      "checks": 36,
+      "uncaughtExceptions": 0
+    }
+  ],
+  "codexGenerationUsed": false,
+  "providerAllowanceUsed": 0,
+  "independentMixamoAssetUsed": false,
+  "modeler": "deterministic local fixture mesh edit"
+}

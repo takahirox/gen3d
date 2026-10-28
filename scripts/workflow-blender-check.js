@@ -4,6 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { runProcess } from '../src/codex.js';
 import { fileHash } from '../src/workflow.js';
+import { checkPosedWorkflow } from './posed-workflow-check.js';
 const output = path.resolve(process.env.GEN3D_WORKFLOW_BLENDER_OUTPUT || '.gen3d/workflow-blender-check');
 fs.mkdirSync(output, { recursive: true });
 const runtime = path.resolve('blender');
@@ -732,12 +733,15 @@ try:
 except RuntimeError as error:
     assert 'materials' in str(error), str(error)
     checks.append('blocked export-only emission change: ' + str(error))
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence, 'surfacePreservation':surface_evidence})
+import runpy
+posed_evidence = runpy.run_path(${JSON.stringify(path.resolve('scripts/posed-rig-check.py'))})['run'](p, out + '/posed')
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence, 'surfacePreservation':surface_evidence, 'posedRigs':posed_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });
   const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
   assert.equal(report.preservation.passed, true); assert.equal(report.preservation.roundtrip.passed, true);
+  report.posedWorkflow = await checkPosedWorkflow(path.join(output, 'posed-workflow'), path.join(output, 'posed'));
   report.sourceSha256 = fileHash(path.join(output,'character.blend')); report.validatedAt = new Date().toISOString();
   fs.writeFileSync(path.join(output,'report.json'), JSON.stringify(report,null,2));
   console.log(JSON.stringify({ realBlender:true, checks:report.checks, output }));

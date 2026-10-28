@@ -1,5 +1,6 @@
 // Deterministic browser regression using injected providers and previously recorded
-// assets. No Codex, Blender process, external service or allowance is used.
+// assets. Optional posed cases use the production Blender preview and workflow.
+// No Codex, external service or provider allowance is used.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,11 +12,17 @@ import { categories, anatomyCategories } from '../src/refinement.js';
 import { Transformer } from '@napi-rs/image';
 import { referenceViews } from '../src/model-reference-visuals.js';
 import { createApp } from '../src/server.js';
+import { AssetLibrary } from '../src/asset-library.js';
+import { blenderExecutor, deterministicEdit } from './posed-workflow-check.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.resolve(process.env.GEN3D_BROWSER_OUTPUT || '.gen3d/studio-browser-check');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-studio-browser-'));
 const assets = path.join(root, 'docs/validation/issue10/prop');
+const posedFixtures = process.env.GEN3D_BROWSER_POSED_FIXTURES && path.resolve(process.env.GEN3D_BROWSER_POSED_FIXTURES);
+let realPosed = false;
+fs.mkdirSync(output, { recursive: true });
+const posedBlender = blenderExecutor(output);
 const checkpoints = { input: false, concept: false, multiView: false, preview: false };
 const png = fs.readFileSync(path.join(assets, 'concept-1/concept.png'));
 let generationNumber = 0;
@@ -31,7 +38,10 @@ function selectionGLB() {
 }
 const providers = {
   dataDir: path.join(temp, 'data'),
-  selectionPreview: async (a, source, output) => fs.writeFileSync(output,selectionGLB()),
+  selectionPreview: async (a, source, output) => {
+    if (realPosed) return productionSelectionPreview(a, source, output);
+    fs.writeFileSync(output,selectionGLB());
+  },
   inspectAsset: async a => {
     const dir = path.join(app.store.library.root, a.id); fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(assets, 'model-1/preview.png'), path.join(dir, 'preview.png'));
@@ -47,6 +57,7 @@ const providers = {
     }
   },
   blender: async (tool, { code = '' }) => {
+    if (realPosed) return posedBlender(tool, { code });
     const args = code.match(/refs.render_reference\(("[^"\n]*"), ("[^"\n]*")\)/);
     if (args) {
       const directory = JSON.parse(args[2]); fs.mkdirSync(directory, { recursive: true });
@@ -74,6 +85,7 @@ const providers = {
       views: renders.map(r => ({ view: r.view, observations: [...categories, ...(profile === 'character' ? anatomyCategories : [])].map((category, i) => ({ category, status: !acceptable && i === 1 ? 'discrepancy' : 'acceptable', detail: 'Synthetic browser fixture observation.' })) })) };
   },
   generate: async (p, v, dir) => {
+    if (realPosed) return deterministicEdit(posedBlender, p, v, dir);
     if (releaseModel) await new Promise(resolve => { releaseModel = resolve; });
     if (usageLimit) { const e = new Error('Fixture usage limit reached'); e.usageLimited = true; throw e; }
     if (failModel) throw new Error('Fixture Blender bridge unavailable');
@@ -89,6 +101,8 @@ const providers = {
   }
 };
 const app = createApp(providers);
+// Capture the default AssetLibrary implementation for the real posed cases.
+const productionSelectionPreview = new AssetLibrary(providers.dataDir).selectionPreview;
 app.runner.blender = providers.blender;
 let chrome, ws, page;
 const checks = [], exceptions = [];
@@ -635,9 +649,42 @@ try {
   await click('#empty-create'); await wait('document.querySelector("#create-dialog").open');await click('#close-create');
   assert.equal(exceptions.length,0,exceptions.join('\n'));check('last deletion leaves a usable empty state and create action, persists after reload, with no browser exceptions');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+  if (posedFixtures) {
+    realPosed = true;
+    for (const [kind, source] of [['blend','posed.blend'],['glb','blend/base.glb']]) {
+      await click('#nav-home');await click('#new-project');await fill('#create',{workflowType:'humanoid',mode:'image',prompt:'Improve posed hair '+kind});
+      await upload('#create input[name=image]',path.join(assets,'concept-1/concept.png'));await submit('#create');
+      await until(()=>app.store.list().some(p=>p.prompt==='Improve posed hair '+kind),'posed project');
+      const project=app.store.list().find(p=>p.prompt==='Improve posed hair '+kind);
+      // Keep this focused on the real preservation path; visual inspection
+      // providers remain injected in the surrounding browser suite.
+      await select('#studio-refinement','false');await until(()=>!app.store.get(project.id).refinementSettings.enabled,'posed refinement off');
+      await click('#select-models');await wait('document.querySelector("#library-dialog").open');
+      await upload('#library-file',path.join(posedFixtures,source));
+      await until(()=>app.store.library.list().assets.some(a=>a.name===path.basename(source)),'posed asset upload',30000);
+      const asset=app.store.library.list().assets.find(a=>a.name===path.basename(source));
+      await evaluate('document.querySelector("#library-search").value='+JSON.stringify(path.basename(source))+';document.querySelector("#library-search").dispatchEvent(new Event("input",{bubbles:true}))');
+      await wait('document.querySelectorAll("#library-assets article").length===1');
+      await libraryAction('Edit this model');await wait('document.querySelector("#base-dialog").open && document.querySelectorAll("#base-meshes input").length===2 && document.querySelector("#part-status").textContent === ""');
+      await evaluate('document.querySelector("#base-meshes input").click()');await submit('#base-form');
+      await until(()=>app.store.get(project.id).editableBase?.review==='approved','posed scope');
+      await wait('!document.querySelector("#base-dialog").open && !document.querySelector("#run-workflow").disabled');
+      const original=app.store.library.get(asset.id).sha256;
+      await click('#run-workflow');
+      await until(()=>{const r=app.store.get(project.id).workflowRuns[0];if(r&&r.status!=='running')assert.equal(r.status,'completed',r.error);return r?.status==='completed';},'real posed '+kind+' workflow',120000);
+      const saved=app.store.get(project.id),version=saved.versions.at(-1);
+      assert.deepEqual(saved.editableBase.scope,{editableObjects:['Hair'],allowChanges:[],allowNewObjects:false});
+      assert.equal(saved.activity.filter(e=>e.type==='editable_base_authorized').length,1);
+      assert.equal(version.preservation.roundtrip.passed,true);assert.equal(app.store.library.verify(asset).sha256,original);
+      await wait('document.querySelector("#exports").textContent.includes("Download GLB")');
+      await screenshot('posed-'+kind+'-verified');
+      check('posed '+kind+' Edit this model → Edit selected parts → Improve passes real Blender preservation with one exact scope authorization');
+    }
+    realPosed = false;
+  }
   const limited=await failure('Usage limit',()=>{usageLimit=true;},'Fixture usage limit reached');
   assert.equal(app.runner.usageLimited,true);const count=app.store.get(limited.id).workflowRuns.length;
   await wait('document.querySelector("#run-workflow").disabled');await pause(1800);
   assert.equal(app.store.get(limited.id).workflowRuns.length,count);check('injected usage limit disables generation with no retries, resets, or provider switches');
-  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({realBrowser:true,realBlender:false,codexUsed:false,viewports:[{width:1440,height:1050},{width:390,height:844}],checks,exceptions,limitation:'Injected providers and recorded GLBs; live generation/preservation are separately checked.'},null,2));
+  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({realBrowser:true,realBlender:!!posedFixtures,posedFixtures:!!posedFixtures,codexUsed:false,viewports:[{width:1440,height:1050},{width:390,height:844}],checks,exceptions,limitation:posedFixtures?'Posed base cases use real Blender and a deterministic modeler. Other cases use injected providers/recorded GLBs; no Codex generation.':'Injected providers and recorded GLBs; live generation/preservation are separately checked.'},null,2));
 } finally { ws?.close();if(chrome&&chrome.exitCode===null){chrome.kill();await once(chrome,'exit');}app.server.close();await app.closed;fs.rmSync(temp,{recursive:true,force:true}); }
