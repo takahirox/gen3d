@@ -145,7 +145,8 @@ for o in meshes:
 bpy.context.view_layer.objects.active = meshes[0]
 bpy.ops.wm.save_as_mainfile(filepath=out + '/scene.blend', compress=False)
 ${editableBase ? `# Export the complete modeling scene, including skeletons and morphs.
-bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', export_apply=False, export_animations=False)` : `bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', use_selection=True, export_apply=True)`}
+import preservation
+preservation.export_glb(out + '/model.glb')` : `bpy.ops.export_scene.gltf(filepath=out + '/model.glb', export_format='GLB', use_selection=True, export_apply=True)`}
 bpy.ops.render.render(write_still=True)
 ${refinementSettings?.enabled ? `camera.data.type = 'ORTHO'
 default_scale = max(hi.z - lo.z, hi.x - lo.x, hi.y - lo.y) * 1.3
