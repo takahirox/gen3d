@@ -735,13 +735,15 @@ except RuntimeError as error:
     checks.append('blocked export-only emission change: ' + str(error))
 import runpy
 posed_evidence = runpy.run_path(${JSON.stringify(path.resolve('scripts/posed-rig-check.py'))})['run'](p, out + '/posed')
-p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence, 'surfacePreservation':surface_evidence, 'posedRigs':posed_evidence})
+mixamo_evidence = runpy.run_path(${JSON.stringify(path.resolve('scripts/mixamo-bind-check.py'))})['run'](p, out + '/mixamo')
+p.write(out + '/report.json', {'realBlender':True, 'codexUsed':False, 'checks':checks, 'preservation':report, 'expressions':expression_evidence, 'boneInheritance':bone_evidence, 'armatureEvaluation':armature_evidence, 'collectionVisibility':visibility_evidence, 'surfacePreservation':surface_evidence, 'posedRigs':posed_evidence, 'mixamoBindFrames':mixamo_evidence})
 `);
 try {
   await runProcess(process.env.GEN3D_BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--disable-autoexec', '--python-exit-code', '1', '--python', script], { timeout: 180000, onLine: line => { if (/Error|RuntimeError|Traceback|AssertionError/.test(line)) console.log(line); } });
   const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
   assert.equal(report.preservation.passed, true); assert.equal(report.preservation.roundtrip.passed, true);
   report.posedWorkflow = await checkPosedWorkflow(path.join(output, 'posed-workflow'), path.join(output, 'posed'));
+  report.mixamoWorkflow = await checkPosedWorkflow(path.join(output, 'mixamo-workflow'), path.join(output, 'mixamo'), [['mixamo-rest', 'rest.glb', 'glb'], ['mixamo-posed', 'posed.glb', 'glb'], ['mixamo-scaled', 'scaled.glb', 'glb']]);
   report.sourceSha256 = fileHash(path.join(output,'character.blend')); report.validatedAt = new Date().toISOString();
   fs.writeFileSync(path.join(output,'report.json'), JSON.stringify(report,null,2));
   console.log(JSON.stringify({ realBlender:true, checks:report.checks, output }));

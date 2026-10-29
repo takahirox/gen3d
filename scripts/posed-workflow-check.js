@@ -36,7 +36,7 @@ export async function deterministicEdit(blender, project, version, directory) {
   fs.writeFileSync(path.join(directory, 'mcp-audit.jsonl'), JSON.stringify({ tool: 'execute_blender_code', synthetic: true, description: 'Deterministic fixture edit; no Codex invocation' }) + '\n');
 }
 
-export async function checkPosedWorkflow(output, fixtures) {
+export async function checkPosedWorkflow(output, fixtures, cases = [['blend', 'posed.blend', 'blend'], ['glb', 'blend/base.glb', 'glb'], ['constraint', 'constraint.blend', 'blend']]) {
   fs.mkdirSync(output, { recursive: true });
   const store = new Store(fs.mkdtempSync(path.join(output, 'data-')));
   const blender = blenderExecutor(output);
@@ -45,8 +45,8 @@ export async function checkPosedWorkflow(output, fixtures) {
   const engine = new WorkflowEngine(store, runner, workflowOperations(store, runner));
   const png = fs.readFileSync('docs/validation/issue10/prop/model-1/preview.png');
   const results = [];
-  for (const [kind, source] of [['blend', 'posed.blend'], ['glb', 'blend/base.glb'], ['constraint', 'constraint.blend']]) {
-    const asset = await store.library.import({ name: `posed-${kind}.${kind === 'glb' ? 'glb' : 'blend'}`, data: fs.readFileSync(path.join(fixtures, source)).toString('base64') });
+  for (const [kind, source, format] of cases) {
+    const asset = await store.library.import({ name: `posed-${kind}.${format}`, data: fs.readFileSync(path.join(fixtures, source)).toString('base64') });
     const before = fileHash(store.library.resolve(asset));
     let selectionPreview;
     if (kind !== 'constraint') {

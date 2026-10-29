@@ -20,6 +20,7 @@ const output = path.resolve(process.env.GEN3D_BROWSER_OUTPUT || '.gen3d/studio-b
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'gen3d-studio-browser-'));
 const assets = path.join(root, 'docs/validation/issue10/prop');
 const posedFixtures = process.env.GEN3D_BROWSER_POSED_FIXTURES && path.resolve(process.env.GEN3D_BROWSER_POSED_FIXTURES);
+const mixamoFixtures = process.env.GEN3D_BROWSER_MIXAMO_FIXTURES && path.resolve(process.env.GEN3D_BROWSER_MIXAMO_FIXTURES);
 let realPosed = false;
 fs.mkdirSync(output, { recursive: true });
 const posedBlender = blenderExecutor(output);
@@ -649,9 +650,13 @@ try {
   await click('#empty-create'); await wait('document.querySelector("#create-dialog").open');await click('#close-create');
   assert.equal(exceptions.length,0,exceptions.join('\n'));check('last deletion leaves a usable empty state and create action, persists after reload, with no browser exceptions');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
-  if (posedFixtures) {
+  if (posedFixtures || mixamoFixtures) {
     realPosed = true;
-    for (const [kind, source] of [['blend','posed.blend'],['glb','blend/base.glb']]) {
+    const cases = [
+      ...(posedFixtures ? [['blend',path.join(posedFixtures,'posed.blend')],['glb',path.join(posedFixtures,'blend/base.glb')]] : []),
+      ...(mixamoFixtures ? [['mixamo-rest',path.join(mixamoFixtures,'rest.glb')],['mixamo-posed',path.join(mixamoFixtures,'posed.glb')]] : [])
+    ];
+    for (const [kind, source] of cases) {
       await click('#nav-home');await click('#new-project');await fill('#create',{workflowType:'humanoid',mode:'image',prompt:'Improve posed hair '+kind});
       await upload('#create input[name=image]',path.join(assets,'concept-1/concept.png'));await submit('#create');
       await until(()=>app.store.list().some(p=>p.prompt==='Improve posed hair '+kind),'posed project');
@@ -660,7 +665,7 @@ try {
       // providers remain injected in the surrounding browser suite.
       await select('#studio-refinement','false');await until(()=>!app.store.get(project.id).refinementSettings.enabled,'posed refinement off');
       await click('#select-models');await wait('document.querySelector("#library-dialog").open');
-      await upload('#library-file',path.join(posedFixtures,source));
+      await upload('#library-file',source);
       await until(()=>app.store.library.list().assets.some(a=>a.name===path.basename(source)),'posed asset upload',30000);
       const asset=app.store.library.list().assets.find(a=>a.name===path.basename(source));
       await evaluate('document.querySelector("#library-search").value='+JSON.stringify(path.basename(source))+';document.querySelector("#library-search").dispatchEvent(new Event("input",{bubbles:true}))');
@@ -686,5 +691,5 @@ try {
   assert.equal(app.runner.usageLimited,true);const count=app.store.get(limited.id).workflowRuns.length;
   await wait('document.querySelector("#run-workflow").disabled');await pause(1800);
   assert.equal(app.store.get(limited.id).workflowRuns.length,count);check('injected usage limit disables generation with no retries, resets, or provider switches');
-  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({realBrowser:true,realBlender:!!posedFixtures,posedFixtures:!!posedFixtures,codexUsed:false,viewports:[{width:1440,height:1050},{width:390,height:844}],checks,exceptions,limitation:posedFixtures?'Posed base cases use real Blender and a deterministic modeler. Other cases use injected providers/recorded GLBs; no Codex generation.':'Injected providers and recorded GLBs; live generation/preservation are separately checked.'},null,2));
+  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({realBrowser:true,realBlender:!!(posedFixtures || mixamoFixtures),posedFixtures:!!posedFixtures,mixamoFixtures:!!mixamoFixtures,codexUsed:false,viewports:[{width:1440,height:1050},{width:390,height:844}],checks,exceptions,limitation:posedFixtures || mixamoFixtures?'Rigged base cases use real Blender and a deterministic modeler. Other cases use injected providers/recorded GLBs; no Codex generation.':'Injected providers and recorded GLBs; live generation/preservation are separately checked.'},null,2));
 } finally { ws?.close();if(chrome&&chrome.exitCode===null){chrome.kill();await once(chrome,'exit');}app.server.close();await app.closed;fs.rmSync(temp,{recursive:true,force:true}); }

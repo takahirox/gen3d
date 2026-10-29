@@ -5,6 +5,7 @@ No mesh-only copies. Unsupported GLB capabilities block rather than disappear.
 import bpy
 import hashlib
 import json
+import math
 import os
 import struct
 import tempfile
@@ -488,7 +489,12 @@ def explicit_skeletons(gltf):
         if len(ancestors) != 1 or None in ancestors:
             raise RuntimeError('Unverifiable GLB bind frame: skin needs a common named armature parent')
         ancestor = ancestors.pop()
-        if skin.get('skeleton', ancestor) not in {ancestor, *roots}:
+        allowed = {roots[0]} if len(roots) == 1 else set()
+        current = ancestor
+        while current is not None:
+            allowed.add(current)
+            current = parents.get(current)
+        if skin.get('skeleton', ancestor) not in allowed:
             raise RuntimeError('Unverifiable GLB bind frame: skeleton differs from the joint hierarchy')
         skin['skeleton'] = ancestor
 
@@ -504,10 +510,136 @@ def write_glb_json(source, destination, gltf):
         f.write(content[:8] + struct.pack('<I', 20 + len(encoded) + len(tail)) + struct.pack('<I4s', len(encoded), b'JSON') + encoded + tail)
 
 
+def skin_import_copy(source, destination, gltf):
+    """Express skin inputs in Blender's armature frame, in a disposable GLB.
+
+    glTF inverse binds map mesh coordinates to joint coordinates. Blender's
+    importer guesses them relative to the armature, then retargets vertices.
+    For armature world A, use I' = I A and v' = A^-1 v, so J I' v' = J I v.
+    Nothing in the source, joint hierarchy or current joint transforms changes.
+    Export bakes the mesh object frame back into positions and inverse binds.
+    """
+    if not gltf.get('skins'):
+        write_glb_json(source, destination, gltf)
+        return
+    if len(gltf.get('buffers', [])) != 1 or gltf['buffers'][0].get('uri'):
+        raise RuntimeError('Protected skin verification requires an embedded GLB buffer')
+    normalized = json.loads(json.dumps(gltf))
+    worlds, _ = glb_worlds(gltf)
+    with open(source, 'rb') as f:
+        content = f.read()
+    json_length = struct.unpack_from('<I', content, 12)[0]
+    binary = bytearray(content[28 + json_length:])
+
+    def access(index):
+        return glb_accessor(source, gltf, index, content)
+
+    def append(rows, kind):
+        binary.extend(b'\0' * (-len(binary) % 4))
+        start = len(binary)
+        for row in rows:
+            binary.extend(struct.pack('<' + 'f' * len(row), *row))
+        normalized.setdefault('bufferViews', []).append({'buffer': 0, 'byteOffset': start, 'byteLength': len(binary) - start})
+        normalized.setdefault('accessors', []).append({'bufferView': len(normalized['bufferViews']) - 1, 'componentType': 5126, 'count': len(rows), 'type': kind})
+        return len(normalized['accessors']) - 1
+
+    frames = {}
+    joint_binds = {}
+    for index, skin in enumerate(gltf.get('skins', [])):
+        if 'inverseBindMatrices' not in skin:
+            raise RuntimeError('Unverifiable GLB bind frame: explicit inverse bind matrices are required')
+        accessor = gltf['accessors'][skin['inverseBindMatrices']]
+        if accessor['componentType'] != 5126 or accessor['type'] != 'MAT4' or accessor['count'] != len(skin['joints']):
+            raise RuntimeError('Invalid GLB inverse bind matrices for protected editing')
+        frame = worlds[skin['skeleton']]
+        if not all(math.isfinite(v) for row in frame for v in row):
+            raise RuntimeError('Invalid nonfinite GLB armature transform')
+        try:
+            inverse_frame = frame.inverted()
+        except ValueError as error:
+            raise RuntimeError('Unsupported Blender bind representation: singular armature frame') from error
+        frames[index] = inverse_frame
+        matrices = []
+        for joint, values in zip(skin['joints'], access(skin['inverseBindMatrices'])):
+            name = gltf['nodes'][joint]['name']
+            if not all(math.isfinite(v) for row in worlds[joint] for v in row):
+                raise RuntimeError('Invalid nonfinite GLB joint transform: ' + name)
+            if not all(math.isfinite(v) for v in values):
+                raise RuntimeError('Invalid nonfinite GLB inverse bind matrix: ' + name)
+            inverse_bind = matrix_from_gltf(values)
+            try:
+                local_bind = inverse_frame @ inverse_bind.inverted()
+            except ValueError as error:
+                raise RuntimeError('Singular GLB inverse bind matrix: ' + name) from error
+            # Edit bones encode translation/rotation, not rest scale or shear.
+            # Reject this representation limit explicitly before Blender can
+            # discard it. Do not describe a valid affine source as broken.
+            rigid = Matrix.LocRotScale(local_bind.to_translation(), local_bind.to_quaternion(), Vector((1, 1, 1)))
+            if max(abs(x-y) for a,b in zip(local_bind, rigid) for x,y in zip(a,b)) > 0.00002:
+                raise RuntimeError('Unsupported Blender bind representation: ' + name + '; armature-local rest contains scale, shear or a nonaffine transform; exact inverse-bind retention is unavailable')
+            if joint in joint_binds and max(abs(x-y) for x,y in zip(values, joint_binds[joint])) > 0.00002:
+                raise RuntimeError('Unsupported Blender bind representation: shared joint has different inverse binds: ' + name)
+            joint_binds[joint] = values
+            matrices.append([v for row in (inverse_bind @ frame).transposed() for v in row])
+        normalized['skins'][index]['inverseBindMatrices'] = append(matrices, 'MAT4')
+
+    # Clone meshes per (mesh, skin); shared source accessors/instances must not
+    # be rewritten for another skin or an unskinned use of the same mesh.
+    meshes = {}
+    for node in normalized.get('nodes', []):
+        if 'mesh' not in node or 'skin' not in node:
+            continue
+        key = (node['mesh'], node['skin'])
+        if key not in meshes:
+            mesh = json.loads(json.dumps(gltf['meshes'][node['mesh']]))
+            inverse_frame = frames[node['skin']]
+            normal_frame = inverse_frame.to_3x3().inverted().transposed()
+            for primitive in mesh['primitives']:
+                direction_lengths = {}
+                for attrs, delta in [(primitive['attributes'], False)] + [(t, True) for t in primitive.get('targets', [])]:
+                    for field in ['POSITION', 'NORMAL', 'TANGENT']:
+                        if field not in attrs:
+                            continue
+                        rows = []
+                        for value in access(attrs[field]):
+                            if field == 'POSITION':
+                                transformed = inverse_frame.to_3x3() @ Vector(value) if delta else inverse_frame @ Vector(value)
+                            else:
+                                # Tangents are directions; normals are covectors.
+                                transform = normal_frame if field == 'NORMAL' else inverse_frame.to_3x3()
+                                transformed = transform @ Vector(value[:3])
+                                if not delta:
+                                    direction_lengths.setdefault(field, []).append(transformed.length)
+                                    transformed.normalize()
+                                elif field in direction_lengths:
+                                    # Morph deltas use the same normalization as
+                                    # their base direction, not unit length.
+                                    transformed /= direction_lengths[field][len(rows)]
+                            tail = list(value[3:])
+                            if field == 'TANGENT' and tail and inverse_frame.to_3x3().determinant() < 0:
+                                tail[0] *= -1
+                            rows.append([*transformed, *tail])
+                        attrs[field] = append(rows, 'VEC4' if field == 'TANGENT' and not delta else 'VEC3')
+                        if field == 'POSITION':
+                            # Bounds must describe the newly encoded coordinates.
+                            position = normalized['accessors'][attrs[field]]
+                            position['min'] = [min(v[i] for v in rows) for i in range(3)]
+                            position['max'] = [max(v[i] for v in rows) for i in range(3)]
+            normalized['meshes'].append(mesh)
+            meshes[key] = len(normalized['meshes']) - 1
+        node['mesh'] = meshes[key]
+    normalized['buffers'] = [{'byteLength': len(binary)}]
+    encoded = json.dumps(normalized, separators=(',', ':')).encode()
+    encoded += b' ' * (-len(encoded) % 4)
+    binary.extend(b'\0' * (-len(binary) % 4))
+    with open(destination, 'wb') as f:
+        f.write(struct.pack('<4sII', b'glTF', 2, 28 + len(encoded) + len(binary)) + struct.pack('<I4s', len(encoded), b'JSON') + encoded + struct.pack('<I4s', len(binary), b'BIN\0') + binary)
+
+
 def verify_imported_skin(file, gltf):
     # Do not trust the importer's bind-pose guess. Verify against the actual
     # encoded inverse binds and joint hierarchy before establishing a baseline.
-    worlds, _ = glb_worlds(gltf)
+    worlds, parents = glb_worlds(gltf)
     with open(file, 'rb') as f:
         content = f.read()
 
@@ -528,13 +660,18 @@ def verify_imported_skin(file, gltf):
             if name not in bones:
                 raise RuntimeError('GLB skeleton import mismatch: ' + name)
             rig, bone = bones[name]
+            parent = parents.get(joint)
+            expected_parent = gltf['nodes'][parent]['name'] if parent in skin['joints'] else None
+            if (bone.parent.name if bone.parent else None) != expected_parent:
+                raise RuntimeError('GLB joint hierarchy changed during import: ' + name)
             try:
                 bind = to_blender @ matrix_from_gltf(values).inverted()
             except ValueError as error:
                 raise RuntimeError('Singular GLB inverse bind matrix: ' + name) from error
             for label, expected, actual in [('bind/rest', bind, rig.matrix_world @ bone.bone.matrix_local), ('posed joint', to_blender @ worlds[joint], rig.matrix_world @ bone.matrix)]:
-                if max(abs(x-y) for a,b in zip(expected,actual) for x,y in zip(a,b)) > 0.00002:
-                    raise RuntimeError('Unverifiable GLB ' + label + ' after import: ' + name + '; encoded transforms cannot be retained by the supported Blender bind-frame representation')
+                error = max(abs(x-y) for a,b in zip(expected,actual) for x,y in zip(a,b))
+                if error > 0.00002:
+                    raise RuntimeError('Unverifiable GLB ' + label + ' after import: ' + name + '; armature-frame reconstruction has matrix error ' + format(error, '.8g') + ' (limit 0.00002); unsupported Blender importer representation of these source transforms')
     for node in gltf.get('nodes', []):
         if 'mesh' not in node or 'skin' not in node:
             continue
@@ -551,9 +688,13 @@ def verify_imported_skin(file, gltf):
             positions = access(attrs['POSITION'])
             joint_indices = access(attrs['JOINTS_0'])
             weights = access(attrs['WEIGHTS_0'])
+            if len(positions) != len(joint_indices) or len(positions) != len(weights):
+                raise RuntimeError('Invalid GLB skin attribute counts: ' + node['name'])
             morphs = [access(target['POSITION']) if 'POSITION' in target else None for target in primitive.get('targets', [])]
             corners = []
             for vertex_index, (position, indices, influences) in enumerate(zip(positions, joint_indices, weights)):
+                if any(not math.isfinite(w) or w < 0 or w > 1 for w in influences) or abs(sum(influences) - 1) > 0.00002 or any(i < 0 or i >= len(joints) for i in indices):
+                    raise RuntimeError('Invalid GLB skin weights or joint indices: ' + node['name'])
                 bind = nums(to_blender @ Vector(position))
                 bind_positions.add(json.dumps(bind))
                 morphed = Vector(position)
@@ -587,7 +728,7 @@ def import_glb(file, gltf):
     explicit_skeletons(gltf)
     with tempfile.TemporaryDirectory(prefix='gen3d-skin-import-') as directory:
         normalized = os.path.join(directory, 'import.glb')
-        write_glb_json(file, normalized, gltf)
+        skin_import_copy(file, normalized, gltf)
         bpy.ops.import_scene.gltf(filepath=normalized, disable_bone_shape=True, bone_heuristic='BLENDER', guess_original_bind_pose=True)
     verify_imported_skin(file, gltf)
 
@@ -694,6 +835,7 @@ def prepare(source, directory, scope):
         raise RuntimeError('Unsupported protected base GLB roundtrip: ' + str(error)) from error
     report['kind'] = 'base-glb-roundtrip'
     report['poseStrategy'] = 'static-joints-and-inverse-binds-v1'
+    report['bindImportStrategy'] = 'armature-frame-skin-coordinates-v1'
     write(validation, report)
     bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
 
@@ -717,6 +859,7 @@ def validate(baseline_file, scope, blend, glb, report_file):
     report['roundtrip'] = export_report
     report['kind'] = 'edited-scene-and-glb-preservation'
     report['poseStrategy'] = 'static-joints-and-inverse-binds-v1'
+    report['bindImportStrategy'] = 'armature-frame-skin-coordinates-v1'
     write(report_file, report)
     bpy.ops.wm.open_mainfile(filepath=blend, use_scripts=False)
     return report
