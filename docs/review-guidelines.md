@@ -24,6 +24,20 @@ Verify that:
 
 Application checks are `npm test` and `npm run check`; live integration validation additionally requires authenticated Codex and a running Blender bridge. Review evidence of real generation separately from synthetic workflow fixtures, following [local setup](local-setup.md) and [recorded validation](validation.md). For documentation changes, check Markdown and template syntax, local links and anchors, and whitespace. Do not demand invented build commands, new dependencies, an application scaffold, or CI solely to validate documentation. Do not claim an unperformed check passed.
 
+## Check the Rendered UI/UX
+
+For UI/UX changes, apply the canonical [UI/UX guidelines](ui-ux-guidelines.md). Evaluate the rendered user path, not just source markup. Walk the affected primary flow in a browser when available and cite relevant screenshots or interaction evidence, including narrow layouts and Light/Dark themes. If rendered evidence is unavailable, state the limitation; do not claim visual or interaction checks passed from markup alone.
+
+- Can users find the input/source, primary action, progress and results through layout and previews, without a prose tutorial? Does grouping and scale establish a clear hierarchy across affected views?
+- For each element, should it be **visible, removed, contextual or advanced**? Are everyday inputs such as Project name and relevant Four-view check controls reachable directly, without unjustified disclosures or editor navigation?
+- Which secondary labels, paragraphs, headings or status captions repeat what the controls/layout already communicate? Should they be deleted rather than collapsed?
+- Can users complete the affected choose/import → purpose → describe → run → inspect → refine → export path without redundant clicks, navigation, select/save steps or repeated approvals? Are genuine consent and configured review gates preserved?
+- Do action labels express user intent, such as Use as reference or Edit this model, instead of permission jargon or workflow internals?
+- Are consent, destructive-action, cost, error and unsupported-preservation messages available where needed? Do authorization boundaries, protected-feature checks and safety stops still hold?
+- Do keyboard operation, visible focus, accessible names and assistive-technology semantics work? Are statuses readable without relying only on color, with no responsive or theme regressions? Use interaction/accessibility evidence as well as screenshots.
+
+Request specific corrections grounded in the affected path and evidence. Do not prescribe blanket hiding or duplicate the canonical principles as a separate rule set.
+
 ## Check Pre-Merge Acceptance and Post-Merge Verification
 
 Follow the [development flow](development-flow.md#1-start-with-an-issue). Require mandatory pre-merge criteria to be achievable and verifiable before merge and verify their evidence. Default to checks an AI agent can execute. Require human-only work only when necessary for the actual Issue, with its reason and expected result stated. Optional additional validation is not a mandatory acceptance condition.
