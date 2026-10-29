@@ -18,6 +18,10 @@ For example, when merge triggers deployment, validate the changed code/configura
 
 Implement the Issue and propose the change through a Pull Request associated with it. Avoid speculative abstractions, unrelated refactoring, and frameworks not needed to satisfy the Issue.
 
+For UI/UX changes, consult the canonical [UI/UX guidelines](ui-ux-guidelines.md) before implementation. Use them to choose the information hierarchy, control visibility, labels and interaction steps. When those choices are material, briefly explain in the Issue or PR why they fit the principles, including whether elements should be visible, removed, contextual or advanced. Fit this rationale into the existing Issue/PR template sections.
+
+Validate the rendered primary user path using the [UI/UX review check](review-guidelines.md#check-the-rendered-uiux), with screenshots or browser evidence when available; report unavailable evidence and its limits. Simplifying interactions must preserve required human authorization, configured review gates, safety stops and accessibility.
+
 Validation must fit the changed files and available tooling. Application checks are `npm test` and `npm run check`. For Codex/Blender integration changes, run relevant live checks when those prerequisites are available and record actual results; synthetic test artifacts do not demonstrate real generation. See [local setup](local-setup.md) and [recorded validation](validation.md). Do not invent build commands or add dependencies or CI merely to document a process. For documentation changes, inspect Markdown and template syntax, resolve local links and anchors, and check whitespace with `git diff --check` (stage new files first and use `git diff --cached --check`).
 
 Use the PR template to explain:

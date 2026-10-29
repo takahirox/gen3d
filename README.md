@@ -76,6 +76,8 @@ Files and Blender run locally. Codex inference runs online through your authenti
 
 ## Development
 
+UI work follows the [UI/UX guidelines](docs/ui-ux-guidelines.md).
+
 ```sh
 npm test
 npm run check
