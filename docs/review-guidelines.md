@@ -24,6 +24,8 @@ Verify that:
 
 Application checks are `npm test` and `npm run check`; live integration validation additionally requires authenticated Codex and a running Blender bridge. Review evidence of real generation separately from synthetic workflow fixtures, following [local setup](local-setup.md) and [recorded validation](validation.md). For documentation changes, check Markdown and template syntax, local links and anchors, and whitespace. Do not demand invented build commands, new dependencies, an application scaffold, or CI solely to validate documentation. Do not claim an unperformed check passed.
 
+Apply the canonical [test and CI performance principles](development-flow.md#test-and-ci-performance-principles): does this change provide sufficient confidence with the lightest appropriate validation, without redundant execution? For new or expanded checks, identify the additional defect covered, overlap with existing coverage, and added execution and maintenance cost.
+
 ## Check the Rendered UI/UX
 
 For UI/UX changes, apply the canonical [UI/UX guidelines](ui-ux-guidelines.md). Evaluate the rendered user path, not just source markup. Walk the affected primary flow in a browser when available and cite relevant screenshots or interaction evidence, including narrow layouts and Light/Dark themes. If rendered evidence is unavailable, state the limitation; do not claim visual or interaction checks passed from markup alone.
