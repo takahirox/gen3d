@@ -22,7 +22,7 @@ For UI/UX changes, consult the canonical [UI/UX guidelines](ui-ux-guidelines.md)
 
 Validate the rendered primary user path using the [UI/UX review check](review-guidelines.md#check-the-rendered-uiux), with screenshots or browser evidence when available; report unavailable evidence and its limits. Simplifying interactions must preserve required human authorization, configured review gates, safety stops and accessibility.
 
-Validation must fit the changed files and available tooling. Application checks are `npm test` and `npm run check`. For Codex/Blender integration changes, run relevant live checks when those prerequisites are available and record actual results; synthetic test artifacts do not demonstrate real generation. See [local setup](local-setup.md) and [recorded validation](validation.md). Do not invent build commands or add dependencies or CI merely to document a process. For documentation changes, inspect Markdown and template syntax, resolve local links and anchors, and check whitespace with `git diff --check` (stage new files first and use `git diff --cached --check`).
+Validation must fit the changed files and available tooling. Apply the [test and CI performance principles](#test-and-ci-performance-principles) when choosing checks. Application checks are `npm test` and `npm run check`. For Codex/Blender integration changes, run relevant live checks when those prerequisites are available and record actual results; synthetic test artifacts do not demonstrate real generation. See [local setup](local-setup.md) and [recorded validation](validation.md). Do not invent build commands or add dependencies or CI merely to document a process. For documentation changes, inspect Markdown and template syntax, resolve local links and anchors, and check whitespace with `git diff --check` (stage new files first and use `git diff --cached --check`).
 
 Use the PR template to explain:
 
@@ -58,3 +58,32 @@ Issue → Implementation → PR → Review → Revision as needed → Merge
                                                           ↓
                                      Post-merge verification (if required)
 ```
+
+## Test and CI performance principles
+
+**Detect the required failures at the lightest appropriate layer, without redundant execution.** Preserve required behavior, regression confidence and meaningful integration coverage when moving or consolidating checks.
+
+gen3d has local checks in [package.json](../package.json), but no checked-in CI workflows or build/deployment commands. These principles apply to current validation and future CI additions; they do not introduce CI or a new merge gate.
+
+1. **Prefer the lightest meaningful layer.** Use Node unit/component tests for calculations, branches, graph/state rules and broad data combinations. Reserve real Chrome, Blender rendering/import/export and live Codex checks for boundaries that need them. Injected scheduler/browser fixtures exercise behavior but do not prove real generation. Add assertions that catch a concrete defect, rather than mirror implementation details.
+
+2. **Choose combinations deliberately.** Select representative text/image inputs, GLB/Blender bases, rigs, materials, review/consistency states and UI themes/layouts that exercise distinct paths. Expand combinations exhaustively where interactions require it, rather than multiplying every dimension automatically. Retain required regressions and integration assertions when redistributing coverage.
+
+3. **Match validation to the change.** Use focused checks for fast feedback and the applicable full regression checks before merge. Choose checks as follows, following [local setup](local-setup.md#failures-and-checks) for prerequisites and evidence limits:
+
+   | Change | Applicable validation |
+   | --- | --- |
+   | Documentation only | Markdown/template structure, local links/anchors and whitespace checks described above. |
+   | UI | `npm test`, `npm run check`, and the affected rendered user path, including `npm run test:browser` where applicable; follow the [UI/UX review check](review-guidelines.md#check-the-rendered-uiux). |
+   | Core/runtime or integration | `npm test` and `npm run check`; relevant Blender checks such as `npm run test:workflow-blender` for preservation/import/export, and live checks for changed Codex/Blender integration when prerequisites are available. |
+   | Future CI/build configuration | Validate changed configuration and affected commands before merge; keep feedback, full regression and publication responsibilities/triggers explicit. No build command exists today. |
+
+   Live `npm run validate:workflow-live` is opt-in and consumes subscription allowance. Report unavailable prerequisites and unperformed checks; mandatory pre-merge criteria still need evidence. Keep optional validation separate. Only genuinely post-merge-only publication/deployed-site checks belong after merge, recorded separately as pending when required.
+
+4. **Reuse work and avoid duplicate execution.** Reuse valid fixtures, conversions, downloads and any future builds with keys covering inputs, tooling and versions, while isolating mutable state. `npm run test:workflow-artifacts` can revalidate saved scene/GLB evidence without new Codex generation; it does not validate changed generation behavior. For future CI, avoid equivalent push/PR runs for the same revision and cancel superseded runs when safe, preserving necessary deployment ordering. Measure resource use before adding parallel workers; Blender has one current scene and modeling is serialized.
+
+5. **Review additional confidence and cost together.** Identify the additional defect each new/expanded check detects, whether existing coverage already detects it, and its execution/maintenance cost. Watch repeated Chrome/Blender startup and rendering, large model fixtures, live generation allowance and Cartesian-product growth. Consolidate redundant work while retaining meaningful assertions and required coverage.
+
+6. **Maintain an execution-time budget.** A normal-CI baseline/target is not yet established. Historical generation timings in validation reports are not a CI baseline. During actual test/CI performance work, measure representative checks, establish an appropriate baseline/target, monitor growth and investigate overruns. Track elapsed feedback time, total runner/computation time and queue time separately. Revisit structure and duplication as cost grows while retaining required confidence; this documentation adds no benchmark, hardware purchase or approval requirement.
+
+Review question: **Does this change provide sufficient confidence with the lightest appropriate validation, without redundant execution?**
