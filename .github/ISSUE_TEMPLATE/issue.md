@@ -23,7 +23,7 @@ List concrete mandatory criteria that can be achieved and verified before merge,
 
 ## Post-merge verification
 
-Record genuinely required checks possible only after merge separately, or state "None." Do not add checks routinely. Report required checks as pending until performed; pre-merge validation does not prove they passed.
+Record genuinely required checks possible only after merge separately, or state "None." Do not add checks routinely. Follow the [post-merge lifecycle](https://github.com/takahirox/gen3d/blob/main/docs/development-flow.md#6-perform-required-post-merge-verification): merge and close the fully implemented Issue once mandatory pre-merge acceptance is satisfied, then record actual verification evidence. Keep unperformed or environment-blocked checks explicit; closure does not claim they passed. Track discovered defects in new linked Issues after checking for duplicates, rather than reopening the original Issue solely for follow-up.
 
 ## Optional validation
 
@@ -31,4 +31,4 @@ List useful additional checks that are not mandatory, or state "None."
 
 ## Context
 
-Add relevant context, examples, logs, or related Issues. Include reproduction steps and actual versus expected behavior where applicable.
+Add relevant context, examples, logs, or related Issues. Include reproduction steps, the affected revision and actual versus expected behavior where applicable. For a post-merge defect, link the original Issue and PR.

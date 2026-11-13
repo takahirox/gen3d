@@ -33,7 +33,7 @@ Use the PR template to explain:
 - genuinely required post-merge verification still pending, separately from completed validation
 - the source Issue and any related Issues
 
-Do not claim success without evidence. Only claim to close an Issue when the implementation fully addresses it. An intentionally partial PR must state its remaining scope and leave the Issue open. Pending post-merge checks do not make an otherwise complete implementation partial, but verification is not complete until those checks are performed.
+Do not claim success without evidence. Use the normal `Closes #N` reference when the implementation fully addresses the Issue and applicable mandatory pre-merge acceptance is satisfied. An intentionally partial PR must state its remaining scope and leave the parent Issue open without an automatic closing reference. Pending post-merge-only checks do not make an otherwise complete implementation partial, but verification is not complete until those checks are performed.
 
 ## 3. Review Before Merge
 
@@ -47,16 +47,26 @@ Fix agent-fixable findings, update the PR and validation results, and review the
 
 Approve and merge when the implementation is a complete, appropriately scoped response to the Issue and mandatory pre-merge checks are sufficient and pass. Optional validation and pending post-merge-only checks are not pre-merge blockers.
 
+Close the original Issue after successful merge, normally through `Closes #N`. Preserve that reference: review must not request its removal, require keeping the Issue open, or withhold approval solely because a post-merge-only check is pending. ProjectWeave publication adds the closing reference; having review remove it would create a repeating Review → Fix → Publish → Review loop. Missing implementation, mandatory pre-merge tests, required protections/reviews and genuinely necessary pre-merge human acceptance remain blockers; this lifecycle does not bypass them.
+
 ## 6. Perform Required Post-Merge Verification
 
-If the Issue requires post-merge verification, perform the recorded checks after merge. Keep them pending until performed, then record actual results, including failures and required follow-up. Do not claim they passed based on pre-merge evidence. If none are required, no post-merge verification step is needed.
+After merge and closure of the original Issue, perform any genuinely required post-merge checks. Record actual results and evidence in the merged PR, closed Issue, or a linked validation report. Keep unperformed, pending or environment-blocked checks explicit, with reasons; Issue closure does not claim they passed, and pre-merge evidence does not prove they passed. An unavailable test environment alone is not evidence of a product defect.
+
+If verification finds an actual defect, check for an existing equivalent Issue first. Link an equivalent Issue or create a new Issue with reproduction steps, the affected revision, expected and actual behavior, and links to the original Issue and PR. Do not keep or reopen the original Issue solely for post-merge follow-up.
+
+Require post-merge verification only when the actual change needs it. If none is required, state "None"; documentation/template edits alone need no application test suite, routine manual approval, physical-device test, heavyweight model download or deployment gate. Existing verification requirements remain in force for changes to which they apply.
+
+This lifecycle supersedes older instructions to keep an implemented Issue open solely until post-merge verification finishes. Preserve historical test outcomes and evidence, including unperformed checks; do not rewrite historical results to fit the current lifecycle.
 
 The normal flow is:
 
 ```text
-Issue → Implementation → PR → Review → Revision as needed → Merge
-                                                          ↓
-                                     Post-merge verification (if required)
+Issue → Implementation → PR → Review → Revision as needed → Merge + close Issue
+                                                                    ↓
+                                               Post-merge verification (if required)
+                                                                    ↓
+                                               Defect → linked Issue (check duplicates)
 ```
 
 ## Test and CI performance principles

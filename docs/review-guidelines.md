@@ -6,7 +6,7 @@ These guidelines adapt the [GitWeave review guidelines](https://github.com/takah
 
 Read the source Issue, PR description, full diff, and reported validation. Treat the Issue's problem, expected outcome, and acceptance criteria as the reference for scope. Clarify unclear requirements instead of adding assumptions.
 
-Verify that every requirement the PR claims to resolve is implemented. An intentionally partial PR must say so and leave the Issue open; do not approve it as closing the Issue.
+Verify that every requirement the PR claims to resolve is implemented. An intentionally partial PR must state its remaining scope and leave the parent Issue open without an automatic closing reference; do not approve it as closing the Issue. Pending post-merge-only verification does not make a complete implementation partial.
 
 ## Check for Unnecessary Work
 
@@ -46,7 +46,7 @@ Follow the [development flow](development-flow.md#1-start-with-an-issue). Requir
 
 Checks possible only after merge must not be prerequisites for pre-merge approval. For example, when merge triggers deployment, applicable code/configuration checks, builds, and tests belong before merge; required publication and published-site checks belong after merge.
 
-Ensure genuinely required post-merge checks are recorded separately and remain pending until performed. Do not add them routinely when unnecessary. Pre-merge evidence does not establish that post-merge checks passed. This distinction preserves implementation requirements and applicable pre-merge tests.
+Ensure genuinely required post-merge checks are recorded separately and remain pending until performed. Do not add them routinely when unnecessary, including manual approval, physical-device tests, heavyweight model downloads or deployment gates for documentation/template edits alone. Pre-merge evidence does not establish that post-merge checks passed. Missing implementation, mandatory pre-merge tests, required protections/reviews and genuinely necessary pre-merge human acceptance remain blockers.
 
 ## Review, Revision, and Merge
 
@@ -61,4 +61,6 @@ For agent-fixable findings, request specific fixes with the affected file, the p
 
 When necessary human input is missing, record the question, why it is necessary, and the expected result, and wait for that input. Do not repeatedly request code fixes for a question that needs human input.
 
-Approve and merge once the readiness conditions are met. Pending post-merge-only checks and optional validation do not prevent approval. After merge, perform any required post-merge verification and record actual results, failures, and follow-up; keep unperformed checks pending.
+Approve and merge once the readiness conditions are met, preserving the normal `Closes #N` reference. Do not request removing it, keeping the source Issue open, or withholding approval solely for pending post-merge-only checks; this prevents the Review → Fix → Publish → Review loop described in the [merge guidance](development-flow.md#5-merge). Optional validation also does not prevent approval.
+
+Follow the [post-merge lifecycle](development-flow.md#6-perform-required-post-merge-verification): close the original Issue after successful merge, record accurate verification evidence in the merged PR, closed Issue or linked report, and track actual defects in a new linked Issue after checking for an equivalent Issue. Do not reopen the original solely for follow-up. Unperformed or environment-blocked checks remain explicit; closure does not claim they passed, and an unavailable environment alone does not establish a defect. Preserve historical evidence; the current lifecycle supersedes older instructions to keep an implemented Issue open solely for post-merge verification.
