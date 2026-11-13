@@ -1,8 +1,0 @@
-{
-  "realBlender": true,
-  "blender": "5.1.2",
-  "diagnostic": "Protected GLB export requires a rest pose: mixamorig:Spine",
-  "fixture": "scripts/posed-rig-check.py",
-  "baselineCommit": "2d67b35fad2cbbcc02c641cf142f971a9a7527e3",
-  "command": "blender --background --factory-startup --disable-autoexec --python-exit-code 1 --python scripts/posed-rig-check.py -- --baseline .gen3d/pose-investigation/baseline-preservation.py"
-}

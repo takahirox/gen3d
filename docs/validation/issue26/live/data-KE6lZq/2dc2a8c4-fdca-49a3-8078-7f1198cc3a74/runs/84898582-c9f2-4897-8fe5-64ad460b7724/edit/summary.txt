@@ -1,1 +1,0 @@
-Widened Hair mesh local X coordinates by 25% from the unchanged base. Verified other mesh data, UVs, materials, weights, expressions, transforms, and hierarchy remain unchanged. Set the reference camera direction without altering the pose.
